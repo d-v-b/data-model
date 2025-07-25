@@ -120,27 +120,7 @@ def info_command(args: argparse.Namespace) -> None:
         print(f"Total groups: {len(dt.children)}")
 
         print("\nGroup structure:")
-        for group_name, group in dt.groups.items():
-            print(f"  {group_name}:")
-            if hasattr(group, "data_vars") and group.data_vars:
-                print(f"    Variables: {list(group.data_vars.keys())}")
-                # Get dimensions from first variable
-                first_var = list(group.data_vars.keys())[0]
-                if hasattr(group[first_var], "shape"):
-                    print(f"    Shape: {group[first_var].shape}")
-                if hasattr(group[first_var], "dims"):
-                    print(f"    Dimensions: {group[first_var].dims}")
-
-            if hasattr(group, "coords") and group.coords:
-                print(f"    Coordinates: {list(group.coords.keys())}")
-
-            # Check for CRS information
-            if hasattr(group, "data_vars"):
-                for var_name, var in group.data_vars.items():
-                    if hasattr(var, "attrs") and "proj:epsg" in var.attrs:
-                        print(f"    CRS (EPSG): {var.attrs['proj:epsg']}")
-                        break
-            print()
+        print(dt)
 
     except Exception as e:
         print(f"❌ Error reading dataset: {e}")
