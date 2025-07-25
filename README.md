@@ -13,6 +13,7 @@ This library provides tools to convert EOPF datasets to GeoZarr-spec 0.4 complia
 - **Multiscale Support**: COG-style /2 downsampling with overview levels as children groups
 - **CF Conventions**: Proper CF standard names and grid_mapping attributes
 - **Robust Processing**: Band-by-band writing with validation and retry logic
+- **S3 Support**: Direct output to Amazon S3 buckets with automatic credential validation
 
 ## GeoZarr Compliance Features
 
@@ -44,8 +45,11 @@ pip install -e ".[dev]"
 After installation, you can use the `eopf-geozarr` command:
 
 ```bash
-# Convert EOPF dataset to GeoZarr format
+# Convert EOPF dataset to GeoZarr format (local output)
 eopf-geozarr convert input.zarr output.zarr
+
+# Convert EOPF dataset to GeoZarr format (S3 output)
+eopf-geozarr convert input.zarr s3://my-bucket/path/to/output.zarr
 
 # Get information about a dataset
 eopf-geozarr info input.zarr
@@ -55,6 +59,84 @@ eopf-geozarr validate output.zarr
 
 # Get help
 eopf-geozarr --help
+```
+
+### S3 Support
+
+The library supports direct output to S3-compatible storage, including custom providers like OVH Cloud. Simply provide an S3 URL as the output path:
+
+```bash
+# Convert to S3
+eopf-geozarr convert local_input.zarr s3://my-bucket/geozarr-data/output.zarr --verbose
+```
+
+#### S3 Configuration
+
+Before using S3 output, ensure your S3 credentials are configured:
+
+**For AWS S3:**
+```bash
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export AWS_DEFAULT_REGION=us-east-1
+```
+
+**For OVH Cloud Object Storage:**
+```bash
+export AWS_ACCESS_KEY_ID=your_ovh_access_key
+export AWS_SECRET_ACCESS_KEY=your_ovh_secret_key
+export AWS_DEFAULT_REGION=gra  # or other OVH region
+export AWS_S3_ENDPOINT=https://s3.gra.cloud.ovh.net  # OVH endpoint
+```
+
+**For other S3-compatible providers:**
+```bash
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export AWS_DEFAULT_REGION=your_region
+export AWS_S3_ENDPOINT=https://your-s3-endpoint.com
+```
+
+**Alternative: AWS CLI Configuration**
+```bash
+aws configure
+# Note: For custom endpoints, you'll still need to set AWS_S3_ENDPOINT
+```
+
+#### S3 Features
+
+- **Custom Endpoints**: Support for any S3-compatible storage (AWS, OVH Cloud, MinIO, etc.)
+- **Automatic Validation**: The tool validates S3 access before starting conversion
+- **Credential Detection**: Automatically detects and validates S3 credentials
+- **Error Handling**: Provides helpful error messages for S3 configuration issues
+- **Performance**: Optimized for S3 with proper chunking and retry logic
+
+#### S3 Python API
+
+```python
+import os
+import xarray as xr
+from eopf_geozarr import create_geozarr_dataset
+
+# Configure for OVH Cloud (example)
+os.environ['AWS_ACCESS_KEY_ID'] = 'your_ovh_access_key'
+os.environ['AWS_SECRET_ACCESS_KEY'] = 'your_ovh_secret_key'
+os.environ['AWS_DEFAULT_REGION'] = 'gra'
+os.environ['AWS_S3_ENDPOINT'] = 'https://s3.gra.cloud.ovh.net'
+
+# Load your EOPF DataTree
+dt = xr.open_datatree("path/to/eopf/dataset.zarr", engine="zarr")
+
+# Convert directly to S3
+dt_geozarr = create_geozarr_dataset(
+    dt_input=dt,
+    groups=["/measurements/r10m", "/measurements/r20m", "/measurements/r60m"],
+    output_path="s3://my-bucket/geozarr-data/output.zarr",
+    spatial_chunk=4096,
+    min_dimension=256,
+    tile_width=256,
+    max_retries=3
+)
 ```
 
 ### Python API

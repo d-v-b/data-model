@@ -12,6 +12,7 @@ from pathlib import Path
 import xarray as xr
 
 from . import create_geozarr_dataset
+from .conversion import is_s3_path, validate_s3_access, get_s3_credentials_info
 
 
 def convert_command(args: argparse.Namespace) -> None:
@@ -36,9 +37,38 @@ def convert_command(args: argparse.Namespace) -> None:
             sys.exit(1)
         input_path = str(input_path)
 
-    # Create output directory if it doesn't exist
-    output_path = Path(args.output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Handle output path validation
+    output_path_str = args.output_path
+    if is_s3_path(output_path_str):
+        # S3 path - validate S3 access
+        print("🔍 Validating S3 access...")
+        success, error_msg = validate_s3_access(output_path_str)
+        if not success:
+            print(f"❌ Error: Cannot access S3 path {output_path_str}")
+            print(f"   Reason: {error_msg}")
+            print("\n💡 S3 Configuration Help:")
+            print("   Make sure you have S3 credentials configured:")
+            print("   - Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables")
+            print("   - Set AWS_DEFAULT_REGION (default: us-east-1)")
+            print("   - For custom S3 providers (e.g., OVH Cloud), set AWS_S3_ENDPOINT")
+            print("   - Or configure AWS CLI with 'aws configure'")
+            print("   - Or use IAM roles if running on EC2")
+            
+            if args.verbose:
+                creds_info = get_s3_credentials_info()
+                print(f"\n🔧 Current AWS configuration:")
+                for key, value in creds_info.items():
+                    print(f"   {key}: {value or 'Not set'}")
+            
+            sys.exit(1)
+        
+        print("✅ S3 access validated successfully")
+        output_path = output_path_str
+    else:
+        # Local path - create directory if it doesn't exist
+        output_path = Path(output_path_str)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path = str(output_path)
 
     if args.verbose:
         print(f"Loading EOPF dataset from: {input_path}")
@@ -64,7 +94,7 @@ def convert_command(args: argparse.Namespace) -> None:
         dt_geozarr = create_geozarr_dataset(
             dt_input=dt,
             groups=args.groups,
-            output_path=str(output_path),
+            output_path=output_path,
             spatial_chunk=args.spatial_chunk,
             min_dimension=args.min_dimension,
             tile_width=args.tile_width,
@@ -243,7 +273,7 @@ def create_parser() -> argparse.ArgumentParser:
     convert_parser.add_argument(
         "input_path", type=str, help="Path to input EOPF dataset (Zarr format)"
     )
-    convert_parser.add_argument("output_path", type=str, help="Path for output GeoZarr dataset")
+    convert_parser.add_argument("output_path", type=str, help="Path for output GeoZarr dataset (local path or S3 URL like s3://bucket/path)")
     convert_parser.add_argument(
         "--groups",
         type=str,

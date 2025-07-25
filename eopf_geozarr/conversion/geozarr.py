@@ -32,7 +32,7 @@ from zarr.core.sync import sync
 from zarr.storage import StoreLike
 from zarr.storage._common import make_store_path
 
-from . import utils
+from . import s3_utils, utils
 
 
 def create_geozarr_dataset(
@@ -408,7 +408,7 @@ def write_geozarr_group(
     ds : xarray.Dataset
         Dataset to write
     output_path : str
-        Output path for the GeoZarr dataset
+        Output path for the GeoZarr dataset (local path or S3 URL)
     spatial_chunk : int, default 4096
         Spatial chunk size
     compressor : Any, optional
@@ -434,12 +434,24 @@ def write_geozarr_group(
 
     # Copy the attributes from the original dataset to the DataTree
     dt.attrs = ds.attrs.copy()
-    dt.to_zarr(
-        group_path,
-        mode="a",  # Append mode to add to the group
-        consolidated=False,  # No consolidate metadata
-        zarr_format=3,  # Use Zarr format 3
-    )
+    
+    # Handle S3 vs local paths for zarr operations
+    if s3_utils.is_s3_path(output_path):
+        # For S3, use the S3 store
+        store = s3_utils.create_s3_store(group_path)
+        dt.to_zarr(
+            store,
+            mode="a",  # Append mode to add to the group
+            consolidated=False,  # No consolidate metadata
+            zarr_format=3,  # Use Zarr format 3
+        )
+    else:
+        dt.to_zarr(
+            group_path,
+            mode="a",  # Append mode to add to the group
+            consolidated=False,  # No consolidate metadata
+            zarr_format=3,  # Use Zarr format 3
+        )
 
     # Create encoding for all variables in this group
     encoding = {}
@@ -474,13 +486,19 @@ def write_geozarr_group(
 
     # Try to open the existing group path
     existing_native_dataset = None
-    if os.path.exists(native_dataset_path):
-        try:
-            existing_native_dataset = xr.open_zarr(native_dataset_path, zarr_format=3)
-            print(f"Found existing native dataset at {native_dataset_path}")
-        except Exception as e:
-            print(f"Warning: Could not open existing native dataset at {native_dataset_path}: {e}")
-            existing_native_dataset = None
+    try:
+        if s3_utils.is_s3_path(output_path):
+            if s3_utils.s3_path_exists(native_dataset_path):
+                store = s3_utils.create_s3_store(native_dataset_path)
+                existing_native_dataset = xr.open_zarr(store, zarr_format=3)
+                print(f"Found existing native dataset at {native_dataset_path}")
+        else:
+            if os.path.exists(native_dataset_path):
+                existing_native_dataset = xr.open_zarr(native_dataset_path, zarr_format=3)
+                print(f"Found existing native dataset at {native_dataset_path}")
+    except Exception as e:
+        print(f"Warning: Could not open existing native dataset at {native_dataset_path}: {e}")
+        existing_native_dataset = None
 
     # Write native data band by band to avoid losing all work if one band fails
     success, ds = write_dataset_band_by_band_with_validation(
@@ -515,14 +533,23 @@ def write_geozarr_group(
     ds.close()  # Close the original dataset to release resources
 
     # Open the zarr group and consolidate
-    zarr_group = zarr.open_group(group_path, mode="r+", zarr_format=3)
+    if s3_utils.is_s3_path(output_path):
+        zarr_group = s3_utils.open_s3_zarr_group(group_path, mode="r+")
+    else:
+        zarr_group = zarr.open_group(group_path, mode="r+", zarr_format=3)
+    
     consolidate_metadata(zarr_group.store)
 
     print("  ✅ Metadata consolidated")
 
-    ds = xr.open_dataset(
-        group_path, engine="zarr", zarr_format=3, decode_coords="all"
-    ).compute()  # Reopen to ensure we have the latest state
+    # Reopen to ensure we have the latest state
+    if s3_utils.is_s3_path(output_path):
+        store = s3_utils.create_s3_store(group_path)
+        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all").compute()
+    else:
+        ds = xr.open_dataset(
+            group_path, engine="zarr", zarr_format=3, decode_coords="all"
+        ).compute()
 
     return ds
 
@@ -615,17 +642,37 @@ def create_geozarr_compliant_multiscales(
 
     # Add multiscales metadata to the group
     zarr_json_path = f"{output_path}/{group_name}/zarr.json"
-    with open(zarr_json_path, "r") as f:
-        zarr_json = json.load(f)
+    
+    # Handle S3 vs local paths for JSON metadata
+    if s3_utils.is_s3_path(output_path):
+        # For S3, use s3fs to read/write JSON
+        import s3fs
+        fs = s3fs.S3FileSystem(anon=False)
+        
+        with fs.open(zarr_json_path, "r") as f:
+            zarr_json = json.load(f)
 
-    zarr_json["attributes"]["multiscales"] = {
-        "tile_matrix_set": tile_matrix_set,
-        "resampling_method": "average",
-        "tile_matrix_limits": tile_matrix_limits,
-    }
+        zarr_json["attributes"]["multiscales"] = {
+            "tile_matrix_set": tile_matrix_set,
+            "resampling_method": "average",
+            "tile_matrix_limits": tile_matrix_limits,
+        }
 
-    with open(zarr_json_path, "w") as f:
-        json.dump(zarr_json, f, indent=2)
+        with fs.open(zarr_json_path, "w") as f:
+            json.dump(zarr_json, f, indent=2)
+    else:
+        # Local file operations
+        with open(zarr_json_path, "r") as f:
+            zarr_json = json.load(f)
+
+        zarr_json["attributes"]["multiscales"] = {
+            "tile_matrix_set": tile_matrix_set,
+            "resampling_method": "average",
+            "tile_matrix_limits": tile_matrix_limits,
+        }
+
+        with open(zarr_json_path, "w") as f:
+            json.dump(zarr_json, f, indent=2)
 
     print(f"Added multiscales metadata to {group_name}")
 

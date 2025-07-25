@@ -7,7 +7,7 @@
 
         {
             // eopf_geozarr convert https://objectstore.eodc.eu:2222/e05ab01a9d56408d82ac32d69a5aae2a:sample-data/tutorial_data/cpm_v253/S2B_MSIL1C_20250113T103309_N0511_R108_T32TLQ_20250113T122458.zarr /tmp/tmp7mmjkjk3/s2b_subset_test.zarr --groups /measurements/reflectance/r10m --spatial-chunk 512 --min-dimension 128 --tile-width 256 --max-retries 2 --verbose
-            "name": "Python Debugger: Module",
+            "name": "Convert to GeoZarr locally",
             "type": "debugpy",
             "request": "launch",
             "module": "eopf_geozarr",
@@ -28,6 +28,35 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/eopf_geozarr/.venv/bin"
             },
+        },
+        {
+            // eopf_geozarr convert https://objectstore.eodc.eu:2222/e05ab01a9d56408d82ac32d69a5aae2a:sample-data/tutorial_data/cpm_v253/S2B_MSIL1C_20250113T103309_N0511_R108_T32TLQ_20250113T122458.zarr /tmp/tmp7mmjkjk3/s2b_subset_test.zarr --groups /measurements/reflectance/r10m --spatial-chunk 512 --min-dimension 128 --tile-width 256 --max-retries 2 --verbose
+            "name": "Convert to GeoZarr (S3)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "eopf_geozarr",
+            "args": [
+                "convert",
+                "https://objectstore.eodc.eu:2222/e05ab01a9d56408d82ac32d69a5aae2a:sample-data/tutorial_data/cpm_v253/S2B_MSIL1C_20250113T103309_N0511_R108_T32TLQ_20250113T122458.zarr",
+                "s3://esa-zarr-sentinel-explorer/tests-output/eopf_geozarr/s2b_test.zarr",
+                "--groups", "/measurements/reflectance/r10m", "/measurements/reflectance/r20m", "/measurements/reflectance/r60m", "/quality/l1c_quicklook/r10m",
+                "--spatial-chunk", "512",
+                "--min-dimension", "128",
+                "--tile-width", "256",
+                "--max-retries", "2",
+                "--verbose"
+            ],
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/eopf_geozarr/.venv/bin",
+                "AWS_ACCESS_KEY_ID": "user-Nbs5Rmd2KgmQ",
+                "AWS_SECRET_ACCESS_KEY": "eb1b07f69b1d494abb947aa0bba8587e",
+                "AWS_DEFAULT_REGION": "gra",
+                "AWS_S3_ENDPOINT": "https://s3.gra.io.cloud.ovh.net/" 
+            },
+            
         }
     ]
 }

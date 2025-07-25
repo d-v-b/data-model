@@ -8,6 +8,16 @@ from .geozarr import (
     recursive_copy,
     setup_datatree_metadata_geozarr_spec_compliant,
 )
+from .s3_utils import (
+    create_s3_store,
+    get_s3_credentials_info,
+    is_s3_path,
+    open_s3_zarr_group,
+    parse_s3_path,
+    s3_path_exists,
+    validate_s3_access,
+    write_s3_json_metadata,
+)
 from .utils import (
     calculate_aligned_chunk_size,
     downsample_2d_array,
@@ -26,4 +36,12 @@ __all__ = [
     "calculate_aligned_chunk_size",
     "is_grid_mapping_variable",
     "validate_existing_band_data",
+    "create_s3_store",
+    "get_s3_credentials_info",
+    "is_s3_path",
+    "open_s3_zarr_group",
+    "parse_s3_path",
+    "s3_path_exists",
+    "validate_s3_access",
+    "write_s3_json_metadata",
 ]
