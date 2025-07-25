@@ -1,6 +1,6 @@
 """Tests for the conversion module."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -20,7 +20,7 @@ from eopf_geozarr.conversion import (
 class TestUtilityFunctions:
     """Test utility functions."""
 
-    def test_downsample_2d_array_block_averaging(self):
+    def test_downsample_2d_array_block_averaging(self) -> None:
         """Test downsampling with block averaging."""
         # Create a 4x4 array
         source_data = np.array(
@@ -40,7 +40,7 @@ class TestUtilityFunctions:
 
         np.testing.assert_array_equal(result, expected)
 
-    def test_downsample_2d_array_subsampling(self):
+    def test_downsample_2d_array_subsampling(self) -> None:
         """Test downsampling with subsampling when block size is 1."""
         source_data = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=float)
 
@@ -52,7 +52,7 @@ class TestUtilityFunctions:
 
         np.testing.assert_array_equal(result, expected)
 
-    def test_calculate_aligned_chunk_size_perfect_divisor(self):
+    def test_calculate_aligned_chunk_size_perfect_divisor(self) -> None:
         """Test chunk size calculation with perfect divisor."""
         # 1000 dimension, want 256 chunks
         result = calculate_aligned_chunk_size(1000, 256)
@@ -60,19 +60,19 @@ class TestUtilityFunctions:
         assert result == 250
         assert 1000 % result == 0
 
-    def test_calculate_aligned_chunk_size_larger_than_dimension(self):
+    def test_calculate_aligned_chunk_size_larger_than_dimension(self) -> None:
         """Test chunk size calculation when desired size is larger than dimension."""
         result = calculate_aligned_chunk_size(100, 256)
         assert result == 100
 
-    def test_calculate_aligned_chunk_size_no_perfect_divisor(self):
+    def test_calculate_aligned_chunk_size_no_perfect_divisor(self) -> None:
         """Test chunk size calculation when no perfect divisor exists."""
         # Prime number dimension
         result = calculate_aligned_chunk_size(97, 50)
         # Should return 1 as the only divisor when no good divisor is found
         assert result == 1
 
-    def test_is_grid_mapping_variable(self):
+    def test_is_grid_mapping_variable(self) -> None:
         """Test grid mapping variable detection."""
         # Create a dataset with a grid mapping variable
         ds = xr.Dataset(
@@ -86,10 +86,10 @@ class TestUtilityFunctions:
             }
         )
 
-        assert is_grid_mapping_variable(ds, "spatial_ref") == True
-        assert is_grid_mapping_variable(ds, "temperature") == False
+        assert is_grid_mapping_variable(ds, "spatial_ref") is True
+        assert is_grid_mapping_variable(ds, "temperature") is False
 
-    def test_validate_existing_band_data_valid(self):
+    def test_validate_existing_band_data_valid(self) -> None:
         """Test validation of existing valid band data."""
         # Create datasets
         existing_ds = xr.Dataset(
@@ -108,16 +108,16 @@ class TestUtilityFunctions:
 
         expected_ds = xr.Dataset({"B04": (["y", "x"], np.random.rand(100, 100))})
 
-        assert validate_existing_band_data(existing_ds, "B04", expected_ds) == True
+        assert validate_existing_band_data(existing_ds, "B04", expected_ds) is True
 
-    def test_validate_existing_band_data_missing(self):
+    def test_validate_existing_band_data_missing(self) -> None:
         """Test validation of missing band data."""
         existing_ds = xr.Dataset({})
         expected_ds = xr.Dataset({"B04": (["y", "x"], np.random.rand(100, 100))})
 
-        assert validate_existing_band_data(existing_ds, "B04", expected_ds) == False
+        assert validate_existing_band_data(existing_ds, "B04", expected_ds) is False
 
-    def test_calculate_overview_levels(self):
+    def test_calculate_overview_levels(self) -> None:
         """Test overview levels calculation."""
         levels = calculate_overview_levels(1024, 1024, min_dimension=256, tile_width=256)
 
@@ -142,7 +142,7 @@ class TestUtilityFunctions:
 class TestMetadataSetup:
     """Test metadata setup functions."""
 
-    def test_setup_datatree_metadata_geozarr_spec_compliant(self):
+    def test_setup_datatree_metadata_geozarr_spec_compliant(self) -> None:
         """Test GeoZarr metadata setup."""
         # Create a real DataTree with measurement groups
         # Create datasets for different resolution groups
@@ -189,7 +189,7 @@ class TestMetadataSetup:
 class TestIntegration:
     """Integration tests."""
 
-    def test_create_simple_geozarr_metadata(self):
+    def test_create_simple_geozarr_metadata(self) -> None:
         """Test creating simple GeoZarr metadata structure."""
         # Create a simple dataset
         data = np.random.rand(10, 10)

@@ -518,7 +518,7 @@ def write_geozarr_group(
     zarr_group = zarr.open_group(group_path, mode="r+", zarr_format=3)
     consolidate_metadata(zarr_group.store)
 
-    print(f"  ✅ Metadata consolidated")
+    print("  ✅ Metadata consolidated")
 
     ds = xr.open_dataset(
         group_path, engine="zarr", zarr_format=3, decode_coords="all"
@@ -645,7 +645,7 @@ def create_geozarr_compliant_multiscales(
 
         # Skip level 0 - native resolution is in the root group
         if level == 0:
-            print(f"Skipping level 0 - native resolution is already in group 0")
+            print("Skipping level 0 - native resolution is already in group 0")
             continue
 
         print(f"\nCreating overview level {level} (1:{scale_factor} scale)...")

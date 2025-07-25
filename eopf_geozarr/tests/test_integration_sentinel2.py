@@ -6,7 +6,6 @@ format, following the patterns established in the analysis notebook:
 docs/analysis/eopf-geozarr/EOPF_Sentinel2_ZarrV3_geozarr_compliant.ipynb
 """
 
-import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -24,7 +23,7 @@ class TestSentinel2Integration:
     """Integration tests for Sentinel-2 EOPF to GeoZarr conversion."""
 
     @pytest.fixture
-    def sample_sentinel2_datatree(self):
+    def sample_sentinel2_datatree(self) -> xr.DataTree:
         """
         Create a sample Sentinel-2 EOPF DataTree structure for testing.
 
@@ -217,7 +216,7 @@ class TestSentinel2Integration:
         return dt
 
     @pytest.fixture
-    def temp_output_dir(self):
+    def temp_output_dir(self) -> str:
         """Create a temporary directory for test outputs."""
         temp_dir = tempfile.mkdtemp()
         yield temp_dir
@@ -225,7 +224,7 @@ class TestSentinel2Integration:
 
     def test_complete_sentinel2_conversion_notebook_workflow(
         self, sample_sentinel2_datatree, temp_output_dir
-    ):
+    ) -> None:
         """
         Test complete conversion following the notebook workflow.
 
@@ -247,7 +246,7 @@ class TestSentinel2Integration:
             "/quality/l1c_quicklook/r10m",
         ]
 
-        print(f"Converting Sentinel-2 EOPF DataTree to GeoZarr format...")
+        print("Converting Sentinel-2 EOPF DataTree to GeoZarr format...")
         print(f"Input groups: {groups}")
         print(f"Output path: {output_path}")
 
@@ -283,7 +282,7 @@ class TestSentinel2Integration:
 
         print("✅ All integration tests passed!")
 
-    def _verify_basic_structure(self, output_path, groups):
+    def _verify_basic_structure(self, output_path, groups) -> None:
         """Verify the basic Zarr store structure."""
         print("Verifying basic structure...")
 
@@ -301,7 +300,7 @@ class TestSentinel2Integration:
             assert level_0_path.exists(), f"Level 0 not found for {group}"
             assert (level_0_path / "zarr.json").exists(), f"Level 0 missing zarr.json for {group}"
 
-    def _verify_geozarr_spec_compliance(self, output_path, group):
+    def _verify_geozarr_spec_compliance(self, output_path, group) -> None:
         """
         Verify GeoZarr specification compliance following the notebook verification.
 
@@ -380,13 +379,13 @@ class TestSentinel2Integration:
         if "GeoTransform" in ds["spatial_ref"].attrs:
             print(f"    ✅ GeoTransform: {ds['spatial_ref'].attrs['GeoTransform']}")
         else:
-            print(f"    ⚠️  Missing GeoTransform attribute")
+            print("    ⚠️  Missing GeoTransform attribute")
 
         # Check 6: CRS information (from notebook verification)
         if "crs_wkt" in ds["spatial_ref"].attrs:
-            print(f"    ✅ CRS WKT present")
+            print("    ✅ CRS WKT present")
         else:
-            print(f"    ⚠️  Missing CRS WKT")
+            print("    ⚠️  Missing CRS WKT")
 
         # Check 7: Coordinate standard names (from notebook verification)
         for coord in ["x", "y"]:
@@ -402,7 +401,7 @@ class TestSentinel2Integration:
 
         ds.close()
 
-    def _verify_multiscale_structure(self, output_path, group):
+    def _verify_multiscale_structure(self, output_path, group) -> None:
         """Verify multiscale structure following notebook patterns."""
         print(f"Verifying multiscale structure for {group}...")
 
@@ -475,15 +474,15 @@ class TestSentinel2Integration:
                         f"    Level {prev_level}→{level} downsampling ratio: {height_ratio:.2f}x{width_ratio:.2f}"
                     )
 
-    def _verify_rgb_data_access(self, output_path, groups):
+    def _verify_rgb_data_access(self, output_path, groups) -> None:
         """Verify RGB data access patterns from the notebook."""
         print("Verifying RGB data access patterns...")
 
         # Find groups with RGB bands (following notebook logic)
         rgb_groups = []
         for group in groups:
-            group_path = str(output_path / group.lstrip("/") / "0")
-            ds = xr.open_dataset(group_path, engine="zarr", zarr_format=3)
+            group_path_str = str(output_path / group.lstrip("/") / "0")
+            ds = xr.open_dataset(group_path_str, engine="zarr", zarr_format=3)
 
             # Check for RGB bands (b04=red, b03=green, b02=blue for Sentinel-2)
             has_rgb = all(band in ds.data_vars for band in ["b04", "b03", "b02"])
@@ -530,7 +529,7 @@ class TestSentinel2Integration:
                 ds.close()
 
     @pytest.mark.slow
-    def test_performance_characteristics(self, sample_sentinel2_datatree, temp_output_dir):
+    def test_performance_characteristics(self, sample_sentinel2_datatree, temp_output_dir) -> None:
         """
         Test performance characteristics following notebook analysis.
 
@@ -546,7 +545,7 @@ class TestSentinel2Integration:
         groups = ["/measurements/reflectance/r10m"]  # Focus on one group for performance testing
 
         with patch("eopf_geozarr.conversion.geozarr.print"):
-            dt_geozarr = create_geozarr_dataset(
+            create_geozarr_dataset(
                 dt_input=dt_input,
                 groups=groups,
                 output_path=str(output_path),

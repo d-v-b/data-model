@@ -120,7 +120,7 @@ def info_command(args: argparse.Namespace) -> None:
         print(f"Total groups: {len(dt.children)}")
 
         print("\nGroup structure:")
-        for group_name, group in dt.children.items():
+        for group_name, group in dt.groups.items():
             print(f"  {group_name}:")
             if hasattr(group, "data_vars") and group.data_vars:
                 print(f"    Variables: {list(group.data_vars.keys())}")
@@ -221,14 +221,14 @@ def validate_command(args: argparse.Namespace) -> None:
         print(f"Non-compliant variables: {total_variables - compliant_variables}")
 
         if compliance_issues:
-            print(f"\n❌ Dataset is NOT GeoZarr compliant")
+            print("\n❌ Dataset is NOT GeoZarr compliant")
             print(f"Issues found: {len(compliance_issues)}")
             if args.verbose:
                 print("Detailed issues:")
                 for issue in set(compliance_issues):
                     print(f"  - {issue}")
         else:
-            print(f"\n✅ Dataset appears to be GeoZarr compliant")
+            print("\n✅ Dataset appears to be GeoZarr compliant")
 
     except Exception as e:
         print(f"❌ Error validating dataset: {e}")
@@ -316,7 +316,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """Main entry point for the CLI."""
+    """Execute main entry point for the CLI."""
     parser = create_parser()
 
     if len(sys.argv) == 1:

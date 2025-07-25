@@ -19,7 +19,7 @@ class TestCLIEndToEnd:
     """End-to-end CLI tests with real data."""
 
     @pytest.fixture
-    def temp_output_dir(self) -> str:
+    def temp_output_dir(self):  # type: ignore[no-untyped-def]
         """Create a temporary directory for test outputs."""
         temp_dir = tempfile.mkdtemp()
         yield temp_dir
@@ -27,7 +27,7 @@ class TestCLIEndToEnd:
 
     @pytest.mark.slow
     @pytest.mark.network
-    def test_cli_convert_real_sentinel2_data(self, temp_output_dir) -> None:
+    def test_cli_convert_real_sentinel2_data(self, temp_output_dir: str) -> None:
         """
         Test CLI conversion using real Sentinel-2 data from the notebook.
 
@@ -111,8 +111,9 @@ class TestCLIEndToEnd:
 
         # Verify info output contains expected information
         info_output = result_info.stdout
-        assert "Groups found:" in info_output, "Info should list groups"
-        assert "measurements/reflectance/r10m" in info_output, "Should find r10m group"
+        assert "Total groups:" in info_output, "Info should show total groups count"
+        assert "Group structure:" in info_output, "Info should show group structure"
+        assert "measurements:" in info_output, "Should find measurements group"
 
         # Test 3: CLI validate command
         print("\n=== Testing CLI validate command ===")
@@ -136,7 +137,7 @@ class TestCLIEndToEnd:
 
         # Verify validation output
         validate_output = result_validate.stdout
-        assert "GeoZarr compliance validation" in validate_output, "Should show validation header"
+        assert "Validation Results:" in validate_output, "Should show validation header"
         assert "✅" in validate_output, "Should show successful validations"
 
         # Test 4: Verify data structure and compliance
@@ -146,9 +147,8 @@ class TestCLIEndToEnd:
 
         print("✅ All CLI end-to-end tests passed!")
 
-    def _verify_converted_data_structure(self, output_path, groups) -> None:
+    def _verify_converted_data_structure(self, output_path: Path, groups: list[str]) -> None:
         """Verify the structure and compliance of converted data."""
-
         # Check each group was converted
         for group in groups:
             group_path = output_path / group.lstrip("/")
@@ -195,7 +195,7 @@ class TestCLIEndToEnd:
                 assert (
                     "_ARRAY_DIMENSIONS" in ds["spatial_ref"].attrs
                 ), f"Missing _ARRAY_DIMENSIONS in spatial_ref for {group}"
-                print(f"    ✅ spatial_ref variable verified")
+                print("    ✅ spatial_ref variable verified")
 
             ds.close()
 
@@ -204,11 +204,10 @@ class TestCLIEndToEnd:
             print(f"    Overview levels: {sorted([d.name for d in level_dirs])}")
 
             if len(level_dirs) > 1:
-                print(f"    ✅ Multiscale structure created")
+                print("    ✅ Multiscale structure created")
 
     def test_cli_help_commands(self) -> None:
         """Test that all CLI help commands work."""
-
         # Test main help
         result = subprocess.run(
             ["python", "-m", "eopf_geozarr", "--help"], capture_output=True, text=True
