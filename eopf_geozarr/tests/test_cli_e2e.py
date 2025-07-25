@@ -113,7 +113,7 @@ class TestCLIEndToEnd:
         info_output = result_info.stdout
         assert "Total groups:" in info_output, "Info should show total groups count"
         assert "Group structure:" in info_output, "Info should show group structure"
-        assert "measurements:" in info_output, "Should find measurements group"
+        assert "/measurements" in info_output, "Should find measurements group"
 
         # Test 3: CLI validate command
         print("\n=== Testing CLI validate command ===")
