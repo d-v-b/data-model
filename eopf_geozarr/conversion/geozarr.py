@@ -282,14 +282,15 @@ def recursive_copy(
         # Handle S3 vs local paths for zarr operations
         group_path = f"{output_path}/{group_prefix}"
         if s3_utils.is_s3_path(output_path):
-            # For S3, use the S3 store
-            store = s3_utils.create_s3_store(group_path)
+            # For S3, use storage_options
+            storage_options = s3_utils.get_s3_storage_options(group_path)
             ds.to_zarr(
-                store,
+                group_path,
                 mode="w" if no_children else "a",  # Write if no children, append otherwise
                 consolidated=is_dataset,  # Consolidate metadata if it's a dataset
                 zarr_format=3,
                 encoding=encoding,
+                storage_options=storage_options,
             )
         else:
             ds.to_zarr(
@@ -1165,15 +1166,16 @@ def write_dataset_band_by_band_with_validation(
 
                 # Handle S3 vs local paths for zarr operations
                 if s3_utils.is_s3_path(output_path):
-                    # For S3, use the S3 store
-                    store = s3_utils.create_s3_store(output_path)
+                    # For S3, use storage_options
+                    storage_options = s3_utils.get_s3_storage_options(output_path)
                     single_var_ds.to_zarr(
-                        store,
+                        output_path,
                         mode=mode,
                         consolidated=False,
                         zarr_format=3,
                         encoding=var_encoding,
                         align_chunks=True,
+                        storage_options=storage_options,
                     )
                 else:
                     single_var_ds.to_zarr(
@@ -1225,14 +1227,15 @@ def write_dataset_band_by_band_with_validation(
             try:
                 # Handle S3 vs local paths for zarr operations
                 if s3_utils.is_s3_path(output_path):
-                    # For S3, use the S3 store
-                    store = s3_utils.create_s3_store(output_path)
+                    # For S3, use storage_options
+                    storage_options = s3_utils.get_s3_storage_options(output_path)
                     single_var_ds.to_zarr(
-                        store,
+                        output_path,
                         mode="a",  # Always append for grid_mapping variables
                         consolidated=False,
                         zarr_format=3,
                         encoding=var_encoding,
+                        storage_options=storage_options,
                     )
                 else:
                     single_var_ds.to_zarr(

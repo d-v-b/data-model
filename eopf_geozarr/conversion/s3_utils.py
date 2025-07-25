@@ -51,9 +51,9 @@ def parse_s3_path(s3_path: str) -> tuple[str, str]:
     return bucket, key
 
 
-def create_s3_store(s3_path: str, **s3_kwargs) -> FsspecStore:
+def get_s3_storage_options(s3_path: str, **s3_kwargs) -> Dict[str, Any]:
     """
-    Create an S3 store for Zarr operations.
+    Get storage options for S3 access with xarray.
 
     Parameters
     ----------
@@ -64,8 +64,8 @@ def create_s3_store(s3_path: str, **s3_kwargs) -> FsspecStore:
 
     Returns
     -------
-    FsspecStore
-        Zarr store backed by S3
+    Dict[str, Any]
+        Storage options dictionary for xarray
     """
     # Set up default S3 configuration
     default_s3_kwargs = {
@@ -84,17 +84,30 @@ def create_s3_store(s3_path: str, **s3_kwargs) -> FsspecStore:
     # Merge with user-provided kwargs
     s3_config = {**default_s3_kwargs, **s3_kwargs}
     
-    # Create S3 filesystem
-    fs = s3fs.S3FileSystem(**s3_config)
+    return s3_config
+
+
+def create_s3_store(s3_path: str, **s3_kwargs) -> str:
+    """
+    Create an S3 path with storage options for Zarr operations.
     
-    # Remove the s3:// scheme from the path for FsspecStore
-    bucket, key = parse_s3_path(s3_path)
-    path_without_scheme = f"{bucket}/{key}" if key else bucket
-    
-    # Create FsspecStore
-    store = FsspecStore(fs=fs, path=path_without_scheme)
-    
-    return store
+    This function now returns the S3 path directly, to be used with
+    xarray's storage_options parameter instead of creating a store.
+
+    Parameters
+    ----------
+    s3_path : str
+        S3 path in format s3://bucket/key
+    **s3_kwargs
+        Additional keyword arguments for s3fs.S3FileSystem
+
+    Returns
+    -------
+    str
+        S3 path to be used with storage_options
+    """
+    # Just return the S3 path - storage options will be handled separately
+    return s3_path
 
 
 def write_s3_json_metadata(s3_path: str, metadata: Dict[str, Any], **s3_kwargs) -> None:
@@ -117,6 +130,7 @@ def write_s3_json_metadata(s3_path: str, metadata: Dict[str, Any], **s3_kwargs) 
     default_s3_kwargs = {
         "anon": False,
         "use_ssl": True,
+        "asynchronous": False,  # Force synchronous mode
         "client_kwargs": {
             "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
         }
@@ -155,6 +169,7 @@ def s3_path_exists(s3_path: str, **s3_kwargs) -> bool:
     default_s3_kwargs = {
         "anon": False,
         "use_ssl": True,
+        "asynchronous": False,  # Force synchronous mode
         "client_kwargs": {
             "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
         }
@@ -234,6 +249,7 @@ def validate_s3_access(s3_path: str, **s3_kwargs) -> tuple[bool, Optional[str]]:
         default_s3_kwargs = {
             "anon": False,
             "use_ssl": True,
+            "asynchronous": False,  # Force synchronous mode
             "client_kwargs": {
                 "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
             }

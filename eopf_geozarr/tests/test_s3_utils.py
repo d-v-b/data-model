@@ -9,6 +9,7 @@ from eopf_geozarr.conversion.s3_utils import (
     get_s3_credentials_info,
     validate_s3_access,
     create_s3_store,
+    get_s3_storage_options,
 )
 
 
@@ -77,22 +78,27 @@ def test_validate_s3_access_failure(mock_s3fs):
     assert "Access denied" in error
 
 
-@patch('eopf_geozarr.conversion.s3_utils.s3fs.S3FileSystem')
-@patch('eopf_geozarr.conversion.s3_utils.FsspecStore')
-def test_create_s3_store_path_handling(mock_fsspec_store, mock_s3fs):
-    """Test that create_s3_store correctly handles S3 path schemes."""
-    mock_fs = Mock()
-    mock_s3fs.return_value = mock_fs
-    mock_store = Mock()
-    mock_fsspec_store.return_value = mock_store
-    
+def test_create_s3_store_path_handling():
+    """Test that create_s3_store returns the S3 path correctly."""
     # Test with S3 path
-    store = create_s3_store("s3://test-bucket/path/to/data")
-    
-    # Verify that FsspecStore was called with path without scheme
-    mock_fsspec_store.assert_called_once_with(fs=mock_fs, path="test-bucket/path/to/data")
+    result = create_s3_store("s3://test-bucket/path/to/data")
+    assert result == "s3://test-bucket/path/to/data"
     
     # Test with bucket only
-    mock_fsspec_store.reset_mock()
-    store = create_s3_store("s3://test-bucket")
-    mock_fsspec_store.assert_called_with(fs=mock_fs, path="test-bucket")
+    result = create_s3_store("s3://test-bucket")
+    assert result == "s3://test-bucket"
+
+
+def test_get_s3_storage_options():
+    """Test that get_s3_storage_options returns correct configuration."""
+    with patch.dict('os.environ', {
+        'AWS_DEFAULT_REGION': 'us-west-2',
+        'AWS_S3_ENDPOINT': 'https://s3.example.com'
+    }):
+        options = get_s3_storage_options("s3://test-bucket/path")
+        
+        assert options['anon'] is False
+        assert options['use_ssl'] is True
+        assert options['client_kwargs']['region_name'] == 'us-west-2'
+        assert options['endpoint_url'] == 'https://s3.example.com'
+        assert options['client_kwargs']['endpoint_url'] == 'https://s3.example.com'
