@@ -8,7 +8,6 @@ This module provides CLI commands for converting EOPF datasets to GeoZarr compli
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 import xarray as xr
 
@@ -72,7 +71,7 @@ def convert_command(args: argparse.Namespace) -> None:
             max_retries=args.max_retries,
         )
 
-        print(f"✅ Successfully converted EOPF dataset to GeoZarr format")
+        print("✅ Successfully converted EOPF dataset to GeoZarr format")
         print(f"Output saved to: {output_path}")
 
         if args.verbose:
@@ -116,11 +115,11 @@ def info_command(args: argparse.Namespace) -> None:
         print(f"Loading dataset from: {input_path}")
         dt = xr.open_datatree(input_path, engine="zarr")
 
-        print(f"\nDataset Information:")
-        print(f"==================")
+        print("\nDataset Information:")
+        print("==================")
         print(f"Total groups: {len(dt.children)}")
 
-        print(f"\nGroup structure:")
+        print("\nGroup structure:")
         for group_name, group in dt.children.items():
             print(f"  {group_name}:")
             if hasattr(group, "data_vars") and group.data_vars:
@@ -182,14 +181,14 @@ def validate_command(args: argparse.Namespace) -> None:
         total_variables = 0
         compliant_variables = 0
 
-        print(f"\nValidation Results:")
-        print(f"==================")
+        print("\nValidation Results:")
+        print("==================")
 
         for group_name, group in dt.children.items():
             print(f"\nGroup: {group_name}")
 
             if not hasattr(group, "data_vars") or not group.data_vars:
-                print(f"  ⚠️  No data variables found")
+                print("  ⚠️  No data variables found")
                 continue
 
             for var_name, var in group.data_vars.items():
@@ -215,8 +214,8 @@ def validate_command(args: argparse.Namespace) -> None:
                     print(f"  ✅ {var_name}: Compliant")
                     compliant_variables += 1
 
-        print(f"\nSummary:")
-        print(f"========")
+        print("\nSummary:")
+        print("========")
         print(f"Total variables checked: {total_variables}")
         print(f"Compliant variables: {compliant_variables}")
         print(f"Non-compliant variables: {total_variables - compliant_variables}")

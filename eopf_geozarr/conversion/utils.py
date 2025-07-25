@@ -1,7 +1,7 @@
 """Utility functions for GeoZarr conversion."""
 
 import numpy as np
-import rasterio
+import rasterio  # noqa: F401  # Import to enable .rio accessor
 import xarray as xr
 
 

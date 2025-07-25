@@ -18,13 +18,9 @@ import json
 import os
 import shutil
 import time
-import warnings
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import dask.array as da
 import numpy as np
-import rasterio
 import xarray as xr
 import zarr
 import zarr.api
@@ -502,7 +498,7 @@ def write_geozarr_group(
     # Create GeoZarr-spec compliant multiscales (overview levels as children groups)
     try:
         print(f"Creating GeoZarr-spec compliant multiscales for {group_name}")
-        multiscales_result = create_geozarr_compliant_multiscales(
+        create_geozarr_compliant_multiscales(
             ds=ds,
             output_path=output_path,
             group_name=group_name,
@@ -815,7 +811,6 @@ def create_native_crs_tile_matrix_set(
         level = overview["level"]
         width = overview["width"]
         height = overview["height"]
-        scale_factor = overview["scale_factor"]
 
         # Calculate cell size (pixel size in CRS units)
         cell_size_x = (right - left) / width

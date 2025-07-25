@@ -6,7 +6,6 @@ from the analysis notebook:
 docs/analysis/eopf-geozarr/EOPF_Sentinel2_ZarrV3_geozarr_compliant.ipynb
 """
 
-import os
 import shutil
 import subprocess
 import tempfile
@@ -20,7 +19,7 @@ class TestCLIEndToEnd:
     """End-to-end CLI tests with real data."""
 
     @pytest.fixture
-    def temp_output_dir(self):
+    def temp_output_dir(self) -> str:
         """Create a temporary directory for test outputs."""
         temp_dir = tempfile.mkdtemp()
         yield temp_dir
@@ -28,7 +27,7 @@ class TestCLIEndToEnd:
 
     @pytest.mark.slow
     @pytest.mark.network
-    def test_cli_convert_real_sentinel2_data(self, temp_output_dir):
+    def test_cli_convert_real_sentinel2_data(self, temp_output_dir) -> None:
         """
         Test CLI conversion using real Sentinel-2 data from the notebook.
 
@@ -39,7 +38,10 @@ class TestCLIEndToEnd:
         4. Tests CLI info and validate commands
         """
         # Dataset from the notebook
-        input_url = "https://objectstore.eodc.eu:2222/e05ab01a9d56408d82ac32d69a5aae2a:sample-data/tutorial_data/cpm_v253/S2B_MSIL1C_20250113T103309_N0511_R108_T32TLQ_20250113T122458.zarr"
+        input_url = (
+            "https://objectstore.eodc.eu:2222/e05ab01a9d56408d82ac32d69a5aae2a:sample-data/"
+            "tutorial_data/cpm_v253/S2B_MSIL1C_20250113T103309_N0511_R108_T32TLQ_20250113T122458.zarr"
+        )
         output_path = Path(temp_output_dir) / "s2b_geozarr_cli_test.zarr"
 
         # Groups to convert (from the notebook)
@@ -50,7 +52,7 @@ class TestCLIEndToEnd:
             "/quality/l1c_quicklook/r10m",
         ]
 
-        print(f"Testing CLI conversion with real Sentinel-2 data...")
+        print("Testing CLI conversion with real Sentinel-2 data...")
         print(f"Input URL: {input_url}")
         print(f"Output path: {output_path}")
 
@@ -144,7 +146,7 @@ class TestCLIEndToEnd:
 
         print("✅ All CLI end-to-end tests passed!")
 
-    def _verify_converted_data_structure(self, output_path, groups):
+    def _verify_converted_data_structure(self, output_path, groups) -> None:
         """Verify the structure and compliance of converted data."""
 
         # Check each group was converted
@@ -204,7 +206,7 @@ class TestCLIEndToEnd:
             if len(level_dirs) > 1:
                 print(f"    ✅ Multiscale structure created")
 
-    def test_cli_help_commands(self):
+    def test_cli_help_commands(self) -> None:
         """Test that all CLI help commands work."""
 
         # Test main help
@@ -237,7 +239,7 @@ class TestCLIEndToEnd:
 
         print("✅ All CLI help commands work correctly")
 
-    def test_cli_version(self):
+    def test_cli_version(self) -> None:
         """Test CLI version command."""
         result = subprocess.run(
             ["python", "-m", "eopf_geozarr", "--version"], capture_output=True, text=True
