@@ -279,32 +279,62 @@ def recursive_copy(
         dt_node = ds
         is_dataset = True
 
-        ds.to_zarr(
-            f"{output_path}/{group_prefix}",
-            mode="w" if no_children else "a",  # Write if no children, append otherwise
-            consolidated=is_dataset,  # Consolidate metadata if it's a dataset
-            zarr_format=3,
-            encoding=encoding,
-        )
+        # Handle S3 vs local paths for zarr operations
+        group_path = f"{output_path}/{group_prefix}"
+        if s3_utils.is_s3_path(output_path):
+            # For S3, use the S3 store
+            store = s3_utils.create_s3_store(group_path)
+            ds.to_zarr(
+                store,
+                mode="w" if no_children else "a",  # Write if no children, append otherwise
+                consolidated=is_dataset,  # Consolidate metadata if it's a dataset
+                zarr_format=3,
+                encoding=encoding,
+            )
+        else:
+            ds.to_zarr(
+                group_path,
+                mode="w" if no_children else "a",  # Write if no children, append otherwise
+                consolidated=is_dataset,  # Consolidate metadata if it's a dataset
+                zarr_format=3,
+                encoding=encoding,
+            )
     else:
         # Write manually the group in zarr.json
         print(f"Writing group metadata for '{group_prefix}'")
-        with open(f"{output_path}/{group_prefix}/zarr.json", "w") as f:
-            f.write(
-                "{\n"
-                '  "attributes": {},\n'
-                '  "zarr_format": 3,\n'
-                '  "consolidated_metadata": null,\n'
-                '  "node_type": "group"\n'
-                "}"
-            )
+        group_path = f"{output_path}/{group_prefix}"
+        
+        zarr_json_content = {
+            "attributes": {},
+            "zarr_format": 3,
+            "consolidated_metadata": None,
+            "node_type": "group"
+        }
+        
+        if s3_utils.is_s3_path(output_path):
+            # For S3, write JSON metadata directly
+            s3_utils.write_s3_json_metadata(f"{group_path}/zarr.json", zarr_json_content)
+        else:
+            # For local paths, write to file
+            with open(f"{group_path}/zarr.json", "w") as f:
+                f.write(
+                    "{\n"
+                    '  "attributes": {},\n'
+                    '  "zarr_format": 3,\n'
+                    '  "consolidated_metadata": null,\n'
+                    '  "node_type": "group"\n'
+                    "}"
+                )
 
         # Consolidate metadata without removing existing metadata from children
-        zarr_group = zarr.open(
-            f"{output_path}/{group_prefix}",
-            mode="r+",
-            zarr_format=3,
-        )
+        if s3_utils.is_s3_path(output_path):
+            zarr_group = s3_utils.open_s3_zarr_group(group_path, mode="r+")
+        else:
+            zarr_group = zarr.open(
+                group_path,
+                mode="r+",
+                zarr_format=3,
+            )
         consolidate_metadata(zarr_group.store)
 
     return dt_node
@@ -1133,14 +1163,27 @@ def write_dataset_band_by_band_with_validation(
                         k: v for k, v in var_encoding.items() if k not in single_var_ds.coords
                     }
 
-                single_var_ds.to_zarr(
-                    output_path,
-                    mode=mode,
-                    consolidated=False,
-                    zarr_format=3,
-                    encoding=var_encoding,
-                    align_chunks=True,
-                )
+                # Handle S3 vs local paths for zarr operations
+                if s3_utils.is_s3_path(output_path):
+                    # For S3, use the S3 store
+                    store = s3_utils.create_s3_store(output_path)
+                    single_var_ds.to_zarr(
+                        store,
+                        mode=mode,
+                        consolidated=False,
+                        zarr_format=3,
+                        encoding=var_encoding,
+                        align_chunks=True,
+                    )
+                else:
+                    single_var_ds.to_zarr(
+                        output_path,
+                        mode=mode,
+                        consolidated=False,
+                        zarr_format=3,
+                        encoding=var_encoding,
+                        align_chunks=True,
+                    )
 
                 print(f"    ✅ Successfully wrote {var}")
                 successful_vars.append(var)
@@ -1180,13 +1223,25 @@ def write_dataset_band_by_band_with_validation(
         success = False
         for attempt in range(max_retries):
             try:
-                single_var_ds.to_zarr(
-                    output_path,
-                    mode="a",  # Always append for grid_mapping variables
-                    consolidated=False,
-                    zarr_format=3,
-                    encoding=var_encoding,
-                )
+                # Handle S3 vs local paths for zarr operations
+                if s3_utils.is_s3_path(output_path):
+                    # For S3, use the S3 store
+                    store = s3_utils.create_s3_store(output_path)
+                    single_var_ds.to_zarr(
+                        store,
+                        mode="a",  # Always append for grid_mapping variables
+                        consolidated=False,
+                        zarr_format=3,
+                        encoding=var_encoding,
+                    )
+                else:
+                    single_var_ds.to_zarr(
+                        output_path,
+                        mode="a",  # Always append for grid_mapping variables
+                        consolidated=False,
+                        zarr_format=3,
+                        encoding=var_encoding,
+                    )
 
                 print(f"    ✅ Successfully wrote {var}")
                 successful_vars.append(var)
@@ -1208,11 +1263,14 @@ def write_dataset_band_by_band_with_validation(
             print(f"  Failed to write grid_mapping variable {var}")
 
     # Consolidate metadata without removing existing metadata from children
-    zarr_group = zarr.open(
-        f"{output_path}",
-        mode="r+",
-        zarr_format=3,
-    )
+    if s3_utils.is_s3_path(output_path):
+        zarr_group = s3_utils.open_s3_zarr_group(output_path, mode="r+")
+    else:
+        zarr_group = zarr.open(
+            f"{output_path}",
+            mode="r+",
+            zarr_format=3,
+        )
     consolidate_metadata(zarr_group.store)
 
     print(f"  ✅ Metadata consolidated for {len(successful_vars)} variables")
@@ -1220,7 +1278,12 @@ def write_dataset_band_by_band_with_validation(
     # Close the dataset to release resources
     ds.close()
 
-    ds = xr.open_dataset(output_path, engine="zarr", zarr_format=3, decode_coords="all").compute()
+    # Reopen the dataset
+    if s3_utils.is_s3_path(output_path):
+        store = s3_utils.create_s3_store(output_path)
+        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all").compute()
+    else:
+        ds = xr.open_dataset(output_path, engine="zarr", zarr_format=3, decode_coords="all").compute()
 
     # Report results
     if failed_vars:

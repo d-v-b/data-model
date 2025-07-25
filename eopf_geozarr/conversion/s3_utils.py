@@ -87,8 +87,12 @@ def create_s3_store(s3_path: str, **s3_kwargs) -> FsspecStore:
     # Create S3 filesystem
     fs = s3fs.S3FileSystem(**s3_config)
     
+    # Remove the s3:// scheme from the path for FsspecStore
+    bucket, key = parse_s3_path(s3_path)
+    path_without_scheme = f"{bucket}/{key}" if key else bucket
+    
     # Create FsspecStore
-    store = FsspecStore(fs=fs, path=s3_path)
+    store = FsspecStore(fs=fs, path=path_without_scheme)
     
     return store
 

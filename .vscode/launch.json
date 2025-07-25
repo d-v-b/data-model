@@ -51,7 +51,7 @@
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/eopf_geozarr/.venv/bin",
-                "AWS_ACCESS_KEY_ID": "user-Nbs5Rmd2KgmQ",
+                "AWS_ACCESS_KEY_ID": "04fd31bb339247658e971fad3a1d879e",
                 "AWS_SECRET_ACCESS_KEY": "eb1b07f69b1d494abb947aa0bba8587e",
                 "AWS_DEFAULT_REGION": "gra",
                 "AWS_S3_ENDPOINT": "https://s3.gra.io.cloud.ovh.net/" 

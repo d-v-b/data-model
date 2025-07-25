@@ -8,6 +8,7 @@ from eopf_geozarr.conversion.s3_utils import (
     parse_s3_path,
     get_s3_credentials_info,
     validate_s3_access,
+    create_s3_store,
 )
 
 
@@ -74,3 +75,24 @@ def test_validate_s3_access_failure(mock_s3fs):
     success, error = validate_s3_access("s3://test-bucket/path")
     assert success is False
     assert "Access denied" in error
+
+
+@patch('eopf_geozarr.conversion.s3_utils.s3fs.S3FileSystem')
+@patch('eopf_geozarr.conversion.s3_utils.FsspecStore')
+def test_create_s3_store_path_handling(mock_fsspec_store, mock_s3fs):
+    """Test that create_s3_store correctly handles S3 path schemes."""
+    mock_fs = Mock()
+    mock_s3fs.return_value = mock_fs
+    mock_store = Mock()
+    mock_fsspec_store.return_value = mock_store
+    
+    # Test with S3 path
+    store = create_s3_store("s3://test-bucket/path/to/data")
+    
+    # Verify that FsspecStore was called with path without scheme
+    mock_fsspec_store.assert_called_once_with(fs=mock_fs, path="test-bucket/path/to/data")
+    
+    # Test with bucket only
+    mock_fsspec_store.reset_mock()
+    store = create_s3_store("s3://test-bucket")
+    mock_fsspec_store.assert_called_with(fs=mock_fs, path="test-bucket")
