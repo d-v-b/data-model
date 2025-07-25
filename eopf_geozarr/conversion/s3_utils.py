@@ -188,7 +188,7 @@ def s3_path_exists(s3_path: str, **s3_kwargs) -> bool:
 
 def open_s3_zarr_group(s3_path: str, mode: str = "r", **s3_kwargs) -> zarr.Group:
     """
-    Open a Zarr group from S3.
+    Open a Zarr group from S3 using storage_options.
 
     Parameters
     ----------
@@ -204,8 +204,8 @@ def open_s3_zarr_group(s3_path: str, mode: str = "r", **s3_kwargs) -> zarr.Group
     zarr.Group
         Zarr group
     """
-    store = create_s3_store(s3_path, **s3_kwargs)
-    return zarr.open_group(store, mode=mode, zarr_format=3)
+    storage_options = get_s3_storage_options(s3_path, **s3_kwargs)
+    return zarr.open_group(s3_path, mode=mode, zarr_format=3, storage_options=storage_options)
 
 
 def get_s3_credentials_info() -> Dict[str, Optional[str]]:

@@ -280,7 +280,11 @@ def recursive_copy(
         is_dataset = True
 
         # Handle S3 vs local paths for zarr operations
-        group_path = f"{output_path}/{group_prefix}"
+        # Fix double slash issue by normalizing the path
+        if group_prefix.startswith("/"):
+            group_path = f"{output_path}{group_prefix}"
+        else:
+            group_path = f"{output_path}/{group_prefix}"
         if s3_utils.is_s3_path(output_path):
             # For S3, use storage_options
             storage_options = s3_utils.get_s3_storage_options(group_path)
@@ -468,13 +472,14 @@ def write_geozarr_group(
     
     # Handle S3 vs local paths for zarr operations
     if s3_utils.is_s3_path(output_path):
-        # For S3, use the S3 store
-        store = s3_utils.create_s3_store(group_path)
+        # For S3, use storage_options
+        storage_options = s3_utils.get_s3_storage_options(group_path)
         dt.to_zarr(
-            store,
+            group_path,
             mode="a",  # Append mode to add to the group
             consolidated=False,  # No consolidate metadata
             zarr_format=3,  # Use Zarr format 3
+            storage_options=storage_options,
         )
     else:
         dt.to_zarr(
@@ -676,9 +681,10 @@ def create_geozarr_compliant_multiscales(
     
     # Handle S3 vs local paths for JSON metadata
     if s3_utils.is_s3_path(output_path):
-        # For S3, use s3fs to read/write JSON
+        # For S3, use s3fs with proper configuration
         import s3fs
-        fs = s3fs.S3FileSystem(anon=False)
+        storage_options = s3_utils.get_s3_storage_options(zarr_json_path)
+        fs = s3fs.S3FileSystem(**storage_options)
         
         with fs.open(zarr_json_path, "r") as f:
             zarr_json = json.load(f)
