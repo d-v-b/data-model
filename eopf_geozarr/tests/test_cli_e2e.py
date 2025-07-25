@@ -124,8 +124,7 @@ class TestCLIEndToEnd:
             "eopf_geozarr",
             "validate",
             str(output_path),
-            "--groups",
-        ] + groups
+        ]
 
         result_validate = subprocess.run(cmd_validate, capture_output=True, text=True, timeout=60)
 
