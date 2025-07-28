@@ -778,9 +778,13 @@ def create_geozarr_compliant_multiscales(
                 encoding[var] = {"compressors": None}
             else:
                 # Use smaller chunks for overview levels
-                chunk_size = min(256, width, height)
+                spatial_chunk_aligned = min(
+                    spatial_chunk,
+                    utils.calculate_aligned_chunk_size(width, spatial_chunk),
+                    utils.calculate_aligned_chunk_size(height, spatial_chunk),
+                )
                 encoding[var] = {
-                    "chunks": (chunk_size, chunk_size),
+                    "chunks": (1, spatial_chunk_aligned, spatial_chunk_aligned),
                     "compressors": compressor,
                 }
 
