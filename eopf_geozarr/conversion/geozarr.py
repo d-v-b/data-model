@@ -1198,6 +1198,8 @@ def write_dataset_band_by_band_with_validation(
                     var_encoding = {
                         k: v for k, v in var_encoding.items() if k not in single_var_ds.coords
                     }
+                    
+                single_var_ds.chunk()
 
                 # Handle S3 vs local paths for zarr operations
                 if s3_utils.is_s3_path(output_path):
