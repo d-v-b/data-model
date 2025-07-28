@@ -311,7 +311,10 @@ def recursive_copy(
             group_path = f"{output_path}{group_prefix}"
         else:
             group_path = f"{output_path}/{group_prefix}"
+        
+        # Normalize S3 paths to prevent double slashes (important for OVH S3)
         if s3_utils.is_s3_path(output_path):
+            group_path = s3_utils.normalize_s3_path(group_path)
             # For S3, use storage_options
             storage_options = s3_utils.get_s3_storage_options(group_path)
             ds.to_zarr(
@@ -492,6 +495,10 @@ def write_geozarr_group(
     # to create siblings for the multiscales
     dt = xr.DataTree()
     group_path = f"{output_path}/{group_name}"
+    
+    # Normalize S3 paths to prevent double slashes (important for OVH S3)
+    if s3_utils.is_s3_path(output_path):
+        group_path = s3_utils.normalize_s3_path(group_path)
 
     # Copy the attributes from the original dataset to the DataTree
     dt.attrs = ds.attrs.copy()
@@ -707,6 +714,10 @@ def create_geozarr_compliant_multiscales(
     # Add multiscales metadata to the group
     zarr_json_path = f"{output_path}/{group_name}/zarr.json"
     
+    # Normalize S3 paths to prevent double slashes (important for OVH S3)
+    if s3_utils.is_s3_path(output_path):
+        zarr_json_path = s3_utils.normalize_s3_path(zarr_json_path)
+    
     # Handle S3 vs local paths for JSON metadata
     if s3_utils.is_s3_path(output_path):
         # For S3, use s3fs with proper configuration
@@ -794,6 +805,11 @@ def create_geozarr_compliant_multiscales(
 
         # Write overview level as children group (GeoZarr spec requirement)
         overview_path = f"{output_path}/{group_name}/{level}"
+        
+        # Normalize S3 paths to prevent double slashes (important for OVH S3)
+        if s3_utils.is_s3_path(output_path):
+            overview_path = s3_utils.normalize_s3_path(overview_path)
+        
         start_time = time.time()
         
         if s3_utils.is_s3_path(output_path):

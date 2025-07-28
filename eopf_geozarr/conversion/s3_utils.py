@@ -10,6 +10,44 @@ import zarr
 from zarr.storage import FsspecStore
 
 
+def normalize_s3_path(s3_path: str) -> str:
+    """
+    Normalize an S3 path by removing double slashes and ensuring proper format.
+    
+    This is important for OVH S3 which is sensitive to double slashes.
+
+    Parameters
+    ----------
+    s3_path : str
+        S3 path to normalize
+
+    Returns
+    -------
+    str
+        Normalized S3 path
+    """
+    if not s3_path.startswith("s3://"):
+        return s3_path
+    
+    # Split into scheme and path parts
+    scheme = "s3://"
+    path_part = s3_path[5:]  # Remove "s3://"
+    
+    # Remove double slashes from the path part
+    # But preserve the bucket/key structure
+    parts = path_part.split("/")
+    # Filter out empty parts (which come from double slashes)
+    normalized_parts = [part for part in parts if part]
+    
+    # Reconstruct the path
+    if normalized_parts:
+        normalized_path = scheme + "/".join(normalized_parts)
+    else:
+        normalized_path = scheme
+    
+    return normalized_path
+
+
 def is_s3_path(path: str) -> bool:
     """
     Check if a path is an S3 URL.
