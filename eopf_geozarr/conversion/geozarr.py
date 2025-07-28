@@ -526,7 +526,8 @@ def write_geozarr_group(
         if s3_utils.is_s3_path(output_path):
             if s3_utils.s3_path_exists(native_dataset_path):
                 store = s3_utils.create_s3_store(native_dataset_path)
-                existing_native_dataset = xr.open_zarr(store, zarr_format=3)
+                storage_options = s3_utils.get_s3_storage_options(native_dataset_path)
+                existing_native_dataset = xr.open_zarr(store, zarr_format=3, storage_options=storage_options)
                 print(f"Found existing native dataset at {native_dataset_path}")
         else:
             if os.path.exists(native_dataset_path):
@@ -696,8 +697,7 @@ def create_geozarr_compliant_multiscales(
             "tile_matrix_limits": tile_matrix_limits,
         }
 
-        with fs.open(zarr_json_path, "w") as f:
-            json.dump(zarr_json, f, indent=2)
+        s3_utils.write_s3_json_metadata(zarr_json_path, zarr_json)
     else:
         # Local file operations
         with open(zarr_json_path, "r") as f:
