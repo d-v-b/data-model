@@ -45,8 +45,6 @@ def downsample_2d_array(
     return downsampled
 
 
-
-
 def is_grid_mapping_variable(ds: xr.Dataset, var_name: str) -> bool:
     """
     Check if a variable is a grid_mapping variable by looking for references to it.
@@ -73,17 +71,17 @@ def is_grid_mapping_variable(ds: xr.Dataset, var_name: str) -> bool:
 def calculate_aligned_chunk_size(dimension_size: int, target_chunk_size: int) -> int:
     """
     Calculate a chunk size that divides evenly into the dimension size.
-    
+
     This ensures that Zarr chunks align properly with the data dimensions,
     preventing chunk overlap issues when writing with Dask.
-    
+
     Parameters
     ----------
     dimension_size : int
         Size of the dimension to chunk
     target_chunk_size : int
         Desired chunk size
-        
+
     Returns
     -------
     int
@@ -91,12 +89,12 @@ def calculate_aligned_chunk_size(dimension_size: int, target_chunk_size: int) ->
     """
     if target_chunk_size >= dimension_size:
         return dimension_size
-    
+
     # Find the largest divisor of dimension_size that is <= target_chunk_size
     for chunk_size in range(target_chunk_size, 0, -1):
         if dimension_size % chunk_size == 0:
             return chunk_size
-    
+
     # Fallback: return 1 if no good divisor found
     return 1
 

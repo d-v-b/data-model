@@ -151,7 +151,7 @@ The library includes advanced chunk alignment logic to prevent the common issue 
 
 This prevents errors like:
 ```
-❌ Failed to write tci after 2 attempts: Specified Zarr chunks encoding['chunks']=(1, 3660, 3660) 
+❌ Failed to write tci after 2 attempts: Specified Zarr chunks encoding['chunks']=(1, 3660, 3660)
 for variable named 'tci' would overlap multiple Dask chunks
 ```
 

@@ -54,9 +54,9 @@
                 "PYTHONPATH": "${workspaceFolder}/.venv/bin",
                 "AWS_PROFILE": "eopf-explorer",
                 "AWS_DEFAULT_REGION": "de",
-                "AWS_S3_ENDPOINT": "https://s3.de.io.cloud.ovh.net/" 
+                "AWS_S3_ENDPOINT": "https://s3.de.io.cloud.ovh.net/"
             },
-            
+
         },
         {
             // eopf_geozarr convert https://objectstore.eodc.eu:2222/e05ab01a9d56408d82ac32d69a5aae2a:sample-data/tutorial_data/cpm_v253/S2B_MSIL1C_20250113T103309_N0511_R108_T32TLQ_20250113T122458.zarr /tmp/tmp7mmjkjk3/s2b_subset_test.zarr --groups /measurements/reflectance/r10m --spatial-chunk 512 --min-dimension 128 --tile-width 256 --max-retries 2 --verbose
@@ -83,9 +83,9 @@
                 "PYTHONPATH": "${workspaceFolder}/.venv/bin",
                 "AWS_PROFILE": "eopf-explorer",
                 "AWS_DEFAULT_REGION": "de",
-                "AWS_S3_ENDPOINT": "https://s3.de.io.cloud.ovh.net/" 
+                "AWS_S3_ENDPOINT": "https://s3.de.io.cloud.ovh.net/"
             },
-            
+
         }
     ]
 }

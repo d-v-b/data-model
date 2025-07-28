@@ -13,7 +13,7 @@ from typing import Optional
 import xarray as xr
 
 from . import create_geozarr_dataset
-from .conversion.fs_utils import is_s3_path, validate_s3_access, get_s3_credentials_info
+from .conversion.fs_utils import get_s3_credentials_info, is_s3_path, validate_s3_access
 
 
 def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Optional[object]:
@@ -34,24 +34,26 @@ def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Optional[obj
     """
     if not enable_dask:
         return None
-    
+
     try:
         from dask.distributed import Client
-        
+
         # Set up local cluster
         client = Client()  # set up local cluster
-        
+
         if verbose:
             print(f"🚀 Dask cluster started: {client}")
             print(f"   Dashboard: {client.dashboard_link}")
             print(f"   Workers: {len(client.scheduler_info()['workers'])}")
         else:
             print("🚀 Dask cluster started for parallel processing")
-        
+
         return client
-        
+
     except ImportError:
-        print("❌ Error: dask.distributed not available. Install with: pip install 'dask[distributed]'")
+        print(
+            "❌ Error: dask.distributed not available. Install with: pip install 'dask[distributed]'"
+        )
         sys.exit(1)
     except Exception as e:
         print(f"❌ Error starting dask cluster: {e}")
@@ -69,10 +71,9 @@ def convert_command(args: argparse.Namespace) -> None:
     """
     # Set up dask cluster if requested
     dask_client = setup_dask_cluster(
-        enable_dask=getattr(args, 'dask_cluster', False),
-        verbose=args.verbose
+        enable_dask=getattr(args, "dask_cluster", False), verbose=args.verbose
     )
-    
+
     try:
         # Validate input path (handle both local paths and URLs)
         input_path_str = args.input_path
@@ -103,15 +104,15 @@ def convert_command(args: argparse.Namespace) -> None:
                 print("   - For custom S3 providers (e.g., OVH Cloud), set AWS_S3_ENDPOINT")
                 print("   - Or configure AWS CLI with 'aws configure'")
                 print("   - Or use IAM roles if running on EC2")
-                
+
                 if args.verbose:
                     creds_info = get_s3_credentials_info()
                     print(f"\n🔧 Current AWS configuration:")
                     for key, value in creds_info.items():
                         print(f"   {key}: {value or 'Not set'}")
-                
+
                 sys.exit(1)
-            
+
             print("✅ S3 access validated successfully")
             output_path = output_path_str
         else:
@@ -332,7 +333,11 @@ def create_parser() -> argparse.ArgumentParser:
     convert_parser.add_argument(
         "input_path", type=str, help="Path to input EOPF dataset (Zarr format)"
     )
-    convert_parser.add_argument("output_path", type=str, help="Path for output GeoZarr dataset (local path or S3 URL like s3://bucket/path)")
+    convert_parser.add_argument(
+        "output_path",
+        type=str,
+        help="Path for output GeoZarr dataset (local path or S3 URL like s3://bucket/path)",
+    )
     convert_parser.add_argument(
         "--groups",
         type=str,
@@ -368,7 +373,7 @@ def create_parser() -> argparse.ArgumentParser:
     convert_parser.add_argument(
         "--dask-cluster",
         action="store_true",
-        help="Start a local dask cluster for parallel processing of chunks"
+        help="Start a local dask cluster for parallel processing of chunks",
     )
     convert_parser.set_defaults(func=convert_command)
 

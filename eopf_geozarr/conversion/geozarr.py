@@ -270,16 +270,20 @@ def recursive_copy(
         # Set up encoding for variables with proper chunk alignment
         for var in ds.data_vars:
             # Get the current chunks from the data array if it's dask-backed
-            if hasattr(ds[var].data, 'chunks'):
+            if hasattr(ds[var].data, "chunks"):
                 # Use existing dask chunks to ensure alignment
                 current_chunks = ds[var].chunks
                 if len(current_chunks) >= 2:
                     # For 2D+ data, use the existing chunk structure
-                    chunking = tuple(current_chunks[i][0] if len(current_chunks[i]) > 0 else ds[var].shape[i] 
-                                   for i in range(len(current_chunks)))
+                    chunking = tuple(
+                        current_chunks[i][0] if len(current_chunks[i]) > 0 else ds[var].shape[i]
+                        for i in range(len(current_chunks))
+                    )
                 else:
                     # For 1D data
-                    chunking = (current_chunks[0][0] if len(current_chunks[0]) > 0 else ds[var].shape[0],)
+                    chunking = (
+                        current_chunks[0][0] if len(current_chunks[0]) > 0 else ds[var].shape[0],
+                    )
             else:
                 # Fallback for non-dask arrays - use reasonable chunk sizes
                 data_shape = ds[var].shape
@@ -293,11 +297,8 @@ def recursive_copy(
                         chunking = (chunk_y, chunk_x)
                 else:
                     chunking = (min(spatial_chunk, data_shape[-1]),)
-            
-            encoding[var] = {
-                "compressors": [compressor],
-                "chunks": chunking
-            }
+
+            encoding[var] = {"compressors": [compressor], "chunks": chunking}
         for coord in ds.coords:
             encoding[coord] = {
                 "compressors": None,  # No compression for coordinates
@@ -310,11 +311,11 @@ def recursive_copy(
             group_path = f"{output_path}{group_prefix}"
         else:
             group_path = f"{output_path}/{group_prefix}"
-        
+
         # Normalize path and get storage options
         group_path = fs_utils.normalize_path(group_path)
         storage_options = fs_utils.get_storage_options(group_path)
-        
+
         ds.to_zarr(
             group_path,
             mode="w" if no_children else "a",  # Write if no children, append otherwise
@@ -327,14 +328,14 @@ def recursive_copy(
         # Write manually the group in zarr.json
         print(f"Writing group metadata for '{group_prefix}'")
         group_path = f"{output_path}/{group_prefix}"
-        
+
         zarr_json_content = {
             "attributes": {},
             "zarr_format": 3,
             "consolidated_metadata": None,
-            "node_type": "group"
+            "node_type": "group",
         }
-        
+
         # Write JSON metadata using unified function
         zarr_json_path = fs_utils.normalize_path(f"{group_path}/zarr.json")
         fs_utils.write_json_metadata(zarr_json_path, zarr_json_content)
@@ -470,7 +471,7 @@ def write_geozarr_group(
 
     # Copy the attributes from the original dataset to the DataTree
     dt.attrs = ds.attrs.copy()
-    
+
     # Get storage options and write DataTree
     storage_options = fs_utils.get_storage_options(group_path)
     dt.to_zarr(
@@ -517,7 +518,9 @@ def write_geozarr_group(
     try:
         if fs_utils.path_exists(native_dataset_path):
             storage_options = fs_utils.get_storage_options(native_dataset_path)
-            existing_native_dataset = xr.open_zarr(native_dataset_path, zarr_format=3, storage_options=storage_options, chunks="auto")
+            existing_native_dataset = xr.open_zarr(
+                native_dataset_path, zarr_format=3, storage_options=storage_options, chunks="auto"
+            )
             print(f"Found existing native dataset at {native_dataset_path}")
     except Exception as e:
         print(f"Warning: Could not open existing native dataset at {native_dataset_path}: {e}")
@@ -564,7 +567,12 @@ def write_geozarr_group(
     # Reopen to ensure we have the latest state
     storage_options = fs_utils.get_storage_options(group_path)
     ds = xr.open_dataset(
-        group_path, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options, chunks="auto"
+        group_path,
+        engine="zarr",
+        zarr_format=3,
+        decode_coords="all",
+        storage_options=storage_options,
+        chunks="auto",
     ).compute()
 
     return ds
@@ -658,7 +666,7 @@ def create_geozarr_compliant_multiscales(
 
     # Add multiscales metadata to the group
     zarr_json_path = fs_utils.normalize_path(f"{output_path}/{group_name}/zarr.json")
-    
+
     # Handle JSON metadata using unified functions
     zarr_json = fs_utils.read_json_metadata(zarr_json_path)
 
@@ -731,9 +739,9 @@ def create_geozarr_compliant_multiscales(
 
         # Write overview level as children group (GeoZarr spec requirement)
         overview_path = fs_utils.normalize_path(f"{output_path}/{group_name}/{level}")
-        
+
         start_time = time.time()
-        
+
         # Get storage options and write overview dataset
         storage_options = fs_utils.get_storage_options(overview_path)
         print(f"Writing overview level {level} at {overview_path}")
@@ -752,7 +760,7 @@ def create_geozarr_compliant_multiscales(
             align_chunks=True,
             storage_options=storage_options,
         )
-            
+
         overview_datasets[level] = overview_ds
         proc_time = time.time() - start_time
 
@@ -1144,10 +1152,10 @@ def write_dataset_band_by_band_with_validation(
                     var_encoding = {
                         k: v for k, v in var_encoding.items() if k not in single_var_ds.coords
                     }
-                
+
                 # Ensure the dataset is properly chunked to align with encoding
-                if var in var_encoding and 'chunks' in var_encoding[var]:
-                    target_chunks = var_encoding[var]['chunks']
+                if var in var_encoding and "chunks" in var_encoding[var]:
+                    target_chunks = var_encoding[var]["chunks"]
                     # Create chunk dict using the actual dimensions of the variable
                     var_dims = single_var_ds[var].dims
                     chunk_dict = {}
@@ -1249,7 +1257,14 @@ def write_dataset_band_by_band_with_validation(
 
     # Reopen the dataset
     storage_options = fs_utils.get_storage_options(output_path)
-    ds = xr.open_dataset(output_path, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options, chunks="auto").compute()
+    ds = xr.open_dataset(
+        output_path,
+        engine="zarr",
+        zarr_format=3,
+        decode_coords="all",
+        storage_options=storage_options,
+        chunks="auto",
+    ).compute()
 
     # Report results
     if failed_vars:
