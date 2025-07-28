@@ -149,6 +149,44 @@ def write_s3_json_metadata(s3_path: str, metadata: Dict[str, Any], **s3_kwargs) 
     with fs.open(s3_path, "w") as f:
         f.write(json_content)
 
+def read_s3_json_metadata(s3_path: str, **s3_kwargs) -> Dict[str, Any]:
+    """
+    Read JSON metadata from S3.
+
+    Parameters
+    ----------
+    s3_path : str
+        S3 path for the JSON file
+    **s3_kwargs
+        Additional keyword arguments for s3fs.S3FileSystem
+
+    Returns
+    -------
+    dict
+        Parsed JSON metadata
+    """
+    # Set up default S3 configuration
+    default_s3_kwargs = {
+        "anon": False,
+        "use_ssl": True,
+        "asynchronous": False,  # Force synchronous mode
+        "client_kwargs": {
+            "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+        }
+    }
+    
+    # Add custom endpoint support (e.g., for OVH Cloud)
+    if "AWS_S3_ENDPOINT" in os.environ:
+        default_s3_kwargs["endpoint_url"] = os.environ["AWS_S3_ENDPOINT"]
+        default_s3_kwargs["client_kwargs"]["endpoint_url"] = os.environ["AWS_S3_ENDPOINT"]
+    
+    s3_config = {**default_s3_kwargs, **s3_kwargs}
+    fs = s3fs.S3FileSystem(**s3_config)
+    
+    with fs.open(s3_path, "r") as f:
+        content = f.read()
+    
+    return json.loads(content)
 
 def s3_path_exists(s3_path: str, **s3_kwargs) -> bool:
     """

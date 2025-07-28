@@ -695,12 +695,7 @@ def create_geozarr_compliant_multiscales(
     # Handle S3 vs local paths for JSON metadata
     if s3_utils.is_s3_path(output_path):
         # For S3, use s3fs with proper configuration
-        import s3fs
-        storage_options = s3_utils.get_s3_storage_options(zarr_json_path)
-        fs = s3fs.S3FileSystem(**storage_options)
-        
-        with fs.open(zarr_json_path, "r") as f:
-            zarr_json = json.load(f)
+        zarr_json = s3_utils.read_s3_json_metadata(zarr_json_path)
 
         zarr_json["attributes"]["multiscales"] = {
             "tile_matrix_set": tile_matrix_set,
