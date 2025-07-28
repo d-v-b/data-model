@@ -347,7 +347,7 @@ def recursive_copy(
         
         if s3_utils.is_s3_path(output_path):
             # For S3, write JSON metadata directly
-            s3_utils.write_s3_json_metadata(f"{group_path}/zarr.json", zarr_json_content)
+            s3_utils.write_s3_json_metadata(s3_utils.normalize_s3_path(f"{group_path}/zarr.json"), zarr_json_content)
         else:
             # For local paths, write to file
             with open(f"{group_path}/zarr.json", "w") as f:
@@ -362,7 +362,7 @@ def recursive_copy(
 
         # Consolidate metadata without removing existing metadata from children
         if s3_utils.is_s3_path(output_path):
-            zarr_group = s3_utils.open_s3_zarr_group(group_path, mode="r+")
+            zarr_group = s3_utils.open_s3_zarr_group(s3_utils.normalize_s3_path(group_path), mode="r+")
         else:
             zarr_group = zarr.open(
                 group_path,
