@@ -267,18 +267,33 @@ def recursive_copy(
 
     # Copy the current group to the GeoZarr DataTree
     if dt_node.data_vars:
-        # Set up encoding for variables
+        # Set up encoding for variables with proper chunk alignment
         for var in ds.data_vars:
-            # create chunks to the size of the data
-            data_shape = ds[var].shape
-            if len(data_shape) >= 2:
-                chunking = (
-                    1,
-                    data_shape[-2],
-                    data_shape[-1],
-                )
+            # Get the current chunks from the data array if it's dask-backed
+            if hasattr(ds[var].data, 'chunks'):
+                # Use existing dask chunks to ensure alignment
+                current_chunks = ds[var].chunks
+                if len(current_chunks) >= 2:
+                    # For 2D+ data, use the existing chunk structure
+                    chunking = tuple(current_chunks[i][0] if len(current_chunks[i]) > 0 else ds[var].shape[i] 
+                                   for i in range(len(current_chunks)))
+                else:
+                    # For 1D data
+                    chunking = (current_chunks[0][0] if len(current_chunks[0]) > 0 else ds[var].shape[0],)
             else:
-                chunking = (1, data_shape[-1])
+                # Fallback for non-dask arrays - use reasonable chunk sizes
+                data_shape = ds[var].shape
+                if len(data_shape) >= 2:
+                    # Use spatial_chunk size but ensure it doesn't exceed data dimensions
+                    chunk_y = min(spatial_chunk, data_shape[-2])
+                    chunk_x = min(spatial_chunk, data_shape[-1])
+                    if len(data_shape) == 3:
+                        chunking = (1, chunk_y, chunk_x)
+                    else:
+                        chunking = (chunk_y, chunk_x)
+                else:
+                    chunking = (min(spatial_chunk, data_shape[-1]),)
+            
             encoding[var] = {
                 "compressors": [compressor],
                 "chunks": chunking
@@ -1198,8 +1213,14 @@ def write_dataset_band_by_band_with_validation(
                     var_encoding = {
                         k: v for k, v in var_encoding.items() if k not in single_var_ds.coords
                     }
-                    
-                single_var_ds.chunk()
+                
+                # Ensure the dataset is properly chunked to align with encoding
+                if var in var_encoding and 'chunks' in var_encoding[var]:
+                    target_chunks = var_encoding[var]['chunks']
+                    # Rechunk the dataset to match the target chunks
+                    single_var_ds = single_var_ds.chunk({var: target_chunks})
+                else:
+                    single_var_ds = single_var_ds.chunk()
 
                 # Handle S3 vs local paths for zarr operations
                 if s3_utils.is_s3_path(output_path):
