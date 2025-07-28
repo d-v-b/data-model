@@ -269,8 +269,17 @@ def recursive_copy(
     if dt_node.data_vars:
         # Set up encoding for variables
         for var in ds.data_vars:
+            # create chunks to the size of the data
+            data_shape = ds[var].shape
+            if len(data_shape) >= 2:
+                chunking = (
+                    1,
+                    data_shape[-2],
+                    data_shape[-1],
+                )
             encoding[var] = {
                 "compressors": [compressor],
+                "chunks": chunking
             }
         for coord in ds.coords:
             encoding[coord] = {
@@ -527,11 +536,11 @@ def write_geozarr_group(
             if s3_utils.s3_path_exists(native_dataset_path):
                 store = s3_utils.create_s3_store(native_dataset_path)
                 storage_options = s3_utils.get_s3_storage_options(native_dataset_path)
-                existing_native_dataset = xr.open_zarr(store, zarr_format=3, storage_options=storage_options)
+                existing_native_dataset = xr.open_zarr(store, zarr_format=3, storage_options=storage_options, chunks="auto")
                 print(f"Found existing native dataset at {native_dataset_path}")
         else:
             if os.path.exists(native_dataset_path):
-                existing_native_dataset = xr.open_zarr(native_dataset_path, zarr_format=3)
+                existing_native_dataset = xr.open_zarr(native_dataset_path, zarr_format=3, chunks="auto")
                 print(f"Found existing native dataset at {native_dataset_path}")
     except Exception as e:
         print(f"Warning: Could not open existing native dataset at {native_dataset_path}: {e}")
@@ -583,10 +592,10 @@ def write_geozarr_group(
     if s3_utils.is_s3_path(output_path):
         store = s3_utils.create_s3_store(group_path)
         storage_options = s3_utils.get_s3_storage_options(output_path)
-        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options).compute()
+        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options, chunks="auto").compute()
     else:
         ds = xr.open_dataset(
-            group_path, engine="zarr", zarr_format=3, decode_coords="all"
+            group_path, engine="zarr", zarr_format=3, decode_coords="all", chunks="auto"
         ).compute()
 
     return ds
@@ -1292,9 +1301,9 @@ def write_dataset_band_by_band_with_validation(
     if s3_utils.is_s3_path(output_path):
         store = s3_utils.create_s3_store(output_path)
         storage_options = s3_utils.get_s3_storage_options(output_path)
-        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options).compute()
+        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options, chunks="auto").compute()
     else:
-        ds = xr.open_dataset(output_path, engine="zarr", zarr_format=3, decode_coords="all").compute()
+        ds = xr.open_dataset(output_path, engine="zarr", zarr_format=3, decode_coords="all", chunks="auto").compute()
 
     # Report results
     if failed_vars:
