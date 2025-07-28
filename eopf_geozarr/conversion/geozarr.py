@@ -277,6 +277,8 @@ def recursive_copy(
                     data_shape[-2],
                     data_shape[-1],
                 )
+            else:
+                chunking = (1, data_shape[-1])
             encoding[var] = {
                 "compressors": [compressor],
                 "chunks": chunking
