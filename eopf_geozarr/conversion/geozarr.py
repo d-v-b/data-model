@@ -535,7 +535,7 @@ def write_geozarr_group(
                 spatial_chunk_aligned = spatial_chunk
 
             encoding[var] = {
-                "chunks": (1, spatial_chunk_aligned, spatial_chunk_aligned),
+                "chunks": (spatial_chunk_aligned, spatial_chunk_aligned),
                 "compressors": compressor,
             }
 
@@ -784,7 +784,7 @@ def create_geozarr_compliant_multiscales(
                     utils.calculate_aligned_chunk_size(height, spatial_chunk),
                 )
                 encoding[var] = {
-                    "chunks": (1, spatial_chunk_aligned, spatial_chunk_aligned),
+                    "chunks": (spatial_chunk_aligned, spatial_chunk_aligned),
                     "compressors": compressor,
                 }
 
@@ -1242,7 +1242,6 @@ def write_dataset_band_by_band_with_validation(
                         consolidated=False,
                         zarr_format=3,
                         encoding=var_encoding,
-                        align_chunks=True,
                         storage_options=storage_options,
                     )
                 else:
@@ -1252,7 +1251,6 @@ def write_dataset_band_by_band_with_validation(
                         consolidated=False,
                         zarr_format=3,
                         encoding=var_encoding,
-                        align_chunks=True,
                     )
 
                 print(f"    ✅ Successfully wrote {var}")
