@@ -581,7 +581,8 @@ def write_geozarr_group(
     # Reopen to ensure we have the latest state
     if s3_utils.is_s3_path(output_path):
         store = s3_utils.create_s3_store(group_path)
-        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all").compute()
+        storage_options = s3_utils.get_s3_storage_options(output_path)
+        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options).compute()
     else:
         ds = xr.open_dataset(
             group_path, engine="zarr", zarr_format=3, decode_coords="all"
@@ -1290,7 +1291,8 @@ def write_dataset_band_by_band_with_validation(
     # Reopen the dataset
     if s3_utils.is_s3_path(output_path):
         store = s3_utils.create_s3_store(output_path)
-        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all").compute()
+        storage_options = s3_utils.get_s3_storage_options(output_path)
+        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options).compute()
     else:
         ds = xr.open_dataset(output_path, engine="zarr", zarr_format=3, decode_coords="all").compute()
 

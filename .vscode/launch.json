@@ -50,7 +50,7 @@
             "justMyCode": false,
             "console": "integratedTerminal",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/eopf_geozarr/.venv/bin",
+                "PYTHONPATH": "${workspaceFolder}/.venv/bin",
                 "AWS_ACCESS_KEY_ID": "secret",
                 "AWS_SECRET_ACCESS_KEY": "secret",
                 "AWS_DEFAULT_REGION": "gra",
