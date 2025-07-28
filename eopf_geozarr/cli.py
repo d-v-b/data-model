@@ -13,7 +13,7 @@ from typing import Optional
 import xarray as xr
 
 from . import create_geozarr_dataset
-from .conversion import is_s3_path, validate_s3_access, get_s3_credentials_info
+from .conversion.fs_utils import is_s3_path, validate_s3_access, get_s3_credentials_info
 
 
 def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Optional[object]:

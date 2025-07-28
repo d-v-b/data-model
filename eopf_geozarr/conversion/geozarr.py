@@ -32,7 +32,7 @@ from zarr.core.sync import sync
 from zarr.storage import StoreLike
 from zarr.storage._common import make_store_path
 
-from . import s3_utils, utils
+from . import fs_utils, utils
 
 
 def create_geozarr_dataset(
@@ -305,34 +305,24 @@ def recursive_copy(
         dt_node = ds
         is_dataset = True
 
-        # Handle S3 vs local paths for zarr operations
         # Fix double slash issue by normalizing the path
         if group_prefix.startswith("/"):
             group_path = f"{output_path}{group_prefix}"
         else:
             group_path = f"{output_path}/{group_prefix}"
         
-        # Normalize S3 paths to prevent double slashes (important for OVH S3)
-        if s3_utils.is_s3_path(output_path):
-            group_path = s3_utils.normalize_s3_path(group_path)
-            # For S3, use storage_options
-            storage_options = s3_utils.get_s3_storage_options(group_path)
-            ds.to_zarr(
-                group_path,
-                mode="w" if no_children else "a",  # Write if no children, append otherwise
-                consolidated=is_dataset,  # Consolidate metadata if it's a dataset
-                zarr_format=3,
-                encoding=encoding,
-                storage_options=storage_options,
-            )
-        else:
-            ds.to_zarr(
-                group_path,
-                mode="w" if no_children else "a",  # Write if no children, append otherwise
-                consolidated=is_dataset,  # Consolidate metadata if it's a dataset
-                zarr_format=3,
-                encoding=encoding,
-            )
+        # Normalize path and get storage options
+        group_path = fs_utils.normalize_path(group_path)
+        storage_options = fs_utils.get_storage_options(group_path)
+        
+        ds.to_zarr(
+            group_path,
+            mode="w" if no_children else "a",  # Write if no children, append otherwise
+            consolidated=is_dataset,  # Consolidate metadata if it's a dataset
+            zarr_format=3,
+            encoding=encoding,
+            storage_options=storage_options,
+        )
     else:
         # Write manually the group in zarr.json
         print(f"Writing group metadata for '{group_prefix}'")
@@ -345,30 +335,12 @@ def recursive_copy(
             "node_type": "group"
         }
         
-        if s3_utils.is_s3_path(output_path):
-            # For S3, write JSON metadata directly
-            s3_utils.write_s3_json_metadata(s3_utils.normalize_s3_path(f"{group_path}/zarr.json"), zarr_json_content)
-        else:
-            # For local paths, write to file
-            with open(f"{group_path}/zarr.json", "w") as f:
-                f.write(
-                    "{\n"
-                    '  "attributes": {},\n'
-                    '  "zarr_format": 3,\n'
-                    '  "consolidated_metadata": null,\n'
-                    '  "node_type": "group"\n'
-                    "}"
-                )
+        # Write JSON metadata using unified function
+        zarr_json_path = fs_utils.normalize_path(f"{group_path}/zarr.json")
+        fs_utils.write_json_metadata(zarr_json_path, zarr_json_content)
 
         # Consolidate metadata without removing existing metadata from children
-        if s3_utils.is_s3_path(output_path):
-            zarr_group = s3_utils.open_s3_zarr_group(s3_utils.normalize_s3_path(group_path), mode="r+")
-        else:
-            zarr_group = zarr.open(
-                group_path,
-                mode="r+",
-                zarr_format=3,
-            )
+        zarr_group = fs_utils.open_zarr_group(fs_utils.normalize_path(group_path), mode="r+")
         consolidate_metadata(zarr_group.store)
 
     return dt_node
@@ -494,33 +466,20 @@ def write_geozarr_group(
     # Create a new container for the group as we will need
     # to create siblings for the multiscales
     dt = xr.DataTree()
-    group_path = f"{output_path}/{group_name}"
-    
-    # Normalize S3 paths to prevent double slashes (important for OVH S3)
-    if s3_utils.is_s3_path(output_path):
-        group_path = s3_utils.normalize_s3_path(group_path)
+    group_path = fs_utils.normalize_path(f"{output_path}/{group_name}")
 
     # Copy the attributes from the original dataset to the DataTree
     dt.attrs = ds.attrs.copy()
     
-    # Handle S3 vs local paths for zarr operations
-    if s3_utils.is_s3_path(output_path):
-        # For S3, use storage_options
-        storage_options = s3_utils.get_s3_storage_options(group_path)
-        dt.to_zarr(
-            group_path,
-            mode="a",  # Append mode to add to the group
-            consolidated=False,  # No consolidate metadata
-            zarr_format=3,  # Use Zarr format 3
-            storage_options=storage_options,
-        )
-    else:
-        dt.to_zarr(
-            group_path,
-            mode="a",  # Append mode to add to the group
-            consolidated=False,  # No consolidate metadata
-            zarr_format=3,  # Use Zarr format 3
-        )
+    # Get storage options and write DataTree
+    storage_options = fs_utils.get_storage_options(group_path)
+    dt.to_zarr(
+        group_path,
+        mode="a",  # Append mode to add to the group
+        consolidated=False,  # No consolidate metadata
+        zarr_format=3,  # Use Zarr format 3
+        storage_options=storage_options,
+    )
 
     # Create encoding for all variables in this group
     encoding = {}
@@ -556,16 +515,10 @@ def write_geozarr_group(
     # Try to open the existing group path
     existing_native_dataset = None
     try:
-        if s3_utils.is_s3_path(output_path):
-            if s3_utils.s3_path_exists(native_dataset_path):
-                store = s3_utils.create_s3_store(native_dataset_path)
-                storage_options = s3_utils.get_s3_storage_options(native_dataset_path)
-                existing_native_dataset = xr.open_zarr(store, zarr_format=3, storage_options=storage_options, chunks="auto")
-                print(f"Found existing native dataset at {native_dataset_path}")
-        else:
-            if os.path.exists(native_dataset_path):
-                existing_native_dataset = xr.open_zarr(native_dataset_path, zarr_format=3, chunks="auto")
-                print(f"Found existing native dataset at {native_dataset_path}")
+        if fs_utils.path_exists(native_dataset_path):
+            storage_options = fs_utils.get_storage_options(native_dataset_path)
+            existing_native_dataset = xr.open_zarr(native_dataset_path, zarr_format=3, storage_options=storage_options, chunks="auto")
+            print(f"Found existing native dataset at {native_dataset_path}")
     except Exception as e:
         print(f"Warning: Could not open existing native dataset at {native_dataset_path}: {e}")
         existing_native_dataset = None
@@ -603,24 +556,16 @@ def write_geozarr_group(
     ds.close()  # Close the original dataset to release resources
 
     # Open the zarr group and consolidate
-    if s3_utils.is_s3_path(output_path):
-        zarr_group = s3_utils.open_s3_zarr_group(group_path, mode="r+")
-    else:
-        zarr_group = zarr.open_group(group_path, mode="r+", zarr_format=3)
-    
+    zarr_group = fs_utils.open_zarr_group(group_path, mode="r+")
     consolidate_metadata(zarr_group.store)
 
     print("  ✅ Metadata consolidated")
 
     # Reopen to ensure we have the latest state
-    if s3_utils.is_s3_path(output_path):
-        store = s3_utils.create_s3_store(group_path)
-        storage_options = s3_utils.get_s3_storage_options(output_path)
-        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options, chunks="auto").compute()
-    else:
-        ds = xr.open_dataset(
-            group_path, engine="zarr", zarr_format=3, decode_coords="all", chunks="auto"
-        ).compute()
+    storage_options = fs_utils.get_storage_options(group_path)
+    ds = xr.open_dataset(
+        group_path, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options, chunks="auto"
+    ).compute()
 
     return ds
 
@@ -712,37 +657,18 @@ def create_geozarr_compliant_multiscales(
         }
 
     # Add multiscales metadata to the group
-    zarr_json_path = f"{output_path}/{group_name}/zarr.json"
+    zarr_json_path = fs_utils.normalize_path(f"{output_path}/{group_name}/zarr.json")
     
-    # Normalize S3 paths to prevent double slashes (important for OVH S3)
-    if s3_utils.is_s3_path(output_path):
-        zarr_json_path = s3_utils.normalize_s3_path(zarr_json_path)
-    
-    # Handle S3 vs local paths for JSON metadata
-    if s3_utils.is_s3_path(output_path):
-        # For S3, use s3fs with proper configuration
-        zarr_json = s3_utils.read_s3_json_metadata(zarr_json_path)
+    # Handle JSON metadata using unified functions
+    zarr_json = fs_utils.read_json_metadata(zarr_json_path)
 
-        zarr_json["attributes"]["multiscales"] = {
-            "tile_matrix_set": tile_matrix_set,
-            "resampling_method": "average",
-            "tile_matrix_limits": tile_matrix_limits,
-        }
+    zarr_json["attributes"]["multiscales"] = {
+        "tile_matrix_set": tile_matrix_set,
+        "resampling_method": "average",
+        "tile_matrix_limits": tile_matrix_limits,
+    }
 
-        s3_utils.write_s3_json_metadata(zarr_json_path, zarr_json)
-    else:
-        # Local file operations
-        with open(zarr_json_path, "r") as f:
-            zarr_json = json.load(f)
-
-        zarr_json["attributes"]["multiscales"] = {
-            "tile_matrix_set": tile_matrix_set,
-            "resampling_method": "average",
-            "tile_matrix_limits": tile_matrix_limits,
-        }
-
-        with open(zarr_json_path, "w") as f:
-            json.dump(zarr_json, f, indent=2)
+    fs_utils.write_json_metadata(zarr_json_path, zarr_json)
 
     print(f"Added multiscales metadata to {group_name}")
 
@@ -804,43 +730,28 @@ def create_geozarr_compliant_multiscales(
             encoding[coord] = {"compressors": None}
 
         # Write overview level as children group (GeoZarr spec requirement)
-        overview_path = f"{output_path}/{group_name}/{level}"
-        
-        # Normalize S3 paths to prevent double slashes (important for OVH S3)
-        if s3_utils.is_s3_path(output_path):
-            overview_path = s3_utils.normalize_s3_path(overview_path)
+        overview_path = fs_utils.normalize_path(f"{output_path}/{group_name}/{level}")
         
         start_time = time.time()
         
-        if s3_utils.is_s3_path(output_path):
-            # For S3, use storage_options
-            storage_options = s3_utils.get_s3_storage_options(overview_path)
-            print(f"Writing overview level {level} to S3 at {overview_path}")
+        # Get storage options and write overview dataset
+        storage_options = fs_utils.get_storage_options(overview_path)
+        print(f"Writing overview level {level} at {overview_path}")
 
-            overview_ds.to_zarr(
-                overview_path,
-                mode="w",
-                consolidated=True,
-                storage_options=storage_options,
-                encoding=encoding,
-                align_chunks=True,
-            )
-            
-        else:
-            print(f"Writing overview level {level} to local path at {overview_path}")
-
-            # Ensure the directory exists
+        # Ensure the directory exists for local paths
+        if not fs_utils.is_s3_path(overview_path):
             os.makedirs(os.path.dirname(overview_path), exist_ok=True)
 
-            # Write the overview dataset to Zarr
-            overview_ds.to_zarr(
-                overview_path,
-                mode="w",
-                consolidated=True,
-                zarr_format=3,
-                encoding=encoding,
-                align_chunks=True,
-            )
+        # Write the overview dataset to Zarr
+        overview_ds.to_zarr(
+            overview_path,
+            mode="w",
+            consolidated=True,
+            zarr_format=3,
+            encoding=encoding,
+            align_chunks=True,
+            storage_options=storage_options,
+        )
             
         overview_datasets[level] = overview_ds
         proc_time = time.time() - start_time
@@ -1248,26 +1159,16 @@ def write_dataset_band_by_band_with_validation(
                 else:
                     single_var_ds = single_var_ds.chunk()
 
-                # Handle S3 vs local paths for zarr operations
-                if s3_utils.is_s3_path(output_path):
-                    # For S3, use storage_options
-                    storage_options = s3_utils.get_s3_storage_options(output_path)
-                    single_var_ds.to_zarr(
-                        output_path,
-                        mode=mode,
-                        consolidated=False,
-                        zarr_format=3,
-                        encoding=var_encoding,
-                        storage_options=storage_options,
-                    )
-                else:
-                    single_var_ds.to_zarr(
-                        output_path,
-                        mode=mode,
-                        consolidated=False,
-                        zarr_format=3,
-                        encoding=var_encoding,
-                    )
+                # Get storage options and write variable
+                storage_options = fs_utils.get_storage_options(output_path)
+                single_var_ds.to_zarr(
+                    output_path,
+                    mode=mode,
+                    consolidated=False,
+                    zarr_format=3,
+                    encoding=var_encoding,
+                    storage_options=storage_options,
+                )
 
                 print(f"    ✅ Successfully wrote {var}")
                 successful_vars.append(var)
@@ -1307,26 +1208,16 @@ def write_dataset_band_by_band_with_validation(
         success = False
         for attempt in range(max_retries):
             try:
-                # Handle S3 vs local paths for zarr operations
-                if s3_utils.is_s3_path(output_path):
-                    # For S3, use storage_options
-                    storage_options = s3_utils.get_s3_storage_options(output_path)
-                    single_var_ds.to_zarr(
-                        output_path,
-                        mode="a",  # Always append for grid_mapping variables
-                        consolidated=False,
-                        zarr_format=3,
-                        encoding=var_encoding,
-                        storage_options=storage_options,
-                    )
-                else:
-                    single_var_ds.to_zarr(
-                        output_path,
-                        mode="a",  # Always append for grid_mapping variables
-                        consolidated=False,
-                        zarr_format=3,
-                        encoding=var_encoding,
-                    )
+                # Get storage options and write grid_mapping variable
+                storage_options = fs_utils.get_storage_options(output_path)
+                single_var_ds.to_zarr(
+                    output_path,
+                    mode="a",  # Always append for grid_mapping variables
+                    consolidated=False,
+                    zarr_format=3,
+                    encoding=var_encoding,
+                    storage_options=storage_options,
+                )
 
                 print(f"    ✅ Successfully wrote {var}")
                 successful_vars.append(var)
@@ -1348,14 +1239,7 @@ def write_dataset_band_by_band_with_validation(
             print(f"  Failed to write grid_mapping variable {var}")
 
     # Consolidate metadata without removing existing metadata from children
-    if s3_utils.is_s3_path(output_path):
-        zarr_group = s3_utils.open_s3_zarr_group(output_path, mode="r+")
-    else:
-        zarr_group = zarr.open(
-            f"{output_path}",
-            mode="r+",
-            zarr_format=3,
-        )
+    zarr_group = fs_utils.open_zarr_group(output_path, mode="r+")
     consolidate_metadata(zarr_group.store)
 
     print(f"  ✅ Metadata consolidated for {len(successful_vars)} variables")
@@ -1364,12 +1248,8 @@ def write_dataset_band_by_band_with_validation(
     ds.close()
 
     # Reopen the dataset
-    if s3_utils.is_s3_path(output_path):
-        store = s3_utils.create_s3_store(output_path)
-        storage_options = s3_utils.get_s3_storage_options(output_path)
-        ds = xr.open_dataset(store, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options, chunks="auto").compute()
-    else:
-        ds = xr.open_dataset(output_path, engine="zarr", zarr_format=3, decode_coords="all", chunks="auto").compute()
+    storage_options = fs_utils.get_storage_options(output_path)
+    ds = xr.open_dataset(output_path, engine="zarr", zarr_format=3, decode_coords="all", storage_options=storage_options, chunks="auto").compute()
 
     # Report results
     if failed_vars:

@@ -8,7 +8,7 @@ from .geozarr import (
     recursive_copy,
     setup_datatree_metadata_geozarr_spec_compliant,
 )
-from .s3_utils import (
+from .fs_utils import (
     create_s3_store,
     get_s3_credentials_info,
     is_s3_path,
