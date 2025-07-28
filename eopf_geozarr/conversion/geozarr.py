@@ -1221,8 +1221,14 @@ def write_dataset_band_by_band_with_validation(
                 # Ensure the dataset is properly chunked to align with encoding
                 if var in var_encoding and 'chunks' in var_encoding[var]:
                     target_chunks = var_encoding[var]['chunks']
+                    # Create chunk dict using the actual dimensions of the variable
+                    var_dims = single_var_ds[var].dims
+                    chunk_dict = {}
+                    for i, dim in enumerate(var_dims):
+                        if i < len(target_chunks):
+                            chunk_dict[dim] = target_chunks[i]
                     # Rechunk the dataset to match the target chunks
-                    single_var_ds = single_var_ds.chunk({var: target_chunks})
+                    single_var_ds = single_var_ds.chunk(chunk_dict)
                 else:
                     single_var_ds = single_var_ds.chunk()
 
