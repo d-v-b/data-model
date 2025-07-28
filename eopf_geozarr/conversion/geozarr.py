@@ -775,16 +775,38 @@ def create_geozarr_compliant_multiscales(
 
         # Write overview level as children group (GeoZarr spec requirement)
         overview_path = f"{output_path}/{group_name}/{level}"
-
         start_time = time.time()
-        overview_ds.to_zarr(
-            overview_path,
-            mode="w",
-            consolidated=True,
-            zarr_format=3,
-            encoding=encoding,
-            align_chunks=True,
-        )
+        
+        if s3_utils.is_s3_path(output_path):
+            # For S3, use storage_options
+            storage_options = s3_utils.get_s3_storage_options(overview_path)
+            print(f"Writing overview level {level} to S3 at {overview_path}")
+
+            overview_ds.to_zarr(
+                overview_path,
+                mode="w",
+                consolidated=True,
+                storage_options=storage_options,
+                encoding=encoding,
+                align_chunks=True,
+            )
+            
+        else:
+            print(f"Writing overview level {level} to local path at {overview_path}")
+
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(overview_path), exist_ok=True)
+
+            # Write the overview dataset to Zarr
+            overview_ds.to_zarr(
+                overview_path,
+                mode="w",
+                consolidated=True,
+                zarr_format=3,
+                encoding=encoding,
+                align_chunks=True,
+            )
+            
         overview_datasets[level] = overview_ds
         proc_time = time.time() - start_time
 
