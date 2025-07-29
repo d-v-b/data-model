@@ -8,11 +8,56 @@ This module provides CLI commands for converting EOPF datasets to GeoZarr compli
 import argparse
 import sys
 from pathlib import Path
+from typing import Optional
 
 import xarray as xr
 
 from . import create_geozarr_dataset
-from .conversion import is_s3_path, validate_s3_access, get_s3_credentials_info
+from .conversion.fs_utils import get_s3_credentials_info, is_s3_path, validate_s3_access
+
+
+def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Optional[object]:
+    """
+    Set up a dask cluster for parallel processing.
+
+    Parameters
+    ----------
+    enable_dask : bool
+        Whether to enable dask cluster
+    verbose : bool, default False
+        Enable verbose output
+
+    Returns
+    -------
+    dask.distributed.Client or None
+        Dask client if enabled, None otherwise
+    """
+    if not enable_dask:
+        return None
+
+    try:
+        from dask.distributed import Client
+
+        # Set up local cluster
+        client = Client()  # set up local cluster
+
+        if verbose:
+            print(f"🚀 Dask cluster started: {client}")
+            print(f"   Dashboard: {client.dashboard_link}")
+            print(f"   Workers: {len(client.scheduler_info()['workers'])}")
+        else:
+            print("🚀 Dask cluster started for parallel processing")
+
+        return client
+
+    except ImportError:
+        print(
+            "❌ Error: dask.distributed not available. Install with: pip install 'dask[distributed]'"
+        )
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error starting dask cluster: {e}")
+        sys.exit(1)
 
 
 def convert_command(args: argparse.Namespace) -> None:
@@ -24,64 +69,69 @@ def convert_command(args: argparse.Namespace) -> None:
     args : argparse.Namespace
         Command line arguments
     """
-    # Validate input path (handle both local paths and URLs)
-    input_path_str = args.input_path
-    if input_path_str.startswith(("http://", "https://", "s3://", "gs://")):
-        # URL - no local validation needed
-        input_path = input_path_str
-    else:
-        # Local path - validate existence
-        input_path = Path(input_path_str)
-        if not input_path.exists():
-            print(f"Error: Input path {input_path} does not exist")
-            sys.exit(1)
-        input_path = str(input_path)
-
-    # Handle output path validation
-    output_path_str = args.output_path
-    if is_s3_path(output_path_str):
-        # S3 path - validate S3 access
-        print("🔍 Validating S3 access...")
-        success, error_msg = validate_s3_access(output_path_str)
-        if not success:
-            print(f"❌ Error: Cannot access S3 path {output_path_str}")
-            print(f"   Reason: {error_msg}")
-            print("\n💡 S3 Configuration Help:")
-            print("   Make sure you have S3 credentials configured:")
-            print("   - Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables")
-            print("   - Set AWS_DEFAULT_REGION (default: us-east-1)")
-            print("   - For custom S3 providers (e.g., OVH Cloud), set AWS_S3_ENDPOINT")
-            print("   - Or configure AWS CLI with 'aws configure'")
-            print("   - Or use IAM roles if running on EC2")
-            
-            if args.verbose:
-                creds_info = get_s3_credentials_info()
-                print(f"\n🔧 Current AWS configuration:")
-                for key, value in creds_info.items():
-                    print(f"   {key}: {value or 'Not set'}")
-            
-            sys.exit(1)
-        
-        print("✅ S3 access validated successfully")
-        output_path = output_path_str
-    else:
-        # Local path - create directory if it doesn't exist
-        output_path = Path(output_path_str)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path = str(output_path)
-
-    if args.verbose:
-        print(f"Loading EOPF dataset from: {input_path}")
-        print(f"Groups to convert: {args.groups}")
-        print(f"Output path: {output_path}")
-        print(f"Spatial chunk size: {args.spatial_chunk}")
-        print(f"Min dimension: {args.min_dimension}")
-        print(f"Tile width: {args.tile_width}")
+    # Set up dask cluster if requested
+    dask_client = setup_dask_cluster(
+        enable_dask=getattr(args, "dask_cluster", False), verbose=args.verbose
+    )
 
     try:
+        # Validate input path (handle both local paths and URLs)
+        input_path_str = args.input_path
+        if input_path_str.startswith(("http://", "https://", "s3://", "gs://")):
+            # URL - no local validation needed
+            input_path = input_path_str
+        else:
+            # Local path - validate existence
+            input_path = Path(input_path_str)
+            if not input_path.exists():
+                print(f"Error: Input path {input_path} does not exist")
+                sys.exit(1)
+            input_path = str(input_path)
+
+        # Handle output path validation
+        output_path_str = args.output_path
+        if is_s3_path(output_path_str):
+            # S3 path - validate S3 access
+            print("🔍 Validating S3 access...")
+            success, error_msg = validate_s3_access(output_path_str)
+            if not success:
+                print(f"❌ Error: Cannot access S3 path {output_path_str}")
+                print(f"   Reason: {error_msg}")
+                print("\n💡 S3 Configuration Help:")
+                print("   Make sure you have S3 credentials configured:")
+                print("   - Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables")
+                print("   - Set AWS_DEFAULT_REGION (default: us-east-1)")
+                print("   - For custom S3 providers (e.g., OVH Cloud), set AWS_S3_ENDPOINT")
+                print("   - Or configure AWS CLI with 'aws configure'")
+                print("   - Or use IAM roles if running on EC2")
+
+                if args.verbose:
+                    creds_info = get_s3_credentials_info()
+                    print(f"\n🔧 Current AWS configuration:")
+                    for key, value in creds_info.items():
+                        print(f"   {key}: {value or 'Not set'}")
+
+                sys.exit(1)
+
+            print("✅ S3 access validated successfully")
+            output_path = output_path_str
+        else:
+            # Local path - create directory if it doesn't exist
+            output_path = Path(output_path_str)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path = str(output_path)
+
+        if args.verbose:
+            print(f"Loading EOPF dataset from: {input_path}")
+            print(f"Groups to convert: {args.groups}")
+            print(f"Output path: {output_path}")
+            print(f"Spatial chunk size: {args.spatial_chunk}")
+            print(f"Min dimension: {args.min_dimension}")
+            print(f"Tile width: {args.tile_width}")
+
         # Load the EOPF DataTree
         print("Loading EOPF dataset...")
-        dt = xr.open_datatree(str(input_path), engine="zarr")
+        dt = xr.open_datatree(str(input_path), engine="zarr", chunks="auto")
 
         if args.verbose:
             print(f"Loaded DataTree with {len(dt.children)} groups")
@@ -117,6 +167,16 @@ def convert_command(args: argparse.Namespace) -> None:
 
             traceback.print_exc()
         sys.exit(1)
+    finally:
+        # Clean up dask client if it was created
+        if dask_client is not None:
+            try:
+                dask_client.close()
+                if args.verbose:
+                    print("🔄 Dask cluster closed")
+            except Exception as e:
+                if args.verbose:
+                    print(f"Warning: Error closing dask cluster: {e}")
 
 
 def info_command(args: argparse.Namespace) -> None:
@@ -143,7 +203,7 @@ def info_command(args: argparse.Namespace) -> None:
 
     try:
         print(f"Loading dataset from: {input_path}")
-        dt = xr.open_datatree(input_path, engine="zarr")
+        dt = xr.open_datatree(input_path, engine="zarr", chunks="auto")
 
         print("\nDataset Information:")
         print("==================")
@@ -185,7 +245,7 @@ def validate_command(args: argparse.Namespace) -> None:
 
     try:
         print(f"Validating GeoZarr compliance for: {input_path}")
-        dt = xr.open_datatree(input_path, engine="zarr")
+        dt = xr.open_datatree(input_path, engine="zarr", chunks="auto")
 
         compliance_issues = []
         total_variables = 0
@@ -273,7 +333,11 @@ def create_parser() -> argparse.ArgumentParser:
     convert_parser.add_argument(
         "input_path", type=str, help="Path to input EOPF dataset (Zarr format)"
     )
-    convert_parser.add_argument("output_path", type=str, help="Path for output GeoZarr dataset (local path or S3 URL like s3://bucket/path)")
+    convert_parser.add_argument(
+        "output_path",
+        type=str,
+        help="Path for output GeoZarr dataset (local path or S3 URL like s3://bucket/path)",
+    )
     convert_parser.add_argument(
         "--groups",
         type=str,
@@ -306,6 +370,11 @@ def create_parser() -> argparse.ArgumentParser:
         help="Maximum number of retries for network operations (default: 3)",
     )
     convert_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    convert_parser.add_argument(
+        "--dask-cluster",
+        action="store_true",
+        help="Start a local dask cluster for parallel processing of chunks",
+    )
     convert_parser.set_defaults(func=convert_command)
 
     # Info command
