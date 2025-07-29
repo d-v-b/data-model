@@ -13,7 +13,7 @@ from typing import Optional
 import xarray as xr
 
 from . import create_geozarr_dataset
-from .conversion.fs_utils import get_s3_credentials_info, is_s3_path, validate_s3_access
+from .conversion.fs_utils import get_s3_credentials_info, get_storage_options, is_s3_path, validate_s3_access
 
 
 def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Optional[object]:
@@ -129,9 +129,10 @@ def convert_command(args: argparse.Namespace) -> None:
             print(f"Min dimension: {args.min_dimension}")
             print(f"Tile width: {args.tile_width}")
 
-        # Load the EOPF DataTree
+        # Load the EOPF DataTree with appropriate storage options
         print("Loading EOPF dataset...")
-        dt = xr.open_datatree(str(input_path), engine="zarr", chunks="auto")
+        storage_options = get_storage_options(input_path)
+        dt = xr.open_datatree(str(input_path), engine="zarr", chunks="auto", storage_options=storage_options)
 
         if args.verbose:
             print(f"Loaded DataTree with {len(dt.children)} groups")
@@ -203,7 +204,9 @@ def info_command(args: argparse.Namespace) -> None:
 
     try:
         print(f"Loading dataset from: {input_path}")
-        dt = xr.open_datatree(input_path, engine="zarr", chunks="auto")
+        # Use unified storage options for S3 support
+        storage_options = get_storage_options(input_path)
+        dt = xr.open_datatree(input_path, engine="zarr", chunks="auto", storage_options=storage_options)
 
         print("\nDataset Information:")
         print("==================")
@@ -245,7 +248,9 @@ def validate_command(args: argparse.Namespace) -> None:
 
     try:
         print(f"Validating GeoZarr compliance for: {input_path}")
-        dt = xr.open_datatree(input_path, engine="zarr", chunks="auto")
+        # Use unified storage options for S3 support
+        storage_options = get_storage_options(input_path)
+        dt = xr.open_datatree(input_path, engine="zarr", chunks="auto", storage_options=storage_options)
 
         compliance_issues = []
         total_variables = 0
