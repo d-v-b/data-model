@@ -1,16 +1,35 @@
+"""GeoZarr data API for Zarr V2."""
 from __future__ import annotations
+
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, AfterValidator, Field, model_serializer, model_validator
-from pydantic_zarr.v2 import ArraySpec, GroupSpec, from_flat_group, AnyArraySpec, AnyGroupSpec, TAttr, TItem
+from pydantic import AfterValidator, BaseModel, Field, model_serializer, model_validator
+from pydantic_zarr.v2 import (
+    AnyArraySpec,
+    AnyGroupSpec,
+    ArraySpec,
+    GroupSpec,
+    TAttr,
+    TItem,
+    from_flat_group,
+)
 
 from eopf_geozarr.data_api.geozarr.common import MultiscaleAttrs, check_standard_name
 
 CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
 
+
 class MyGroupSpec(GroupSpec[TAttr, TItem]):
+    """
+    A custom GroupSpec
+    
+    We override the from_flat method to ensure that we can pass by_alias=True
+    when creating a GroupSpec from a flat hierarchy.
+    """
     @classmethod
-    def from_flat(cls, data: dict[str, AnyArraySpec | AnyGroupSpec], *, by_alias: bool = False) -> Self:
+    def from_flat(
+        cls, data: dict[str, AnyArraySpec | AnyGroupSpec], *, by_alias: bool = False
+    ) -> Self:
         """
         Create a `GroupSpec` from a flat hierarchy representation. The flattened hierarchy is a
         `dict` with the following constraints: keys must be valid paths; values must
@@ -42,6 +61,7 @@ class MyGroupSpec(GroupSpec[TAttr, TItem]):
         from_flated = from_flat_group(data)
         return cls(**from_flated.model_dump(by_alias=by_alias))
 
+
 class CoordArrayAttrs(BaseModel, populate_by_name=True):
     """
     Attributes for a GeoZarr coordinate array.
@@ -59,7 +79,7 @@ class CoordArrayAttrs(BaseModel, populate_by_name=True):
         The name of the grid mapping, which is a string that describes the type of grid mapping
         used for the variable.
     """
-    
+
     array_dimensions: tuple[str] = Field(alias="_ARRAY_DIMENSIONS")
     standard_name: CFStandardName
     long_name: str | None = None
@@ -69,9 +89,11 @@ class CoordArrayAttrs(BaseModel, populate_by_name=True):
 
 class CoordArray(ArraySpec[CoordArrayAttrs]):
     """
-    A GeoZarr coordinate array variable. It must be 1-dimensional and have a single element in 
-    its array_dimensions attribute.
+    A GeoZarr coordinate array variable. 
+    
+    It must be 1-dimensional and have a single element in its array_dimensions attribute.
     """
+
     shape: tuple[int]
 
 
@@ -102,12 +124,9 @@ class DataArrayAttrs(BaseModel, populate_by_name=True):
     grid_mapping_name: str
 
 
-
-
 class DataArray(ArraySpec[DataArrayAttrs]):
     """
     A GeoZarr DataArray variable.
-    
 
     References
     ----------
@@ -136,17 +155,25 @@ def check_valid_coordinates(model: GroupSpec[Any, Any]) -> Dataset:
     if model.members is None:
         raise ValueError("Model members cannot be None")
 
-    arrays: dict[str, DataArray] = {k: v for k, v in model.members.items() if isinstance(v, DataArray)}
+    arrays: dict[str, DataArray] = {
+        k: v for k, v in model.members.items() if isinstance(v, DataArray)
+    }
     for key, array in arrays.items():
         for idx, dim in enumerate(array.attributes.array_dimensions):
             if dim not in model.members:
-                raise ValueError(f"Dimension '{dim}' for array '{key}' is not defined in the model members.")
+                raise ValueError(
+                    f"Dimension '{dim}' for array '{key}' is not defined in the model members."
+                )
             member = model.members[dim]
             if isinstance(member, GroupSpec):
-                raise ValueError(f"Dimension '{dim}' for array '{key}' should be a group. Found an array instead.")
+                raise ValueError(
+                    f"Dimension '{dim}' for array '{key}' should be a group. Found an array instead."
+                )
             if member.shape[0] != array.shape[idx]:
-                raise ValueError(f"Dimension '{dim}' for array '{key}' has a shape mismatch: "
-                                 f"{member.shape[0]} != {array.shape[idx]}.")
+                raise ValueError(
+                    f"Dimension '{dim}' for array '{key}' has a shape mismatch: "
+                    f"{member.shape[0]} != {array.shape[idx]}."
+                )
     return model
 
 
@@ -158,9 +185,15 @@ class DatasetAttrs(BaseModel):
     ----------
     multiscales: MultiscaleAttrs
     """
+
     multiscales: MultiscaleAttrs
 
+
 class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
+    """
+    A GeoZarr Dataset.
+    """
+
     @model_validator(mode="after")
     def check_valid_coordinates(self) -> Self:
         """
@@ -174,4 +207,4 @@ class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
         GroupSpec[Any, Any]
             The validated GeoZarr DataSet.
         """
-        return check_valid_coordinates(self)    
+        return check_valid_coordinates(self)
