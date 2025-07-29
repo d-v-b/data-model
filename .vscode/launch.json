@@ -96,7 +96,8 @@
             "args": [
                 "info",
                 "s3://esa-zarr-sentinel-explorer-fra/tests-output/eopf_geozarr/S2A_MSIL2A_20250704T094051_N0511_R036_T33SWB_20250704T115824.zarr",
-                "--verbose"
+                "--verbose",
+                "--html-output", "dataset_info.html"
             ],
             "cwd": "${workspaceFolder}",
             "justMyCode": false,
