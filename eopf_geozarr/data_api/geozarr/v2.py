@@ -95,7 +95,7 @@ class DataArray(ArraySpec[DataArrayAttrs]):
     """
 
 
-def check_valid_coordinates(model: GroupSpec[Any, Any]) -> Dataset:
+def check_valid_coordinates(model: GroupSpec[Any, DataArray | CoordArray]) -> Dataset:
     """
     Check if the coordinates of the DataArrays listed in a GeoZarr DataSet are valid.
 

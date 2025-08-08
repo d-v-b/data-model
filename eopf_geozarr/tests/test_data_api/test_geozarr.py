@@ -147,7 +147,7 @@ class TestCheckValidCoordinates:
                         grid_mapping_name="latitude_longitude",
                     ),
                 ),
-                "/time": ArraySpec(
+                "/time": CoordArray(
                     shape=(10,),
                     dtype="|u1",
                     chunks=(10,),
@@ -155,7 +155,7 @@ class TestCheckValidCoordinates:
                         _ARRAY_DIMENSIONS=["time"], standard_name="time", units="s", axis="T"
                     ),
                 ),
-                "/lat": ArraySpec(
+                "/lat": CoordArray(
                     shape=(11,),
                     dtype="|u1",
                     chunks=(11,),
@@ -167,7 +167,7 @@ class TestCheckValidCoordinates:
         ],
     )
     @staticmethod
-    def test_invalid(example: dict[str, ArraySpec[Any] | GroupSpec[Any, Any]]) -> None:
+    def test_invalid_coordinates(example: dict[str, ArraySpec[Any] | GroupSpec[Any, Any]]) -> None:
         """
         Test the check_valid_coordinates function to ensure it validates coordinates correctly.
 
