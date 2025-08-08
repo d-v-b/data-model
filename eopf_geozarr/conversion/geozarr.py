@@ -999,7 +999,17 @@ def create_overview_dataset_all_vars(
     }
 
     # Find the grid_mapping variable name from the source dataset
+    # Check both dataset attributes and individual variable attributes
     grid_mapping_var_name = ds.attrs.get("grid_mapping", None)
+    if not grid_mapping_var_name and data_vars:
+        # Try to find grid_mapping from the first data variable
+        first_var = data_vars[0]
+        if first_var in ds and "grid_mapping" in ds[first_var].attrs:
+            grid_mapping_var_name = ds[first_var].attrs["grid_mapping"]
+    
+    # If still not found, use default name
+    if not grid_mapping_var_name:
+        grid_mapping_var_name = "spatial_ref"
 
     # Downsample all data variables
     for var in data_vars:
@@ -1026,34 +1036,64 @@ def create_overview_dataset_all_vars(
         attrs = {
             "standard_name": ds[var].attrs.get("standard_name", "toa_bidirectional_reflectance"),
             "_ARRAY_DIMENSIONS": dims,
+            "grid_mapping": grid_mapping_var_name,  # Ensure all data variables have grid_mapping
         }
-
-        if grid_mapping_var_name:
-            attrs["grid_mapping"] = grid_mapping_var_name
 
         overview_data_vars[var] = (dims, downsampled_data, attrs)
 
     # Create overview dataset
     overview_ds = xr.Dataset(overview_data_vars, coords=overview_coords)
 
-    # Add the grid_mapping variable if it exists in the source
-    if grid_mapping_var_name and grid_mapping_var_name in ds:
-        # Copy the grid_mapping variable but update GeoTransform for this level
+    # Ensure the grid_mapping variable is properly added to the overview dataset
+    # First, try to find it in the source dataset
+    if grid_mapping_var_name in ds:
+        # Copy the existing grid_mapping variable and update its attributes
         grid_mapping_attrs = ds[grid_mapping_var_name].attrs.copy()
-
+        
         # Update GeoTransform for this overview level
         transform_gdal = overview_transform.to_gdal()
         transform_str = " ".join([str(i) for i in transform_gdal])
         grid_mapping_attrs["GeoTransform"] = transform_str
+        grid_mapping_attrs["_ARRAY_DIMENSIONS"] = []  # Required for auxiliary variables
+
+        # Create the grid_mapping variable
+        overview_ds[grid_mapping_var_name] = xr.DataArray(
+            data=ds[grid_mapping_var_name].values,  # Copy the original data
+            attrs=grid_mapping_attrs,
+        )
+    else:
+        # Create a new grid_mapping variable if it doesn't exist in source
+        print(f"  Creating new grid_mapping variable '{grid_mapping_var_name}' for overview level {level}")
+        
+        # Update GeoTransform for this overview level
+        transform_gdal = overview_transform.to_gdal()
+        transform_str = " ".join([str(i) for i in transform_gdal])
+        
+        # Create grid_mapping attributes based on the CRS
+        grid_mapping_attrs = {
+            "_ARRAY_DIMENSIONS": [],  # Required for auxiliary variables
+            "GeoTransform": transform_str,
+        }
+        
+        # Add CRS-specific attributes
+        if native_crs:
+            if native_crs.to_epsg():
+                grid_mapping_attrs["spatial_ref"] = native_crs.to_wkt()
+                grid_mapping_attrs["crs_wkt"] = native_crs.to_wkt()
+            else:
+                grid_mapping_attrs["spatial_ref"] = native_crs.to_wkt()
+                grid_mapping_attrs["crs_wkt"] = native_crs.to_wkt()
 
         # Create the grid_mapping variable
         overview_ds[grid_mapping_var_name] = xr.DataArray(
             data=np.array(b"", dtype="S1"),  # Empty scalar
             attrs=grid_mapping_attrs,
         )
-        overview_ds.attrs["grid_mapping"] = grid_mapping_var_name
 
-    # Set CRS using rioxarray (this doesn't affect GeoZarr compliance)
+    # Set dataset-level grid_mapping attribute
+    overview_ds.attrs["grid_mapping"] = grid_mapping_var_name
+
+    # Set CRS using rioxarray to ensure proper CRS handling
     overview_ds = overview_ds.rio.write_crs(native_crs)
 
     return overview_ds
