@@ -16,7 +16,6 @@ from eopf_geozarr.data_api.geozarr.v2 import (
     CoordArrayAttrs,
     DataArray,
     DataArrayAttrs,
-    MyGroupSpec,
     check_valid_coordinates,
 )
 
@@ -129,7 +128,7 @@ class TestCheckValidCoordinates:
         """
         Test the check_valid_coordinates function to ensure it validates coordinates correctly.
         """
-        group = MyGroupSpec.from_flat(example, by_alias=True)
+        group = GroupSpec.from_flat(example)
         assert check_valid_coordinates(group) == group
 
     @pytest.mark.parametrize(
@@ -175,6 +174,6 @@ class TestCheckValidCoordinates:
         This test checks that the function raises a ValueError when the dimensions of the data variable
         do not match the dimensions of the coordinate arrays.
         """
-        group = MyGroupSpec[Any, DataArray | CoordArray].from_flat(example, by_alias=True)
+        group = GroupSpec[Any, DataArray | CoordArray].from_flat(example)
         with pytest.raises(ValueError):
             check_valid_coordinates(group)
