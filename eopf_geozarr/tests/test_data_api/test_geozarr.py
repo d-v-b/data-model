@@ -16,7 +16,6 @@ from eopf_geozarr.data_api.geozarr.v2 import (
     CoordArrayAttrs,
     DataArray,
     DataArrayAttrs,
-    MyGroupSpec,
     check_valid_coordinates,
 )
 
@@ -148,7 +147,7 @@ class TestCheckValidCoordinates:
                         grid_mapping_name="latitude_longitude",
                     ),
                 ),
-                "/time": ArraySpec(
+                "/time": CoordArray(
                     shape=(10,),
                     dtype="|u1",
                     chunks=(10,),
@@ -156,7 +155,7 @@ class TestCheckValidCoordinates:
                         _ARRAY_DIMENSIONS=["time"], standard_name="time", units="s", axis="T"
                     ),
                 ),
-                "/lat": ArraySpec(
+                "/lat": CoordArray(
                     shape=(11,),
                     dtype="|u1",
                     chunks=(11,),
@@ -168,13 +167,13 @@ class TestCheckValidCoordinates:
         ],
     )
     @staticmethod
-    def test_invalid(example: dict[str, ArraySpec[Any] | GroupSpec[Any, Any]]) -> None:
+    def test_invalid_coordinates(example: dict[str, ArraySpec[Any] | GroupSpec[Any, Any]]) -> None:
         """
         Test the check_valid_coordinates function to ensure it validates coordinates correctly.
 
         This test checks that the function raises a ValueError when the dimensions of the data variable
         do not match the dimensions of the coordinate arrays.
         """
-        group = MyGroupSpec[Any, DataArray | CoordArray].from_flat(example, by_alias=True)
+        group = GroupSpec[Any, DataArray | CoordArray].from_flat(example)
         with pytest.raises(ValueError):
             check_valid_coordinates(group)
