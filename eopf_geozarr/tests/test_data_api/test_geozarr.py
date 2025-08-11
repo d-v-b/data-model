@@ -129,7 +129,7 @@ class TestCheckValidCoordinates:
         """
         Test the check_valid_coordinates function to ensure it validates coordinates correctly.
         """
-        group = MyGroupSpec.from_flat(example, by_alias=True)
+        group = GroupSpec.from_flat(example)
         assert check_valid_coordinates(group) == group
 
     @pytest.mark.parametrize(

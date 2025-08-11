@@ -2,6 +2,7 @@
 import io
 import urllib
 import urllib.request
+from typing import Literal, TypeAlias, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import BaseModel
@@ -64,6 +65,37 @@ def check_standard_name(name: str) -> str:
     )
 
 
+# todo: narrow to literal type
+ResamplingMethod = Literal[
+    "nearest",
+    "average",
+    "bilinear",
+    "cubic",
+    "cubic_spline",
+    "lanczos",
+    "mode",
+    "max",
+    "min",
+    "med",
+    "sum",
+    "q1",
+    "q3",
+    "rms",
+    "gauss",
+]
+"""A string literal indicating a resampling method"""
+
+TileMatrixSet: TypeAlias = str | dict[str, object]
+"""Identifier, URI, or inline JSON object compliant with OGC TileMatrixSet v2"""
+
+
+class TileMatrixSetLimits(BaseModel):
+    min_tile_col: int
+    min_tile_row: int
+    max_tile_col: int
+    max_tile_row: int
+
+
 class MultiscaleAttrs(BaseModel):
     """
     Attributes for a GeoZarr multiscale dataset.
@@ -72,9 +104,12 @@ class MultiscaleAttrs(BaseModel):
     ----------
     tile_matrix_set : str
         The tile matrix set identifier for the multiscale dataset.
-    resampling_method : str
-        The resampling method for the multiscale dataset.
+    resampling_method : ResamplingMethod
+        The name of the resampling method for the multiscale dataset.
+    tile_matrix_set_limits : dict[str, TileMatrixSetLimits] | None, optional
+        The tile matrix set limits for the multiscale dataset.
     """
 
-    tile_matrix_set: str
-    resampling_method: str
+    tile_matrix_set: TileMatrixSet
+    resampling_method: ResamplingMethod
+    tile_matrix_set_limits: dict[str, TileMatrixSetLimits] | None = None

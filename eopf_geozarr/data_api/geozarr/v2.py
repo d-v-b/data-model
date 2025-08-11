@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import AfterValidator, BaseModel, Field, model_serializer, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_serializer, model_validator
 from pydantic_zarr.v2 import (
     AnyArraySpec,
     AnyGroupSpec,
@@ -22,10 +22,11 @@ CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
 class MyGroupSpec(GroupSpec[TAttr, TItem]):
     """
     A custom GroupSpec
-    
+
     We override the from_flat method to ensure that we can pass by_alias=True
     when creating a GroupSpec from a flat hierarchy.
     """
+
     @classmethod
     def from_flat(
         cls, data: dict[str, AnyArraySpec | AnyGroupSpec], *, by_alias: bool = False
@@ -89,15 +90,15 @@ class CoordArrayAttrs(BaseModel, populate_by_name=True):
 
 class CoordArray(ArraySpec[CoordArrayAttrs]):
     """
-    A GeoZarr coordinate array variable. 
-    
+    A GeoZarr coordinate array variable.
+
     It must be 1-dimensional and have a single element in its array_dimensions attribute.
     """
 
     shape: tuple[int]
 
 
-class DataArrayAttrs(BaseModel, populate_by_name=True):
+class DataArrayAttrs(BaseModel):
     """
     Attributes for a GeoZarr DataArray.
 
@@ -122,6 +123,8 @@ class DataArrayAttrs(BaseModel, populate_by_name=True):
     standard_name: CFStandardName
     grid_mapping: object
     grid_mapping_name: str
+
+    model_config = ConfigDict(validate_by_name=True, serialze_by_alias=True)
 
 
 class DataArray(ArraySpec[DataArrayAttrs]):
