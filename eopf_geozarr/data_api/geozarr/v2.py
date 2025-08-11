@@ -14,7 +14,7 @@ from pydantic_zarr.v2 import (
     from_flat_group,
 )
 
-from eopf_geozarr.data_api.geozarr.common import MultiscaleAttrs, check_standard_name
+from eopf_geozarr.data_api.geozarr.common import Multiscales, check_standard_name
 
 CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
 
@@ -149,7 +149,7 @@ class DatasetAttrs(BaseModel):
     multiscales: MultiscaleAttrs
     """
 
-    multiscales: MultiscaleAttrs
+    multiscales: Multiscales
 
 
 class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):

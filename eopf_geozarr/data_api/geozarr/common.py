@@ -2,7 +2,7 @@
 import io
 import urllib
 import urllib.request
-from typing import Literal, TypeAlias, TypeVar
+from typing import Literal, Mapping, TypeAlias, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import BaseModel
@@ -85,18 +85,38 @@ ResamplingMethod = Literal[
 ]
 """A string literal indicating a resampling method"""
 
-TileMatrixSet: TypeAlias = str | dict[str, object]
-"""Identifier, URI, or inline JSON object compliant with OGC TileMatrixSet v2"""
+
+class TileMatrixLimit(BaseModel):
+    """"""
+
+    tileMatrix: str
+    minTileCol: int
+    minTileRow: int
+    maxTileCol: int
+    maxTileRow: int
 
 
-class TileMatrixSetLimits(BaseModel):
-    min_tile_col: int
-    min_tile_row: int
-    max_tile_col: int
-    max_tile_row: int
+class TileMatrix(BaseModel):
+    id: str
+    scaleDenominator: float
+    cellSize: float
+    pointOfOrigin: tuple[float, float]
+    tileWidth: int
+    tileHeight: int
+    matrixWidth: int
+    matrixHeight: int
 
 
-class MultiscaleAttrs(BaseModel):
+class TileMatrixSet(BaseModel):
+    id: str
+    title: str | None = None
+    crs: str | None = None
+    supportedCRS: str | None = None
+    orderedAxes: tuple[str, str] | None = None
+    tileMatrices: tuple[TileMatrix, ...]
+
+
+class Multiscales(BaseModel):
     """
     Attributes for a GeoZarr multiscale dataset.
 
@@ -112,4 +132,6 @@ class MultiscaleAttrs(BaseModel):
 
     tile_matrix_set: TileMatrixSet
     resampling_method: ResamplingMethod
-    tile_matrix_set_limits: dict[str, TileMatrixSetLimits] | None = None
+    # TODO: ensure that the keys match tile_matrix_set.tileMatrices[$index].id
+    # TODO: ensure that the keys match the tileMatrix attribute
+    tile_matrix_limits: dict[str, TileMatrixLimit] | None = None

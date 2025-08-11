@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 import pytest
+import zarr
 from pydantic_zarr.v2 import ArraySpec, GroupSpec
 
 from eopf_geozarr.data_api.geozarr.common import (
@@ -18,6 +19,8 @@ from eopf_geozarr.data_api.geozarr.v2 import (
     DataArrayAttrs,
     check_valid_coordinates,
 )
+
+from .conftest import example_zarr_json
 
 
 def test_get_cf_standard_names() -> None:
@@ -177,3 +180,17 @@ class TestCheckValidCoordinates:
         group = GroupSpec[Any, DataArray | CoordArray].from_flat(example)
         with pytest.raises(ValueError):
             check_valid_coordinates(group)
+
+
+def test_round_trip() -> None:
+    from pydantic_zarr.core import tuplify_json
+    from pydantic_zarr.v3 import GroupSpec
+    from zarr.core.buffer import default_buffer_prototype
+
+    from eopf_geozarr.data_api.geozarr.common import Multiscales
+
+    source_store = {"zarr.json": default_buffer_prototype().buffer.from_bytes(example_zarr_json)}
+    source_untyped = GroupSpec.from_zarr(zarr.open_group(source_store, mode="r"))
+    flat = source_untyped.to_flat()
+    meta = flat["/measurements/reflectance/r60m"].attributes["multiscales"]
+    assert Multiscales(**meta).model_dump() == tuplify_json(meta)
