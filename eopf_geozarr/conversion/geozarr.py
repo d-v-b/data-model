@@ -43,6 +43,7 @@ def create_geozarr_dataset(
     min_dimension: int = 256,
     tile_width: int = 256,
     max_retries: int = 3,
+    crs_groups: Optional[List[str]] = None,
 ) -> xr.DataTree:
     """
     Create a GeoZarr-spec 0.4 compliant dataset from EOPF data.
@@ -63,6 +64,8 @@ def create_geozarr_dataset(
         Tile width for TMS compatibility
     max_retries : int, default 3
         Maximum number of retries for network operations
+    crs_groups : list[str], optional
+        List of group names that need CRS information added on best-effort basis
 
     Returns
     -------
@@ -92,7 +95,169 @@ def create_geozarr_dataset(
         max_retries,
     )
 
+    # Add CRS information to specified groups on best-effort basis
+    if crs_groups:
+        add_crs_to_groups(dt_geozarr, crs_groups, output_path)
+
     return dt_geozarr
+
+
+def add_crs_to_groups(
+    dt: xr.DataTree, crs_groups: List[str], output_path: str
+) -> None:
+    """
+    Add CRS information to specified groups on a best-effort basis.
+    
+    This function handles groups that need CRS information but are not full GeoZarr datasets.
+    It adds proper coordinate metadata and CRS information where possible.
+    
+    Parameters
+    ----------
+    dt : xr.DataTree
+        The data tree containing all groups
+    crs_groups : list[str]
+        List of group names that need CRS information added
+    output_path : str
+        Output path for the Zarr store
+    """
+    # Try to infer reference CRS from measurement groups
+    reference_crs = None
+    reference_epsg = None
+    
+    # Look for CRS in measurement groups first
+    for group_path in dt.subtree:
+        group_path_str = str(group_path)
+        if "/measurements/" in group_path_str and group_path.data_vars:
+            group_ds = group_path.to_dataset()
+            for var in group_ds.data_vars:
+                if "proj:epsg" in group_ds[var].attrs:
+                    reference_epsg = group_ds[var].attrs["proj:epsg"]
+                    reference_crs = f"epsg:{reference_epsg}"
+                    print(f"Inferred reference CRS from measurements: {reference_crs}")
+                    break
+            if reference_crs:
+                break
+    
+    # Process each specified group
+    for group_path in crs_groups:
+        try:
+            # Try to access the group using the path
+            group_node = dt[group_path]
+            if group_node is None:
+                print(f"Warning: Group {group_path} not found in DataTree")
+                continue
+        except (KeyError, TypeError):
+            print(f"Warning: Group {group_path} not found in DataTree")
+            continue
+            
+        print(f"Adding CRS information to group: {group_path}")
+        
+        try:
+            # Get the group dataset
+            ds = dt[group_path].to_dataset().copy()
+            
+            # Set up coordinate variables with proper attributes
+            for coord_name in ds.coords:
+                if coord_name == "x":
+                    ds[coord_name].attrs.update({
+                        "_ARRAY_DIMENSIONS": ["x"],
+                        "standard_name": "projection_x_coordinate",
+                        "units": "m",
+                        "long_name": "x coordinate of projection"
+                    })
+                elif coord_name == "y":
+                    ds[coord_name].attrs.update({
+                        "_ARRAY_DIMENSIONS": ["y"],
+                        "standard_name": "projection_y_coordinate", 
+                        "units": "m",
+                        "long_name": "y coordinate of projection"
+                    })
+                elif coord_name == "angle":
+                    ds[coord_name].attrs.update({
+                        "_ARRAY_DIMENSIONS": ["angle"],
+                        "standard_name": "angle",
+                        "long_name": "angle coordinate"
+                    })
+                elif coord_name == "band":
+                    ds[coord_name].attrs.update({
+                        "_ARRAY_DIMENSIONS": ["band"],
+                        "standard_name": "band",
+                        "long_name": "spectral band identifier"
+                    })
+                elif coord_name == "detector":
+                    ds[coord_name].attrs.update({
+                        "_ARRAY_DIMENSIONS": ["detector"],
+                        "standard_name": "detector",
+                        "long_name": "detector identifier"
+                    })
+                else:
+                    # Generic coordinate
+                    if "_ARRAY_DIMENSIONS" not in ds[coord_name].attrs:
+                        ds[coord_name].attrs["_ARRAY_DIMENSIONS"] = [coord_name]
+            
+            # Set up data variables with proper attributes
+            for var_name in ds.data_vars:
+                # Add _ARRAY_DIMENSIONS attribute if missing
+                if "_ARRAY_DIMENSIONS" not in ds[var_name].attrs and hasattr(ds[var_name], "dims"):
+                    ds[var_name].attrs["_ARRAY_DIMENSIONS"] = list(ds[var_name].dims)
+                
+                # Add grid_mapping reference if spatial coordinates are present and we have a reference CRS
+                if "x" in ds.coords and "y" in ds.coords and reference_crs:
+                    ds[var_name].attrs["grid_mapping"] = "spatial_ref"
+            
+            # Add CRS information if we have spatial coordinates and a reference CRS
+            if "x" in ds.coords and "y" in ds.coords and reference_crs:
+                print(f"  Adding CRS information: {reference_crs}")
+                ds = ds.rio.write_crs(reference_crs)
+                
+                # Ensure spatial_ref variable has proper attributes
+                if "spatial_ref" in ds:
+                    ds["spatial_ref"].attrs["_ARRAY_DIMENSIONS"] = []
+                    
+                    # Add GeoTransform if we can calculate it from coordinates
+                    if len(ds.coords["x"]) > 1 and len(ds.coords["y"]) > 1:
+                        x_coords = ds.coords["x"].values
+                        y_coords = ds.coords["y"].values
+                        
+                        # Calculate pixel size
+                        pixel_size_x = float(x_coords[1] - x_coords[0])
+                        pixel_size_y = float(y_coords[0] - y_coords[1])  # Usually negative
+                        
+                        # Create GeoTransform (GDAL format)
+                        transform_str = f"{x_coords[0]} {pixel_size_x} 0.0 {y_coords[0]} 0.0 {pixel_size_y}"
+                        ds["spatial_ref"].attrs["GeoTransform"] = transform_str
+            
+            # Write the updated dataset back to the zarr store
+            group_zarr_path = fs_utils.normalize_path(f"{output_path}{group_path}")
+            storage_options = fs_utils.get_storage_options(group_zarr_path)
+            
+            # Create encoding for the dataset
+            encoding = {}
+            for var in ds.data_vars:
+                if utils.is_grid_mapping_variable(ds, var):
+                    encoding[var] = {"compressors": None}
+                else:
+                    encoding[var] = {"compressors": None}  # No compression for geometry data
+            
+            for coord in ds.coords:
+                encoding[coord] = {"compressors": None}
+            
+            # Try to update the existing zarr group
+            try:
+                ds.to_zarr(
+                    group_zarr_path,
+                    mode="r+",  # Update existing
+                    consolidated=True,
+                    zarr_format=3,
+                    encoding=encoding,
+                    storage_options=storage_options,
+                )
+                print(f"  ✅ Updated {group_path} with proper CRS and coordinate metadata")
+            except Exception as e:
+                print(f"  ⚠️  Could not update {group_path}: {e}")
+                
+        except Exception as e:
+            print(f"  ❌ Failed to process group {group_path}: {e}")
 
 
 def setup_datatree_metadata_geozarr_spec_compliant(
@@ -145,7 +310,7 @@ def setup_datatree_metadata_geozarr_spec_compliant(
                 print(f"    Setting CRS for {band} to EPSG:{epsg}")
                 ds = ds.rio.write_crs(f"epsg:{epsg}")
 
-        # Add _ARRAY_DIMENSIONS to coordinate variables
+        # Add _ARRAY_DIMENSIONS to coordinate variables and ensure proper attributes
         for coord_name, coord_var in ds.coords.items():
             ds[coord_name].attrs["_ARRAY_DIMENSIONS"] = [coord_name]
 
@@ -160,6 +325,15 @@ def setup_datatree_metadata_geozarr_spec_compliant(
                 ds[coord_name].attrs["long_name"] = "y coordinate of projection"
             elif coord_name == "time":
                 ds[coord_name].attrs["standard_name"] = "time"
+            elif coord_name == "angle":
+                ds[coord_name].attrs["standard_name"] = "angle"
+                ds[coord_name].attrs["long_name"] = "angle coordinate"
+            elif coord_name == "band":
+                ds[coord_name].attrs["standard_name"] = "band"
+                ds[coord_name].attrs["long_name"] = "spectral band identifier"
+            elif coord_name == "detector":
+                ds[coord_name].attrs["standard_name"] = "detector"
+                ds[coord_name].attrs["long_name"] = "detector identifier"
 
         # Set up spatial_ref variable with GeoZarr required attributes
         if ds.rio.crs and "spatial_ref" in ds:
@@ -1090,11 +1264,11 @@ def create_overview_dataset_all_vars(
             attrs=grid_mapping_attrs,
         )
 
-    # Set dataset-level grid_mapping attribute
-    overview_ds.attrs["grid_mapping"] = grid_mapping_var_name
-
     # Set CRS using rioxarray to ensure proper CRS handling
     overview_ds = overview_ds.rio.write_crs(native_crs)
+    
+    # Set dataset-level grid_mapping attribute after rio.write_crs to ensure it's preserved
+    overview_ds.attrs["grid_mapping"] = grid_mapping_var_name
 
     return overview_ds
 
