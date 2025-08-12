@@ -124,6 +124,7 @@ def convert_command(args: argparse.Namespace) -> None:
         if args.verbose:
             print(f"Loading EOPF dataset from: {input_path}")
             print(f"Groups to convert: {args.groups}")
+            print(f"CRS groups: {args.crs_groups}")
             print(f"Output path: {output_path}")
             print(f"Spatial chunk size: {args.spatial_chunk}")
             print(f"Min dimension: {args.min_dimension}")
@@ -150,6 +151,7 @@ def convert_command(args: argparse.Namespace) -> None:
             min_dimension=args.min_dimension,
             tile_width=args.tile_width,
             max_retries=args.max_retries,
+            crs_groups=args.crs_groups,
         )
 
         print("✅ Successfully converted EOPF dataset to GeoZarr format")
@@ -1024,6 +1026,12 @@ def create_parser() -> argparse.ArgumentParser:
         type=int,
         default=3,
         help="Maximum number of retries for network operations (default: 3)",
+    )
+    convert_parser.add_argument(
+        "--crs-groups",
+        type=str,
+        nargs="*",
+        help="Groups that need CRS information added on best-effort basis (e.g., /conditions/geometry)",
     )
     convert_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     convert_parser.add_argument(
