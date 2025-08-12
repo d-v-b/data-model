@@ -158,10 +158,14 @@ def convert_command(args: argparse.Namespace) -> None:
         print(f"Output saved to: {output_path}")
 
         if args.verbose:
-            print(f"Converted DataTree has {len(dt_geozarr.children)} groups")
-            print("Converted groups:")
-            for group_name in dt_geozarr.children:
-                print(f"  - {group_name}")
+            # Check if dt_geozarr is a DataTree or Dataset
+            if hasattr(dt_geozarr, 'children'):
+                print(f"Converted DataTree has {len(dt_geozarr.children)} groups")
+                print("Converted groups:")
+                for group_name in dt_geozarr.children:
+                    print(f"  - {group_name}")
+            else:
+                print("Converted dataset (single group)")
 
     except Exception as e:
         print(f"❌ Error during conversion: {e}")
