@@ -365,7 +365,7 @@ def recursive_copy(
     min_dimension: int = 256,
     tile_width: int = 256,
     max_retries: int = 3,
-) -> xr.Dataset:
+) -> xr.DataTree:
     """
     Recursively copy groups from original DataTree to GeoZarr DataTree.
 
@@ -392,8 +392,8 @@ def recursive_copy(
 
     Returns
     -------
-    xarray.Dataset
-        Updated GeoZarr dataset with copied groups and variables
+    xarray.DataTree
+        Updated GeoZarr DataTree with copied groups and variables including multiscale children
     """
     no_children = True
 
@@ -517,6 +517,10 @@ def recursive_copy(
         zarr_group = fs_utils.open_zarr_group(fs_utils.normalize_path(group_path), mode="r+")
         consolidate_metadata(zarr_group.store)
 
+    # Ensure we always return a DataTree
+    if isinstance(dt_node, xr.Dataset):
+        dt_node = xr.DataTree(dt_node)
+    
     return dt_node
 
 
@@ -607,7 +611,7 @@ def write_geozarr_group(
     max_retries: int = 3,
     min_dimension: int = 256,
     tile_width: int = 256,
-) -> xr.Dataset:
+) -> xr.DataTree:
     """
     Write a group to a GeoZarr dataset with multiscales support.
 
@@ -632,8 +636,8 @@ def write_geozarr_group(
 
     Returns
     -------
-    xarray.Dataset
-        The written GeoZarr dataset
+    xarray.DataTree
+        The written GeoZarr DataTree with multiscale groups as children
     """
     print(f"\n=== Processing {group_name} with GeoZarr-spec compliance ===")
 
@@ -737,18 +741,36 @@ def write_geozarr_group(
 
     print("  ✅ Metadata consolidated")
 
-    # Reopen to ensure we have the latest state
+    # Create a DataTree that includes all multiscale groups as children
+    # Reopen the main group as a DataTree to include all children
     storage_options = fs_utils.get_storage_options(group_path)
-    ds = xr.open_dataset(
-        group_path,
-        engine="zarr",
-        zarr_format=3,
-        decode_coords="all",
-        storage_options=storage_options,
-        chunks="auto",
-    ).compute()
-
-    return ds
+    
+    try:
+        # Open as DataTree to get all children groups (multiscale levels)
+        dt_result = xr.open_datatree(
+            group_path,
+            engine="zarr",
+            zarr_format=3,
+            storage_options=storage_options,
+            chunks="auto",
+        )
+        print(f"  ✅ Successfully opened DataTree with {len(dt_result.groups)} groups")
+        return dt_result
+    except Exception as e:
+        print(f"  ⚠️  Could not open as DataTree, falling back to Dataset: {e}")
+        # Fallback to Dataset if DataTree opening fails
+        ds = xr.open_dataset(
+            group_path,
+            engine="zarr",
+            zarr_format=3,
+            decode_coords="all",
+            storage_options=storage_options,
+            chunks="auto",
+        ).compute()
+        
+        # Convert Dataset to DataTree for consistency
+        dt_result = xr.DataTree(ds)
+        return dt_result
 
 
 def create_geozarr_compliant_multiscales(
