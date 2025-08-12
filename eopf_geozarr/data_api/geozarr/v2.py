@@ -1,9 +1,9 @@
 """GeoZarr data API for Zarr V2."""
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Self
+from typing import Any, Literal, Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_serializer, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 from pydantic_zarr.v2 import (
     AnyArraySpec,
     AnyGroupSpec,
@@ -14,9 +14,7 @@ from pydantic_zarr.v2 import (
     from_flat_group,
 )
 
-from eopf_geozarr.data_api.geozarr.common import Multiscales, check_standard_name
-
-CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
+from eopf_geozarr.data_api.geozarr.common import BaseDataArrayAttrs, CFStandardName, DatasetAttrs, get_array_dimensions
 
 
 class CoordArrayAttrs(BaseModel):
@@ -47,7 +45,6 @@ class CoordArrayAttrs(BaseModel):
     units: str
     axis: str
 
-
 class CoordArray(ArraySpec[CoordArrayAttrs]):
     """
     A GeoZarr coordinate array variable.
@@ -57,35 +54,19 @@ class CoordArray(ArraySpec[CoordArrayAttrs]):
 
     shape: tuple[int]
 
+class DataArrayAttrs(BaseDataArrayAttrs):
+        """
+        DataArrayAttrs for DataArrays using Zarr V2
 
-class DataArrayAttrs(BaseModel):
-    """
-    Attributes for a GeoZarr DataArray.
-
-    Attributes
-    ----------
-    array_dimensions : tuple[str, ...]
-        Alias for the _ARRAY_DIMENSIONS attribute, which lists the dimension names for this array.
-    standard_name : str
-        The CF standard name of the variable.
-    grid_mapping : object
-        The grid mapping of the variable, which is a reference to a grid mapping variable that
-        describes the spatial reference of the variable.
-    grid_mapping_name : str
-        The name of the grid mapping, which is a string that describes the type of grid mapping
-        used for the variable.
-    """
-
-    # todo: validate that this names listed here are the names of zarr arrays
-    # unless the variable is an auxiliary variable
-    # see https://github.com/zarr-developers/geozarr-spec/blob/main/geozarr-spec.md#geozarr-coordinates
-    array_dimensions: tuple[str, ...] = Field(alias="_ARRAY_DIMENSIONS")
-    standard_name: CFStandardName
-    grid_mapping: object
-    grid_mapping_name: str
-
-    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
-
+        Attributes
+        ----------
+        array_dimensions : tuple[str, ...]
+            The dimensions of the array. Aliased from _ARRAY_DIMENSIONS.
+        """
+        # necessary for ensuring that the array_dimensions are serialized as _ARRAY_DIMENSIONS
+        model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+        array_dimensions : tuple[str, ...]
+        
 
 class DataArray(ArraySpec[DataArrayAttrs]):
     """
@@ -97,7 +78,7 @@ class DataArray(ArraySpec[DataArrayAttrs]):
     """
 
 
-def check_valid_coordinates(model: GroupSpec[Any, DataArray | CoordArray]) -> Dataset:
+def check_valid_coordinates(model: GroupSpec[Any, Any]) -> Dataset:
     """
     Check if the coordinates of the DataArrays listed in a GeoZarr DataSet are valid.
 
@@ -122,7 +103,7 @@ def check_valid_coordinates(model: GroupSpec[Any, DataArray | CoordArray]) -> Da
         k: v for k, v in model.members.items() if isinstance(v, DataArray)
     }
     for key, array in arrays.items():
-        for idx, dim in enumerate(array.attributes.array_dimensions):
+        for idx, dim in enumerate(get_array_dimensions(array)): # type: ignore[arg-type]
             if dim not in model.members:
                 raise ValueError(
                     f"Dimension '{dim}' for array '{key}' is not defined in the model members."
@@ -138,18 +119,6 @@ def check_valid_coordinates(model: GroupSpec[Any, DataArray | CoordArray]) -> Da
                     f"{member.shape[0]} != {array.shape[idx]}."
                 )
     return model
-
-
-class DatasetAttrs(BaseModel):
-    """
-    Attributes for a GeoZarr dataset.
-
-    Attributes
-    ----------
-    multiscales: MultiscaleAttrs
-    """
-
-    multiscales: Multiscales
 
 
 class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):

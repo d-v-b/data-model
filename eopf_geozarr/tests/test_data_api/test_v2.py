@@ -1,8 +1,9 @@
 from __future__ import annotations
+from eopf_geozarr.data_api.geozarr.common import BaseDataArrayAttrs
 import pytest
 from pydantic_zarr.v2 import ArraySpec, GroupSpec
 from typing import Any
-from eopf_geozarr.data_api.geozarr.common import CoordArrayAttrs, DataArrayAttrs
+from eopf_geozarr.data_api.geozarr.v2 import CoordArrayAttrs, DataArrayAttrs
 
 
 import re
@@ -86,7 +87,7 @@ class TestCheckValidCoordinates:
                     dtype="|u1",
                     chunks=(10, 11),
                     attributes=DataArrayAttrs(
-                        _ARRAY_DIMENSIONS=["time", "lat"],
+                        array_dimensions=["time", "lat"],
                         standard_name="air_temperature",
                         grid_mapping=None,
                         grid_mapping_name="latitude_longitude",

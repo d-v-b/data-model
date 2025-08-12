@@ -2,11 +2,12 @@ from __future__ import annotations
 import re
 
 import zarr
+from eopf_geozarr.data_api.geozarr.v2 import CoordArrayAttrs
 import pytest
 from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.v3 import GroupSpec
 from zarr.core.buffer import default_buffer_prototype
-from eopf_geozarr.data_api.geozarr.common import CF_STANDARD_NAME_URL, CoordArrayAttrs, check_standard_name, get_cf_standard_names
+from eopf_geozarr.data_api.geozarr.common import CF_STANDARD_NAME_URL, check_standard_name, get_cf_standard_names
 from eopf_geozarr.tests.test_data_api.conftest import example_zarr_json
 
 
