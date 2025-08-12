@@ -125,10 +125,9 @@ def add_crs_to_groups(
     reference_epsg = None
     
     # Look for CRS in measurement groups first
-    for group_path in dt.subtree:
-        group_path_str = str(group_path)
-        if "/measurements/" in group_path_str and group_path.data_vars:
-            group_ds = group_path.to_dataset()
+    for group_path in dt.groups:
+        if "/measurements/" in group_path and dt[group_path].data_vars:
+            group_ds = dt[group_path].to_dataset()
             for var in group_ds.data_vars:
                 if "proj:epsg" in group_ds[var].attrs:
                     reference_epsg = group_ds[var].attrs["proj:epsg"]
