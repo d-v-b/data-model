@@ -81,16 +81,32 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Restore global uv cache
+      id: cache-restore
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.cache/uv
+          ~/.local/share/uv
+          .venv
+        key: uv-main-${{ hashFiles('uv.lock') }}
+        restore-keys: |
+          uv-main-
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        version: "0.8.4"
+        python-version: "3.13"
+        enable-cache: false
+
     - name: Install dependencies
-      run: |
-       sudo apt-get update
-        sudo apt-get install -y proj-bin gdal-bin libgdal-dev
-        python -m pip install --upgrade pip
-        pip install -e ".[dev,test]" --only-binary=:all:
+      run: uv sync --group dev --group test
 
     - name: Run network tests
       run: |
         python -m pytest eopf_geozarr/tests/ -v --tb=short -m "network"
+
   security:
     runs-on: ubuntu-latest
     steps:
