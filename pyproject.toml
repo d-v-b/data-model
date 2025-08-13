@@ -77,7 +77,7 @@ Documentation = "https://github.com/developmentseed/eopf-geozarr/tree/main/docs"
 eopf-geozarr = "eopf_geozarr.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["eopf_geozarr*"]
 
 [tool.setuptools.package-data]
@@ -140,8 +140,11 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["."]
-omit = ["*/tests/*", "*/test_*", "setup.py"]
+source = ["src"]
+omit = [
+    "tests/*",
+    "setup.py",
+]
 
 [tool.coverage.report]
 exclude_lines = [
