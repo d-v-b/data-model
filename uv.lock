@@ -728,23 +728,7 @@ dependencies = [
     { name = "zarr" },
 ]
 
-[package.optional-dependencies]
-all = [
-    { name = "bandit" },
-    { name = "black" },
-    { name = "flake8" },
-    { name = "flake8-docstrings" },
-    { name = "isort" },
-    { name = "mypy" },
-    { name = "myst-parser" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "safety" },
-    { name = "sphinx" },
-    { name = "sphinx-autodoc-typehints" },
-    { name = "sphinx-rtd-theme" },
-]
+[package.dev-dependencies]
 dev = [
     { name = "bandit" },
     { name = "black" },
@@ -773,35 +757,42 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.8.1" },
-    { name = "bandit", extras = ["toml"], marker = "extra == 'dev'", specifier = ">=1.7.0" },
-    { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
     { name = "boto3", specifier = ">=1.34.0" },
     { name = "cf-xarray", specifier = ">=0.8.0" },
     { name = "dask", extras = ["array", "distributed"], specifier = ">=2025.5.1" },
-    { name = "eopf-geozarr", extras = ["dev", "docs"], marker = "extra == 'all'" },
-    { name = "flake8", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "flake8-docstrings", marker = "extra == 'dev'", specifier = ">=1.7.0" },
-    { name = "isort", marker = "extra == 'dev'", specifier = ">=5.12.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=1.0.0" },
     { name = "numpy", specifier = ">=2.3.1" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0.0" },
-    { name = "pydantic-zarr", git = "https://github.com/zarr-developers/pydantic-zarr" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=7.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=4.0.0" },
-    { name = "pytest-mock", marker = "extra == 'test'", specifier = ">=3.10.0" },
-    { name = "pytest-xdist", marker = "extra == 'test'", specifier = ">=3.0.0" },
+    { name = "pydantic-zarr", specifier = ">=0.8.1" },
     { name = "rioxarray", specifier = ">=0.13.0" },
     { name = "s3fs", specifier = ">=2024.6.0" },
-    { name = "safety", marker = "extra == 'dev'", specifier = ">=2.0.0" },
-    { name = "sphinx", marker = "extra == 'docs'", specifier = ">=6.0.0" },
-    { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = ">=1.20.0" },
-    { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=1.2.0" },
     { name = "typing-extensions", specifier = ">=4.0.0" },
     { name = "xarray", specifier = ">=2025.7.1" },
-    { name = "zarr", git = "https://github.com/zarr-developers/zarr-python" },
+    { name = "zarr", specifier = ">=3.1.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "bandit", extras = ["toml"], specifier = ">=1.7.0" },
+    { name = "black", specifier = ">=23.0.0" },
+    { name = "flake8", specifier = ">=6.0.0" },
+    { name = "flake8-docstrings", specifier = ">=1.7.0" },
+    { name = "isort", specifier = ">=5.12.0" },
+    { name = "mypy", specifier = ">=1.0.0" },
+    { name = "pre-commit", specifier = ">=3.0.0" },
+    { name = "pytest", specifier = ">=7.0.0" },
+    { name = "pytest-cov", specifier = ">=4.0.0" },
+    { name = "safety", specifier = ">=2.0.0" },
+]
+docs = [
+    { name = "myst-parser", specifier = ">=1.0.0" },
+    { name = "sphinx", specifier = ">=6.0.0" },
+    { name = "sphinx-autodoc-typehints", specifier = ">=1.20.0" },
+    { name = "sphinx-rtd-theme", specifier = ">=1.2.0" },
+]
+test = [
+    { name = "pytest", specifier = ">=7.0.0" },
+    { name = "pytest-cov", specifier = ">=4.0.0" },
+    { name = "pytest-mock", specifier = ">=3.10.0" },
+    { name = "pytest-xdist", specifier = ">=3.0.0" },
 ]
 
 [[package]]
@@ -1004,7 +995,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641 }
 wheels = [
@@ -1768,11 +1759,15 @@ wheels = [
 
 [[package]]
 name = "pydantic-zarr"
-version = "0.7.1.dev146+g815f5b7"
-source = { git = "https://github.com/zarr-developers/pydantic-zarr#815f5b724eb23efff41d23bed2b3c716bcf93370" }
+version = "0.8.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "zarr" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2b/2a/e9194d5a718ac44253981fb56c41acce4083e3bdae65cf805417f7c57d03/pydantic_zarr-0.8.1.tar.gz", hash = "sha256:47079f5df940157ef48e598379b39595b8663b30af4075a6ff70ec4f6a78166b", size = 42029 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/22/de473dc8e00ac85b9b9ef67133f1ecb095e5ce21b235578e2eaed9a80f4c/pydantic_zarr-0.8.1-py3-none-any.whl", hash = "sha256:3d755b27c382010c8d35163af7174bff83b61591cac3126a9d85ebb9a642ddee", size = 25587 },
 ]
 
 [[package]]
@@ -2714,14 +2709,18 @@ wheels = [
 
 [[package]]
 name = "zarr"
-version = "3.1.1.dev26+ga0c56fbb"
-source = { git = "https://github.com/zarr-developers/zarr-python#a0c56fbbba12ca4402de3d83043e5f840406d670" }
+version = "3.1.1"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "donfig" },
     { name = "numcodecs", extra = ["crc32c"] },
     { name = "numpy" },
     { name = "packaging" },
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/15/a9/29fe1800380092ae03ac6207d757f3e5affaf1fcd2e5ef074cf4fc68f0fa/zarr-3.1.1.tar.gz", hash = "sha256:17db72f37f2489452d2137ac891c4133b8f976f9189d8efd3e75f3b3add84e8c", size = 314075 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/48/bde2f58cfbc9fd6ab844e2f2fd79d5e54195c12a17aa9b47c0b0e701a421/zarr-3.1.1-py3-none-any.whl", hash = "sha256:9a0b7e7c27bf62965b8eef6b8b8fdb9b47381f0738be35e40f37be6479b546be", size = 255373 },
 ]
 
 [[package]]
