@@ -1,36 +1,17 @@
 from __future__ import annotations
-from eopf_geozarr.data_api.geozarr.common import BaseDataArrayAttrs
+
+from typing import Any
+
 import pytest
 from pydantic_zarr.v2 import ArraySpec, GroupSpec
-from typing import Any
-from eopf_geozarr.data_api.geozarr.v2 import CoordArrayAttrs, DataArrayAttrs
 
+from eopf_geozarr.data_api.geozarr.v2 import (
+    DataArray,
+    DataArrayAttrs,
+    check_valid_coordinates,
+)
 
-import re
-
-from eopf_geozarr.data_api.geozarr.v2 import CoordArray, DataArray, check_valid_coordinates
-
-
-def test_coord_array_dimensionality() -> None:
-    """
-    Test that only 1-dimensional arrays are allowed.
-    """
-    msg = (
-        "1 validation error for CoordArray\nshape\n  "
-        "Tuple should have at most 1 item after validation, not 2"
-    )
-    with pytest.raises(ValueError, match=re.escape(msg)):
-        CoordArray(
-            shape=(10, 11),
-            dtype="|u1",
-            chunks=(10, 11),
-            attributes=CoordArrayAttrs(
-                _ARRAY_DIMENSIONS=("time",),
-                standard_name="air_temperature",
-                units="s",
-                axis="Y",
-            ),
-        )
+from .conftest import example_group
 
 
 class TestCheckValidCoordinates:
@@ -44,26 +25,33 @@ class TestCheckValidCoordinates:
                     dtype="|u1",
                     chunks=(10, 11),
                     attributes=DataArrayAttrs(
-                        array_dimensions=["time", "lat"],
+                        _FILL_VALUE="AAAAAAAA+H8=",
+                        _ARRAY_DIMENSIONS=["time", "lat"],
                         standard_name="air_temperature",
                         grid_mapping=None,
                         grid_mapping_name="latitude_longitude",
                     ),
                 ),
-                "/time": CoordArray(
+                "/time": DataArray(
                     shape=(10,),
                     dtype="|u1",
                     chunks=(10,),
-                    attributes=CoordArrayAttrs(
-                        array_dimensions=["time"], standard_name="time", units="s", axis="T"
+                    attributes=DataArrayAttrs(
+                        _ARRAY_DIMENSIONS=["time"],
+                        standard_name="time",
+                        units="s",
+                        axis="T",
                     ),
                 ),
-                "/lat": CoordArray(
+                "/lat": DataArray(
                     shape=(11,),
                     dtype="|u1",
                     chunks=(11,),
-                    attributes=CoordArrayAttrs(
-                        array_dimensions=["lat"], standard_name="latitude", units="m", axis="Y"
+                    attributes=DataArrayAttrs(
+                        _ARRAY_DIMENSIONS=["lat"],
+                        standard_name="latitude",
+                        units="m",
+                        axis="Y",
                     ),
                 ),
             },
@@ -87,39 +75,61 @@ class TestCheckValidCoordinates:
                     dtype="|u1",
                     chunks=(10, 11),
                     attributes=DataArrayAttrs(
-                        array_dimensions=["time", "lat"],
+                        _ARRAY_DIMENSIONS=["time", "lat"],
+                        _FILL_VALUE="AAAAAAAA+H8=",
                         standard_name="air_temperature",
                         grid_mapping=None,
                         grid_mapping_name="latitude_longitude",
                     ),
                 ),
-                "/time": CoordArray(
+                "/time": DataArray(
                     shape=(10,),
                     dtype="|u1",
                     chunks=(10,),
-                    attributes=CoordArrayAttrs(
-                        _ARRAY_DIMENSIONS=["time"], standard_name="time", units="s", axis="T"
+                    attributes=DataArrayAttrs(
+                        _ARRAY_DIMENSIONS=["time"],
+                        standard_name="time",
+                        units="s",
+                        axis="T",
                     ),
                 ),
-                "/lat": CoordArray(
+                "/lat": DataArray(
                     shape=(11,),
                     dtype="|u1",
                     chunks=(11,),
-                    attributes=CoordArrayAttrs(
-                        _ARRAY_DIMENSIONS=["lat"], standard_name="latitude", units="m", axis="Y"
+                    attributes=DataArrayAttrs(
+                        _ARRAY_DIMENSIONS=["lat"],
+                        standard_name="latitude",
+                        units="m",
+                        axis="Y",
                     ),
                 ),
             },
         ],
     )
     @staticmethod
-    def test_invalid_coordinates(example: dict[str, ArraySpec[Any] | GroupSpec[Any, Any]]) -> None:
+    def test_invalid_coordinates(
+        example: dict[str, ArraySpec[Any] | GroupSpec[Any, Any]],
+    ) -> None:
         """
         Test the check_valid_coordinates function to ensure it validates coordinates correctly.
 
         This test checks that the function raises a ValueError when the dimensions of the data variable
         do not match the dimensions of the coordinate arrays.
         """
-        group = GroupSpec[Any, DataArray | CoordArray].from_flat(example)
+        group = GroupSpec[Any, DataArray].from_flat(example)
         with pytest.raises(ValueError):
             check_valid_coordinates(group)
+
+
+@pytest.mark.skip(reason="We don't have a v2 example group yet")
+def test_dataarray_attrs_round_trip() -> None:
+    """
+    Ensure that we can round-trip dataarray attributes through the `Multiscales` model.
+    """
+    source_untyped = GroupSpec.from_zarr(example_group)
+    flat = source_untyped.to_flat()
+    for key, val in flat.items():
+        if isinstance(val, ArraySpec):
+            model_json = val.model_dump()["attributes"]
+            assert DataArrayAttrs(**model_json).model_dump() == model_json

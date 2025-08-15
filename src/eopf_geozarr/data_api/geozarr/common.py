@@ -1,13 +1,14 @@
 """Common utilities for GeoZarr data API."""
+
 import io
 import urllib
 import urllib.request
-from typing import Annotated, Literal, Mapping, TypeAlias, TypeVar
-import pydantic_zarr
-import pydantic_zarr.v2
-import pydantic_zarr.v3
+from typing import Annotated, Final, Literal
+
 from cf_xarray.utils import parse_cf_standard_name_table
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel
+
+xarray_dims_key: Final = "_ARRAY_DIMENSIONS"
 
 
 def get_cf_standard_names(url: str) -> tuple[str, ...]:
@@ -27,11 +28,6 @@ def get_cf_standard_names(url: str) -> tuple[str, ...]:
     _info, table, _aliases = parse_cf_standard_name_table(source=content_fobj)
     return tuple(table.keys())
 
-def get_array_dimensions(array: pydantic_zarr.v2.ArraySpec | pydantic_zarr.v3.ArraySpec) -> tuple[str, ...] | None:
-    if isinstance(array, pydantic_zarr.v2.ArraySpec):
-        return array.model_dump()["attributes"].get("array_dimensions")
-    else:
-        return array.model_dump()["dimension_names"]
 
 # This is a URL to the CF standard names table.
 CF_STANDARD_NAME_URL = (
@@ -71,7 +67,8 @@ def check_standard_name(name: str) -> str:
     )
 
 
-# todo: narrow to literal type
+CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
+
 ResamplingMethod = Literal[
     "nearest",
     "average",
@@ -122,7 +119,7 @@ class TileMatrixSet(BaseModel):
     tileMatrices: tuple[TileMatrix, ...]
 
 
-class Multiscales(BaseModel):
+class Multiscales(BaseModel, extra="allow"):
     """
     Multiscale metadata for a GeoZarr dataset.
 
@@ -143,10 +140,7 @@ class Multiscales(BaseModel):
     tile_matrix_limits: dict[str, TileMatrixLimit] | None = None
 
 
-CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
-
-
-class DatasetAttrs(BaseModel):
+class DatasetAttrs(BaseModel, extra="allow"):
     """
     Attributes for a GeoZarr dataset.
 
@@ -158,27 +152,12 @@ class DatasetAttrs(BaseModel):
     multiscales: Multiscales
 
 
-class BaseDataArrayAttrs(BaseModel):
+class BaseDataArrayAttrs(BaseModel, extra="allow"):
     """
     Base attributes for a  GeoZarr DataArray.
 
     Attributes
     ----------
-    standard_name : str
-        The CF standard name of the variable.
-    grid_mapping : object
-        The grid mapping of the variable, which is a reference to a grid mapping variable that
-        describes the spatial reference of the variable.
-    grid_mapping_name : str
-        The name of the grid mapping, which is a string that describes the type of grid mapping
-        used for the variable.
     """
 
-    # todo: validate that this names listed here are the names of zarr arrays
-    # unless the variable is an auxiliary variable
-    # see https://github.com/zarr-developers/geozarr-spec/blob/main/geozarr-spec.md#geozarr-coordinates
-    array_dimensions: tuple[str, ...] = Field(alias="_ARRAY_DIMENSIONS")
-    standard_name: CFStandardName
-    grid_mapping: object
-    grid_mapping_name: str
-
+    coordinates: str

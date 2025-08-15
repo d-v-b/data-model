@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from zarr import open_group
+from zarr.core.buffer import default_buffer_prototype
+
 example_zarr_json = r"""{
   "attributes": {},
   "zarr_format": 3,
@@ -14139,6 +14144,10 @@ example_zarr_json = r"""{
     }
   },
   "node_type": "group"
-}""".encode(
-    "utf-8"
+}""".encode("utf-8")
+example_group = open_group(
+    store={
+        "zarr.json": default_buffer_prototype().buffer.from_bytes(example_zarr_json)
+    },
+    mode="r",
 )
