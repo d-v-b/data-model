@@ -8,7 +8,7 @@ from typing import Annotated, Final, Literal
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel
 
-xarray_dims_key: Final = "_ARRAY_DIMENSIONS"
+XARRAY_DIMS_KEY: Final = "_ARRAY_DIMENSIONS"
 
 
 def get_cf_standard_names(url: str) -> tuple[str, ...]:
@@ -159,5 +159,3 @@ class BaseDataArrayAttrs(BaseModel, extra="allow"):
     Attributes
     ----------
     """
-
-    coordinates: str

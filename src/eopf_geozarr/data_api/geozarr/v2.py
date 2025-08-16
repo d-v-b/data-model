@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Self, TypeVar
+from collections.abc import Mapping
+from typing import Any, Iterable, Literal, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_zarr.v2 import ArraySpec, GroupSpec
-
-from eopf_geozarr.data_api.geozarr.common import BaseDataArrayAttrs, Multiscales
+from pydantic_zarr.v2 import auto_attributes
+from eopf_geozarr.data_api.geozarr.common import XARRAY_DIMS_KEY, BaseDataArrayAttrs, Multiscales
 
 
 class DataArrayAttrs(BaseDataArrayAttrs):
@@ -30,12 +31,51 @@ class DataArrayAttrs(BaseDataArrayAttrs):
 
 class DataArray(ArraySpec[DataArrayAttrs]):
     """
-    A GeoZarr DataArray variable.
+    A GeoZarr DataArray variable. It must have attributes that contain an `"_ARRAY_DIMENSIONS"`
+    key, with a length that matches the dimensionality of the array.
 
     References
     ----------
     https://github.com/zarr-developers/geozarr-spec/blob/main/geozarr-spec.md#geozarr-dataarray
     """
+    @classmethod
+    def from_array(
+        cls, 
+        array: Any,
+        chunks: tuple[int, ...] | Literal["auto"] = "auto",
+        attributes: Mapping[str, object] | Literal["auto"] = "auto",
+        fill_value: object | Literal["auto"] = "auto",
+        order: Literal["C", "F"] | Literal["auto"] ="auto",
+        filters: tuple[Any, ...] | Literal["auto"]="auto",
+        dimension_separator: Literal[".", "/"] | Literal["auto"]="auto",
+        compressor: Any | Literal["auto"] = "auto",
+        dimension_names: Iterable[str] | Literal["auto"] = "auto") -> Self:
+        if attributes == "auto":
+            auto_attrs = dict(auto_attributes(array))
+        else:
+            auto_attrs = dict(attributes)
+        if dimension_names != "auto":
+            auto_attrs = auto_attrs | {XARRAY_DIMS_KEY: tuple(dimension_names)}
+        model = super().from_array(
+            array=array, 
+            chunks=chunks, 
+            attributes=auto_attrs,
+            fill_value=fill_value,
+            order=order,
+            filters=filters,
+            dimension_separator=dimension_separator,
+            compressor=compressor,
+        )
+        return model
+
+    @model_validator(mode="after")
+    def check_array_dimensions(self) -> Self:
+        if (len_dim := len(self.attributes.array_dimensions)) != (ndim:=len(self.shape)):
+            msg = (
+                f'The {XARRAY_DIMS_KEY} attribute has length {len_dim}, which does not '
+                f'match the number of dimensions for this array (got {ndim}).')
+            raise ValueError(msg)
+        return self
 
     @property
     def array_dimensions(self) -> tuple[str, ...]:

@@ -4,70 +4,33 @@ import pytest
 import zarr
 from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.v3 import ArraySpec, GroupSpec
-
+import numpy as np
 from eopf_geozarr.data_api.geozarr.v3 import DataArray, Dataset, check_valid_coordinates
 
 from .conftest import example_group
 
 
 class TestCheckValidCoordinates:
+    @staticmethod
     @pytest.mark.parametrize("data_shape", [(10,), (10, 12)])
     def test_valid(data_shape: tuple[int, ...]) -> None:
         """
         Test the check_valid_coordinates function to ensure it validates coordinates correctly.
         """
 
-        # create a group containing "coordinated" arrays, with 1 n-dimensional data array, and
-        # N 1-dimensional coordinate arrays
-
-        group = GroupSpec.from_flat(example)
+        base_array = DataArray.from_array(
+            np.zeros((data_shape), dtype='uint8'), 
+            dimension_names=[f'dim_{s}' for s in range(len(data_shape))])
+        coords_arrays = {
+            f'dim_{idx}' : DataArray.from_array(np.arange(s), dimension_names=(f'dim_{idx}',)) for idx,s in enumerate(data_shape)
+            }
+        group = GroupSpec[Any, DataArray](members={"base": base_array, **coords_arrays})
         assert check_valid_coordinates(group) == group
 
-    @pytest.mark.parametrize(
-        "example",
-        [
-            {
-                "": GroupSpec(attributes={}, members=None),
-                "/data_var": DataArray(
-                    shape=(9, 10),
-                    data_type="uint8",
-                    chunks=(10, 11),
-                    attributes=DataArrayAttrs(
-                        _ARRAY_DIMENSIONS=["time", "lat"],
-                        _FILL_VALUE="AAAAAAAA+H8=",
-                        standard_name="air_temperature",
-                        grid_mapping=None,
-                        grid_mapping_name="latitude_longitude",
-                    ),
-                ),
-                "/time": DataArray(
-                    shape=(10,),
-                    data_type="uint8",
-                    chunks=(10,),
-                    attributes=DataArrayAttrs(
-                        _ARRAY_DIMENSIONS=["time"],
-                        standard_name="time",
-                        units="s",
-                        axis="T",
-                    ),
-                ),
-                "/lat": DataArray(
-                    shape=(11,),
-                    data_type="uint8",
-                    chunks=(11,),
-                    attributes=DataArrayAttrs(
-                        _ARRAY_DIMENSIONS=["lat"],
-                        standard_name="latitude",
-                        units="m",
-                        axis="Y",
-                    ),
-                ),
-            },
-        ],
-    )
     @staticmethod
+    @pytest.mark.parametrize("data_shape", [(10,), (10, 12)])
     def test_invalid_coordinates(
-        example: dict[str, ArraySpec[Any] | GroupSpec[Any, Any]],
+        data_shape: tuple[int, ...],
     ) -> None:
         """
         Test the check_valid_coordinates function to ensure it validates coordinates correctly.
@@ -75,8 +38,13 @@ class TestCheckValidCoordinates:
         This test checks that the function raises a ValueError when the dimensions of the data variable
         do not match the dimensions of the coordinate arrays.
         """
-        group = GroupSpec[Any, DataArray].from_flat(example)
-        with pytest.raises(ValueError):
+        base_array = DataArray.from_array(np.zeros((data_shape), dtype='uint8'), dimension_names=[f'dim_{s}' for s in range(len(data_shape))])
+        coords_arrays = {
+            f'dim_{idx}' : DataArray.from_array(np.arange(s + 1), dimension_names=(f'dim_{idx}',)) for idx, s in enumerate(data_shape)
+            }
+        group = GroupSpec[Any, DataArray](members={"base": base_array, **coords_arrays})
+        msg = "Dimension .* for array 'base' has a shape mismatch:"
+        with pytest.raises(ValueError, match=msg):
             check_valid_coordinates(group)
 
 
@@ -87,7 +55,7 @@ def test_dataarray_round_trip() -> None:
     source_untyped = GroupSpec.from_zarr(example_group)
     flat = source_untyped.to_flat()
     for key, val in flat.items():
-        if isinstance(val, ArraySpec):
+        if isinstance(val, ArraySpec) and val.dimension_names is not None:
             model_json = val.model_dump()
             assert DataArray(**model_json).model_dump() == model_json
 

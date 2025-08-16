@@ -23,19 +23,6 @@ class DataArray(ArraySpec[BaseDataArrayAttrs]):
 
     dimension_names: tuple[str, ...]
 
-    @model_validator(mode="after")
-    def check_coordinates_dimensionality(self) -> Self:
-        # split coordinates on whitespace
-        coords_split = self.attributes.coordinates.split()
-        missing_dims = set(coords_split) - set(self.dimension_names)
-        if len(missing_dims) > 0:
-            msg = (
-                f"The coordinates {coords_split} are inconsistent with the dimension names "
-                f"{self.dimension_names}. The following dimensions are missing: {missing_dims}"
-            )
-            raise ValueError(msg)
-        return self
-
     @property
     def array_dimensions(self) -> tuple[str, ...]:
         return self.dimension_names
