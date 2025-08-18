@@ -1,10 +1,11 @@
 from typing import Any
 
+import numpy as np
 import pytest
 import zarr
 from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.v3 import ArraySpec, GroupSpec
-import numpy as np
+
 from eopf_geozarr.data_api.geozarr.v3 import DataArray, Dataset, check_valid_coordinates
 
 from .conftest import example_group
@@ -19,11 +20,15 @@ class TestCheckValidCoordinates:
         """
 
         base_array = DataArray.from_array(
-            np.zeros((data_shape), dtype='uint8'), 
-            dimension_names=[f'dim_{s}' for s in range(len(data_shape))])
+            np.zeros((data_shape), dtype="uint8"),
+            dimension_names=[f"dim_{s}" for s in range(len(data_shape))],
+        )
         coords_arrays = {
-            f'dim_{idx}' : DataArray.from_array(np.arange(s), dimension_names=(f'dim_{idx}',)) for idx,s in enumerate(data_shape)
-            }
+            f"dim_{idx}": DataArray.from_array(
+                np.arange(s), dimension_names=(f"dim_{idx}",)
+            )
+            for idx, s in enumerate(data_shape)
+        }
         group = GroupSpec[Any, DataArray](members={"base": base_array, **coords_arrays})
         assert check_valid_coordinates(group) == group
 
@@ -38,10 +43,16 @@ class TestCheckValidCoordinates:
         This test checks that the function raises a ValueError when the dimensions of the data variable
         do not match the dimensions of the coordinate arrays.
         """
-        base_array = DataArray.from_array(np.zeros((data_shape), dtype='uint8'), dimension_names=[f'dim_{s}' for s in range(len(data_shape))])
+        base_array = DataArray.from_array(
+            np.zeros((data_shape), dtype="uint8"),
+            dimension_names=[f"dim_{s}" for s in range(len(data_shape))],
+        )
         coords_arrays = {
-            f'dim_{idx}' : DataArray.from_array(np.arange(s + 1), dimension_names=(f'dim_{idx}',)) for idx, s in enumerate(data_shape)
-            }
+            f"dim_{idx}": DataArray.from_array(
+                np.arange(s + 1), dimension_names=(f"dim_{idx}",)
+            )
+            for idx, s in enumerate(data_shape)
+        }
         group = GroupSpec[Any, DataArray](members={"base": base_array, **coords_arrays})
         msg = "Dimension .* for array 'base' has a shape mismatch:"
         with pytest.raises(ValueError, match=msg):
