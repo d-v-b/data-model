@@ -230,13 +230,16 @@ The attributes of a Multiscale Dataset function as an entry point to a collectio
 | key | type | required | notes |
 |-----| ------| ----------| ----- |
 | `"resampling_method"` | [ResamplingMethod](#resamplingmethod) | yes | This is a string that declares the resampling method used to create the downsampled datasets.
-| `"tile_matrix_set"` | [TileMatrixSet](#tilematrixset) or string | yes | This object declares the names of the downsampled Datasets. If `"tile_matrix_set"` is a string, it must be the name of a well-known [`TileMatrixSet`](https://docs.ogc.org/is/17-083r4/17-083r4.html#toc48).
+| `"tile_matrix_set"` | [TileMatrixSet](#tilematrixset) or string | yes | This object declares the names of the downsampled Datasets. If `"tile_matrix_set"` is a string, it must be the name of a well-known [`TileMatrixSet`](https://docs.ogc.org/is/17-083r4/17-083r4.html#toc48), which must resolve to a JSON object consistent with the `[TileMatrixSet](#tilematrixset)` definition.
 | `"tile_matrix_limit"` | {`string`: [TileMatrixLimit](#tilematrixlimit)} | no |  
 
 ### Members
 
 All of the members declared in the `multiscales` attribute must comply with the [Dataset](#dataset) definition. All of these Datasets must
-have the exact same set of member names.
+have the exact same set of member names. The names of the downsampled Datasets are specified by 
+the `"id"` field of each `TileMatrix` object in the `"tileMatrices"` field in the `"TileMatrixSet"` object in the `tile_matrix_set` field in the [`MultiscaleMetadata`](#multiscalemetadata) object in the `"multiscales"` field in the attributes of the Multiscale Dataset. Or, more compactly, using a path-like JSON query:
+
+`attributes.multiscales.tile_matrix_set.tileMatrices[$idx].id`
 
 ## Appendix
 
