@@ -211,7 +211,7 @@ The downsampling transformation is thus well-defined for Datasets. Downsampling
 is often applied multiple times in a series, e.g. to generate multiple levels of 
 detail for a data variable. 
 
-GeoZarr defines a layout for downsampled Datasets, which this document terms Given some source Dataset `s0`, 
+GeoZarr defines a layout for downsampled Datasets (and the original dataset). Given some source Dataset `s0`, 
 that dataset and all downsampled Datasets `s1`, `s2`, ... are stored in a flat layout inside a Multiscale Dataset
  `D`. The presence of downsampled Datsets in `D` is signalled by a [special key](#attributes-3) in the attributes of `D`.
 
@@ -240,6 +240,10 @@ have the exact same set of member names. The names of the downsampled Datasets a
 the `"id"` field of each `TileMatrix` object in the `"tileMatrices"` field in the `"TileMatrixSet"` object in the `tile_matrix_set` field in the [`MultiscaleMetadata`](#multiscalemetadata) object in the `"multiscales"` field in the attributes of the Multiscale Dataset. Or, more compactly, using a path-like JSON query:
 
 `attributes.multiscales.tile_matrix_set.tileMatrices[$idx].id`
+
+#### Extra members
+
+A multiscale Dataset should not contain any members that are not explicitly declared in the `"multiscales"` field for that multiscale Dataset. Any additional Zarr arrays and groups should be considered external to the GeoZarr model.  
 
 ## Appendix
 
