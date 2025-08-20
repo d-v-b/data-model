@@ -27,9 +27,9 @@ constraints on groups of DataArrays are defined in the section on [Datasets](#da
 
 #### Attributes
 
-| key | type | required | notes |
-|-----| ------| ----------| ----- |
-| _ARRAY_DIMENSIONS | array of strings, length matches number of axes of the array | yes |  xarray convention for naming axes in Zarr V2 |
+| key               | type                                                         | required | notes                                        |
+| ----------------- | ------------------------------------------------------------ | -------- | -------------------------------------------- |
+| _ARRAY_DIMENSIONS | array of strings, length matches number of axes of the array | yes      | xarray convention for naming axes in Zarr V2 |
 
 #### Array metadata
 
@@ -37,9 +37,9 @@ Zarr V2 DataArrays must have at least 1 dimension, i.e. scalar Zarr V2 DataArray
 
 In tabular form: 
 
-| attribute | constraint | notes |
-|-----| ----------| ----- |
-| `shape` | at least 1 element | No scalar arrays allowed
+| attribute | constraint         | notes                    |
+| --------- | ------------------ | ------------------------ |
+| `shape`   | at least 1 element | No scalar arrays allowed |
 
 #### Example 
 
@@ -76,10 +76,10 @@ all be strings, and they must all be unique.
 
 In tabular form:
 
-| attribute | constraint | notes |
-|-----| ----------| ----- |
-| `shape` | at least 1 element | No scalar arrays allowed
-| `dimension_names` | an array of unique strings | all array axes must be uniquely named.
+| attribute         | constraint                 | notes                                  |
+| ----------------- | -------------------------- | -------------------------------------- |
+| `shape`           | at least 1 element         | No scalar arrays allowed               |
+| `dimension_names` | an array of unique strings | all array axes must be uniquely named. |
 
 
 #### Example
@@ -107,7 +107,9 @@ as well as arbitrary sub-groups.
 
 ### Attributes
 
-There are no required attributes for Datasets.
+There are no required attributes for Datasets but to qualify as a GeoZarr Dataset, the group must contain at least one DataArray with spatial reference information.
+This DataArray is referenced in the `grid_mapping` attribute of the dataset and is usually named `spatial_ref`.
+More information on spatial reference information can be found in the [CF conventions](https://cfconventions.org). Another interesting resource is the [rioxarray](https://corteva.github.io/rioxarray/stable/) and more specifically the documentation on [Coordinate Reference System Management](https://corteva.github.io/rioxarray/stable/getting_started/crs_management.html).
 
 ### Members
 
@@ -219,19 +221,19 @@ that dataset and all downsampled Datasets `s1`, `s2`, ... are stored in a flat l
 
 The attributes of a Multiscale Dataset function as an entry point to a collection of downsampled Datasets. Accordingly, the attributes of a Multiscale Dataset declare the names of the downsampled datasets it contains, as well as spatial metadata for those datasets.
 
-| key | type | required | notes |
-|-----| ------| ----------| ----- |
-| `"multiscales"` | [`MultiscaleMetadata`](#multiscalemetadata)  | yes | this field defines the layout of the multiscale Datasets inside this Dataset  |
+| key             | type                                        | required | notes                                                                        |
+| --------------- | ------------------------------------------- | -------- | ---------------------------------------------------------------------------- |
+| `"multiscales"` | [`MultiscaleMetadata`](#multiscalemetadata) | yes      | this field defines the layout of the multiscale Datasets inside this Dataset |
 
 #### MultiscaleMetadata
 
 `MultiscaleMetadata` is a JSON object that declares the names of the downsampled Datasets inside a Multiscale Dataset, as well as the downsampling method used. This object has the following structure:
 
-| key | type | required | notes |
-|-----| ------| ----------| ----- |
-| `"resampling_method"` | [ResamplingMethod](#resamplingmethod) | yes | This is a string that declares the resampling method used to create the downsampled datasets.
-| `"tile_matrix_set"` | [TileMatrixSet](#tilematrixset) or string | yes | This object declares the names of the downsampled Datasets. If `"tile_matrix_set"` is a string, it must be the name of a well-known [`TileMatrixSet`](https://docs.ogc.org/is/17-083r4/17-083r4.html#toc48), which must resolve to a JSON object consistent with the `[TileMatrixSet](#tilematrixset)` definition. For scientific coordinate systems, custom inline TileMatrixSet objects are supported.
-| `"tile_matrix_limit"` | {`string`: [TileMatrixLimit](#tilematrixlimit)} | no |  
+| key                   | type                                            | required | notes                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------- | ----------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"resampling_method"` | [ResamplingMethod](#resamplingmethod)           | yes      | This is a string that declares the resampling method used to create the downsampled datasets.                                                                                                                                                                                                                                                                                                            |
+| `"tile_matrix_set"`   | [TileMatrixSet](#tilematrixset) or string       | yes      | This object declares the names of the downsampled Datasets. If `"tile_matrix_set"` is a string, it must be the name of a well-known [`TileMatrixSet`](https://docs.ogc.org/is/17-083r4/17-083r4.html#toc48), which must resolve to a JSON object consistent with the `[TileMatrixSet](#tilematrixset)` definition. For scientific coordinate systems, custom inline TileMatrixSet objects are supported. |
+| `"tile_matrix_limit"` | {`string`: [TileMatrixLimit](#tilematrixlimit)} | no       |
 
 ### Members
 
@@ -248,6 +250,8 @@ A multiscale Dataset should not contain any members that are not explicitly decl
 ### Custom Coordinate Reference Systems
 
 GeoZarr explicitly supports custom TileMatrixSet definitions for arbitrary coordinate reference systems, encouraging preservation of native CRS in Earth observation data. This is particularly useful for scientific projections including UTM zones, polar stereographic, sinusoidal, and other non-web coordinate systems.
+
+For a dataset to be GeoZarr compliant, data variables MUST include a `grid_mapping` attribute that references a coordinate reference system variable. This `grid_mapping` variable defines the spatial referencing information and MUST be consistent with the CRS specified in the TileMatrixSet.
 
 #### Custom TileMatrixSet Example
 
@@ -383,7 +387,10 @@ Here's a complete example of a multiscale dataset using a custom UTM coordinate 
     "data_type": "uint16",
     "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1024, 1024]}},
     "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y", "x"]
+    "dimension_names": ["y", "x"],
+    "attributes": {
+      "grid_mapping": "spatial_ref"
+    }
   },
   "0/nir/zarr.json": {
     "zarr_format": 3,
@@ -392,7 +399,40 @@ Here's a complete example of a multiscale dataset using a custom UTM coordinate 
     "data_type": "uint16",
     "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1024, 1024]}},
     "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y", "x"]
+    "dimension_names": ["y", "x"],
+    "attributes": {
+      "grid_mapping": "spatial_ref"
+    }
+  },
+  "0/spatial_ref/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [],
+    "data_type": "int32",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": []}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": [],
+    "attributes": {
+      "crs_wkt": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+    "semi_major_axis": 6378137.0,
+    "semi_minor_axis": 6356752.314245179,
+    "inverse_flattening": 298.257223563,
+    "reference_ellipsoid_name": "WGS 84",
+    "longitude_of_prime_meridian": 0.0,
+    "prime_meridian_name": "Greenwich",
+    "geographic_crs_name": "WGS 84",
+    "horizontal_datum_name": "World Geodetic System 1984",
+    "projected_crs_name": "WGS 84 / UTM zone 32N",
+    "grid_mapping_name": "transverse_mercator",
+    "latitude_of_projection_origin": 0.0,
+    "longitude_of_central_meridian": 9.0,
+    "false_easting": 500000.0,
+    "false_northing": 0.0,
+    "scale_factor_at_central_meridian": 0.9996,
+    "spatial_ref": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+    "_ARRAY_DIMENSIONS": [],
+    "GeoTransform": "300000.0 10.0 0.0 5000040.0 0.0 -10.0"
+    }
   },
   "0/x/zarr.json": {
     "zarr_format": 3,
@@ -423,7 +463,10 @@ Here's a complete example of a multiscale dataset using a custom UTM coordinate 
     "data_type": "uint16",
     "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [512, 512]}},
     "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y", "x"]
+    "dimension_names": ["y", "x"],
+    "attributes": {
+      "grid_mapping": "spatial_ref"
+    }
   },
   "1/nir/zarr.json": {
     "zarr_format": 3,
@@ -432,7 +475,40 @@ Here's a complete example of a multiscale dataset using a custom UTM coordinate 
     "data_type": "uint16",
     "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [512, 512]}},
     "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y", "x"]
+    "dimension_names": ["y", "x"],
+    "attributes": {
+      "grid_mapping": "spatial_ref"
+    }
+  },
+  "1/spatial_ref/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [],
+    "data_type": "int32",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": []}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": [],
+    "attributes": {
+      "crs_wkt": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+    "semi_major_axis": 6378137.0,
+    "semi_minor_axis": 6356752.314245179,
+    "inverse_flattening": 298.257223563,
+    "reference_ellipsoid_name": "WGS 84",
+    "longitude_of_prime_meridian": 0.0,
+    "prime_meridian_name": "Greenwich",
+    "geographic_crs_name": "WGS 84",
+    "horizontal_datum_name": "World Geodetic System 1984",
+    "projected_crs_name": "WGS 84 / UTM zone 32N",
+    "grid_mapping_name": "transverse_mercator",
+    "latitude_of_projection_origin": 0.0,
+    "longitude_of_central_meridian": 9.0,
+    "false_easting": 500000.0,
+    "false_northing": 0.0,
+    "scale_factor_at_central_meridian": 0.9996,
+    "spatial_ref": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+    "_ARRAY_DIMENSIONS": [],
+    "GeoTransform": "300000.0 10.0 0.0 5000040.0 0.0 -10.0"
+    }
   },
   "1/x/zarr.json": {
     "zarr_format": 3,
@@ -484,6 +560,10 @@ sentinel2_utm33n.zarr/
 │   │       ├── 0/0             # Chunk files (1024x1024 chunks)
 │   │       ├── 0/1
 │   │       └── ...
+│   ├── spatial_ref/            # Spatial reference system variable
+│   │   ├── zarr.json           # Array metadata with CRS information
+│   │   └── c/                  # Chunk directory
+│   │       └── 0               # Single chunk (scalar)
 │   ├── x/                      # X coordinate variable (UTM Easting)
 │   │   ├── zarr.json           # Array metadata
 │   │   └── c/                  # Chunk directory
@@ -506,6 +586,10 @@ sentinel2_utm33n.zarr/
     │       ├── 0/0             # Chunk files (512x512 chunks)
     │       ├── 0/1
     │       └── ...
+    ├── spatial_ref/            # Spatial reference system variable
+    │   ├── zarr.json           # Array metadata with CRS information
+    │   └── c/                  # Chunk directory
+    │       └── 0               # Single chunk (scalar)
     ├── x/                      # X coordinate variable (UTM Easting)
     │   ├── zarr.json           # Array metadata
     │   └── c/                  # Chunk directory
@@ -529,38 +613,38 @@ Key aspects of this file system layout:
 
 #### TileMatrixLimit
 
-| key | type | required | notes |
-|-----| ------| ----------| ----- |
-| `"tileMatrix"` | string | yes | |
-| `"minTileCol"` |  int | yes | | |
-| `"minTileRow"` | int | yes | |
-| `"maxTileCol"` | int | yes | |
-| `"maxTileRow"` | int | yes | |
+| key            | type   | required | notes |
+| -------------- | ------ | -------- | ----- |
+| `"tileMatrix"` | string | yes      |       |
+| `"minTileCol"` | int    | yes      |       |  |
+| `"minTileRow"` | int    | yes      |       |
+| `"maxTileCol"` | int    | yes      |       |
+| `"maxTileRow"` | int    | yes      |       |
 
 #### TileMatrix
 
-| key | type | required | notes |
-|-----| ------| ----------| ----- |
-| `"id"` | string | yes | |
-| `"scaleDenominator"` | float | yes | |
-| `"cellSize"` | float | yes | |
-| `"pointOfOrigin"` | [float, float] | yes | |
-| `"tileWidth"` | int | yes | |
-| `"tileHeight"` | int | yes | |
-| `"matrixWidth"` | int | yes | |
-| `"matrixHeight"` | int | yes | |
+| key                  | type           | required | notes |
+| -------------------- | -------------- | -------- | ----- |
+| `"id"`               | string         | yes      |       |
+| `"scaleDenominator"` | float          | yes      |       |
+| `"cellSize"`         | float          | yes      |       |
+| `"pointOfOrigin"`    | [float, float] | yes      |       |
+| `"tileWidth"`        | int            | yes      |       |
+| `"tileHeight"`       | int            | yes      |       |
+| `"matrixWidth"`      | int            | yes      |       |
+| `"matrixHeight"`     | int            | yes      |       |
 
 
 #### TileMatrixSet
 
-| key | type | required | notes |
-|-----| ------| ----------| ----- |
-| `"id"` | string | yes | |
-| `"title"` | string | no | |
-| `"crs"` | string | no | |
-| `"supportedCRS"` | string | no | |
-| `"orderedAxes"` | [str, str] | no | |
-| `"tileMatrices"` | [[TileMatrix](#tilematrix), ...] | yes | May not be empty |
+| key              | type                             | required | notes            |
+| ---------------- | -------------------------------- | -------- | ---------------- |
+| `"id"`           | string                           | yes      |                  |
+| `"title"`        | string                           | no       |                  |
+| `"crs"`          | string                           | no       |                  |
+| `"supportedCRS"` | string                           | no       |                  |
+| `"orderedAxes"`  | [str, str]                       | no       |                  |
+| `"tileMatrices"` | [[TileMatrix](#tilematrix), ...] | yes      | May not be empty |
 
 #### ResamplingMethod
 
