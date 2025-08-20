@@ -21,7 +21,7 @@ The GeoZarr specification can be implemented in Zarr V2 and V3. The main differe
 A DataArray is a Zarr array with named axes. The structure of a DataArray depends on the Zarr format.
 
 This section contains the rules for *individual* DataArrays. Additional 
-constraints on collectiosn of DataArrays are defined in the section on [Datasets](#dataset)
+constraints on groups of DataArrays are defined in the section on [Datasets](#dataset)
 
 ### Zarr V2
 
