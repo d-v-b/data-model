@@ -230,7 +230,7 @@ The attributes of a Multiscale Dataset function as an entry point to a collectio
 | key | type | required | notes |
 |-----| ------| ----------| ----- |
 | `"resampling_method"` | [ResamplingMethod](#resamplingmethod) | yes | This is a string that declares the resampling method used to create the downsampled datasets.
-| `"tile_matrix_set"` | [TileMatrixSet](#tilematrixset) or string | yes | This object declares the names of the downsampled Datasets. If `"tile_matrix_set"` is a string, it must be the name of a well-known [`TileMatrixSet`](https://docs.ogc.org/is/17-083r4/17-083r4.html#toc48), which must resolve to a JSON object consistent with the `[TileMatrixSet](#tilematrixset)` definition.
+| `"tile_matrix_set"` | [TileMatrixSet](#tilematrixset) or string | yes | This object declares the names of the downsampled Datasets. If `"tile_matrix_set"` is a string, it must be the name of a well-known [`TileMatrixSet`](https://docs.ogc.org/is/17-083r4/17-083r4.html#toc48), which must resolve to a JSON object consistent with the `[TileMatrixSet](#tilematrixset)` definition. For scientific coordinate systems, custom inline TileMatrixSet objects are supported.
 | `"tile_matrix_limit"` | {`string`: [TileMatrixLimit](#tilematrixlimit)} | no |  
 
 ### Members
@@ -244,6 +244,284 @@ the `"id"` field of each `TileMatrix` object in the `"tileMatrices"` field in th
 #### Extra members
 
 A multiscale Dataset should not contain any members that are not explicitly declared in the `"multiscales"` field for that multiscale Dataset. Any additional Zarr arrays and groups should be considered external to the GeoZarr model.  
+
+### Custom Coordinate Reference Systems
+
+GeoZarr explicitly supports custom TileMatrixSet definitions for arbitrary coordinate reference systems, encouraging preservation of native CRS in Earth observation data. This is particularly useful for scientific projections including UTM zones, polar stereographic, sinusoidal, and other non-web coordinate systems.
+
+#### Custom TileMatrixSet Example
+
+For custom coordinate systems, the `tile_matrix_set` should be defined as an inline JSON object following the OGC TileMatrixSet v2.0 specification:
+
+```json
+{
+  "multiscales": {
+    "tile_matrix_set": {
+      "id": "UTM_Zone_33N_Custom",
+      "title": "UTM Zone 33N for Sentinel-2 native resolution",
+      "crs": "EPSG:32633", 
+      "orderedAxes": ["E", "N"],
+      "tileMatrices": [
+        {
+          "id": "0",
+          "scaleDenominator": 35.28,
+          "cellSize": 10.0,
+          "pointOfOrigin": [299960.0, 9000000.0],
+          "tileWidth": 1024,
+          "tileHeight": 1024,
+          "matrixWidth": 1094,
+          "matrixHeight": 1094
+        },
+        {
+          "id": "1", 
+          "scaleDenominator": 70.56,
+          "cellSize": 20.0,
+          "pointOfOrigin": [299960.0, 9000000.0],
+          "tileWidth": 512,
+          "tileHeight": 512,
+          "matrixWidth": 547,
+          "matrixHeight": 547
+        }
+      ]
+    },
+    "resampling_method": "average"
+  }
+}
+```
+
+#### Custom Decimation Factors
+
+While standard web mapping assumes quadtree decimation (scaling by factor of 2), custom TileMatrixSets may use alternative decimation factors:
+
+- **Factor of 2 (quadtree)**: Standard web mapping approach where each zoom level has 4x more tiles
+- **Factor of 3 (nonary tree)**: Each zoom level has 9x more tiles, useful for certain scientific gridding schemes  
+- **Other integer factors**: Application-specific requirements may dictate alternative decimation
+
+Example with factor-of-3 decimation:
+
+```json
+{
+  "id": "Custom_Nonary_Grid",
+  "crs": "EPSG:4326",
+  "tileMatrices": [
+    {
+      "id": "0",
+      "matrixWidth": 1,
+      "matrixHeight": 1,
+      "tileWidth": 256,
+      "tileHeight": 256
+    },
+    {
+      "id": "1", 
+      "matrixWidth": 3,
+      "matrixHeight": 3,
+      "tileWidth": 256,
+      "tileHeight": 256
+    },
+    {
+      "id": "2",
+      "matrixWidth": 9,
+      "matrixHeight": 9,
+      "tileWidth": 256,
+      "tileHeight": 256
+    }
+  ]
+}
+```
+
+#### Custom CRS Multiscale Dataset Layout Example
+
+Here's a complete example of a multiscale dataset using a custom UTM coordinate reference system:
+
+```json
+{
+  "zarr.json": {
+    "node_type": "group",
+    "zarr_format": 3,
+    "attributes": {
+      "multiscales": {
+        "tile_matrix_set": {
+          "id": "UTM_Zone_33N_Sentinel2",
+          "title": "UTM Zone 33N for Sentinel-2 L2A",
+          "crs": "EPSG:32633",
+          "orderedAxes": ["E", "N"],
+          "tileMatrices": [
+            {
+              "id": "0",
+              "scaleDenominator": 35.28,
+              "cellSize": 10.0,
+              "pointOfOrigin": [299960.0, 9000000.0],
+              "tileWidth": 1024,
+              "tileHeight": 1024,
+              "matrixWidth": 1094,
+              "matrixHeight": 1094
+            },
+            {
+              "id": "1",
+              "scaleDenominator": 70.56,
+              "cellSize": 20.0,
+              "pointOfOrigin": [299960.0, 9000000.0],
+              "tileWidth": 512,
+              "tileHeight": 512,
+              "matrixWidth": 547,
+              "matrixHeight": 547
+            }
+          ]
+        },
+        "resampling_method": "average"
+      }
+    }
+  },
+  "0/zarr.json": {
+    "node_type": "group",
+    "zarr_format": 3
+  },
+  "0/red/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [1094, 1094],
+    "data_type": "uint16",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1024, 1024]}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": ["y", "x"]
+  },
+  "0/nir/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array", 
+    "shape": [1094, 1094],
+    "data_type": "uint16",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1024, 1024]}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": ["y", "x"]
+  },
+  "0/x/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [1094],
+    "data_type": "float64",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1094]}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": ["x"]
+  },
+  "0/y/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [1094],
+    "data_type": "float64", 
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1094]}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": ["y"]
+  },
+  "1/zarr.json": {
+    "node_type": "group",
+    "zarr_format": 3
+  },
+  "1/red/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [547, 547],
+    "data_type": "uint16",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [512, 512]}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": ["y", "x"]
+  },
+  "1/nir/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [547, 547], 
+    "data_type": "uint16",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [512, 512]}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": ["y", "x"]
+  },
+  "1/x/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [547],
+    "data_type": "float64",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [547]}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": ["x"]
+  },
+  "1/y/zarr.json": {
+    "zarr_format": 3,
+    "node_type": "array",
+    "shape": [547],
+    "data_type": "float64",
+    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [547]}},
+    "codecs": [{"name": "bytes"}],
+    "dimension_names": ["y"]
+  }
+}
+```
+
+This example demonstrates:
+- **Custom CRS**: Uses EPSG:32633 (UTM Zone 33N) instead of web mapping CRS
+- **Scientific Resolution**: Native 10m pixel size typical for Sentinel-2 L2A data
+- **Custom Tile Sizes**: 1024x1024 for native, 512x512 for overview to match scientific data characteristics
+- **Consistent Structure**: Both zoom levels (`0` and `1`) contain the same variables (`red`, `nir`, `x`, `y`)
+- **Coordinate Variables**: UTM coordinates in meters stored as `x` and `y` arrays
+- **Chunk Alignment**: Chunk sizes match the `tileWidth` and `tileHeight` from the TileMatrix definition
+
+#### File System Hierarchy Example
+
+The same custom CRS multiscale dataset would appear as the following directory structure on disk:
+
+```
+sentinel2_utm33n.zarr/
+├── zarr.json                    # Root group with multiscales metadata
+├── 0/                          # Native resolution (10m) zoom level
+│   ├── zarr.json               # Group metadata for zoom level 0
+│   ├── red/                    # Red band data variable
+│   │   ├── zarr.json           # Array metadata
+│   │   └── c/                  # Chunk directory
+│   │       ├── 0/0             # Chunk files (1024x1024 chunks)
+│   │       ├── 0/1
+│   │       └── ...
+│   ├── nir/                    # Near-infrared band data variable
+│   │   ├── zarr.json           # Array metadata
+│   │   └── c/                  # Chunk directory
+│   │       ├── 0/0             # Chunk files (1024x1024 chunks)
+│   │       ├── 0/1
+│   │       └── ...
+│   ├── x/                      # X coordinate variable (UTM Easting)
+│   │   ├── zarr.json           # Array metadata
+│   │   └── c/                  # Chunk directory
+│   │       └── 0               # Single chunk (1094 elements)
+│   └── y/                      # Y coordinate variable (UTM Northing)
+│       ├── zarr.json           # Array metadata
+│       └── c/                  # Chunk directory
+│           └── 0               # Single chunk (1094 elements)
+└── 1/                          # Overview level (20m) zoom level
+    ├── zarr.json               # Group metadata for zoom level 1
+    ├── red/                    # Red band data variable
+    │   ├── zarr.json           # Array metadata
+    │   └── c/                  # Chunk directory
+    │       ├── 0/0             # Chunk files (512x512 chunks)
+    │       ├── 0/1
+    │       └── ...
+    ├── nir/                    # Near-infrared band data variable
+    │   ├── zarr.json           # Array metadata
+    │   └── c/                  # Chunk directory
+    │       ├── 0/0             # Chunk files (512x512 chunks)
+    │       ├── 0/1
+    │       └── ...
+    ├── x/                      # X coordinate variable (UTM Easting)
+    │   ├── zarr.json           # Array metadata
+    │   └── c/                  # Chunk directory
+    │       └── 0               # Single chunk (547 elements)
+    └── y/                      # Y coordinate variable (UTM Northing)
+        ├── zarr.json           # Array metadata
+        └── c/                  # Chunk directory
+            └── 0               # Single chunk (547 elements)
+```
+
+Key aspects of this file system layout:
+- **Root metadata**: The `zarr.json` at the root contains the `multiscales` attribute defining the custom UTM TileMatrixSet
+- **Zoom level groups**: Directories `0/` and `1/` correspond exactly to the TileMatrix `id` values
+- **Consistent variables**: Each zoom level contains the same set of variables (`red`, `nir`, `x`, `y`)
+- **Chunk organization**: Data is stored in chunks that align with the tile dimensions specified in the TileMatrixSet
+- **Coordinate preservation**: UTM coordinates are maintained at each resolution level
 
 ## Appendix
 
@@ -287,4 +565,3 @@ A multiscale Dataset should not contain any members that are not explicitly decl
 #### ResamplingMethod
 
 This is a string literal defined [here](https://zarr.dev/geozarr-spec/documents/standard/template/geozarr-spec.html#_71eeacb0-5e4e-8a8e-5714-02fc0838075b).
-
