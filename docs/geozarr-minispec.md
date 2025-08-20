@@ -50,8 +50,8 @@ In tabular form:
         "dtype": "|u1",
         "shape": [10,11,12],
         "chunks": [10,11,12],
-        "filters": None
-        "compressor": None
+        "filters": null
+        "compressor": null
         "order": "C"
         "dimension_separator": "/"
         }
