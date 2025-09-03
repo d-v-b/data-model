@@ -8,6 +8,8 @@ on:
       - "uv.lock"
       - "pyproject.toml"
   workflow_dispatch:
+  schedule:
+    - cron: "0 0 */5 * *"  # Every 5 days, before cache expiry
 
 jobs:
   build-cache:
@@ -15,7 +17,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
