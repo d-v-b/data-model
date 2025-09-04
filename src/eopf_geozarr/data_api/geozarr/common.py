@@ -89,6 +89,21 @@ ResamplingMethod = Literal[
 """A string literal indicating a resampling method"""
 
 
+class GridMappingAttrs(BaseModel, extra="allow"):
+    """
+    Grid mapping attributes for a GeoZarr grid mapping variable.
+
+    Attributes
+    ----------
+    grid_mapping_name : str
+        The name of the grid mapping.
+
+    Additional attributes might be present depending on the type of grid mapping.
+    """
+
+    grid_mapping_name: str
+
+
 class TileMatrixLimit(BaseModel):
     """"""
 
@@ -143,6 +158,23 @@ class Multiscales(BaseModel, extra="allow"):
 class DatasetAttrs(BaseModel, extra="allow"):
     """
     Attributes for a GeoZarr dataset.
+
+    A dataset is a collection of DataArrays.
+
+    Attributes
+    ----------
+    grid_mapping: str
+        The name of the grid mapping variable for this dataset.
+    """
+
+    grid_mapping: str
+
+
+class MultiscaleDatasetAttrs(BaseModel, extra="allow"):
+    """
+    Attributes for Multiscale GeoZarr dataset.
+
+    A Multiscale dataset is a collection of Dataet
 
     Attributes
     ----------

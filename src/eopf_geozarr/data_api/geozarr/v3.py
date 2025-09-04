@@ -95,3 +95,14 @@ class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
             The validated GeoZarr DataSet.
         """
         return check_valid_coordinates(self)
+
+    @model_validator(mode="after")
+    def validate_grid_mapping(self) -> Self:
+        if (
+            self.members is not None
+            and self.attributes.grid_mapping not in self.members
+        ):
+            raise ValueError(
+                f"Grid mapping variable '{self.attributes.grid_mapping}' not found in dataset members."
+            )
+        return self
