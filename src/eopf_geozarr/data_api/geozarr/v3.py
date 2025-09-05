@@ -7,7 +7,7 @@ from pydantic import model_validator
 from pydantic_zarr.v3 import ArraySpec, GroupSpec
 
 from eopf_geozarr.data_api.geozarr.common import BaseDataArrayAttrs, DatasetAttrs, GridMappingAttrs, MultiscaleAttrs
-
+from pydantic.experimental.missing_sentinel import MISSING
 
 class DataArray(ArraySpec[BaseDataArrayAttrs]):
     """
@@ -37,6 +37,7 @@ class GridMappingVariable(ArraySpec[GridMappingAttrs]):
 
     References
     ----------
+    https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html#grid-mappings-and-projections
     """
     ...
 
@@ -88,7 +89,7 @@ def check_valid_coordinates(model: T) -> T:
     return model
 
 
-class Dataset(GroupSpec[DatasetAttrs, DataArray]):
+class Dataset(GroupSpec[DatasetAttrs, DataArray | GridMappingVariable]):
     """
     A GeoZarr Dataset.
     """
@@ -112,12 +113,19 @@ class Dataset(GroupSpec[DatasetAttrs, DataArray]):
     def validate_grid_mapping(self) -> Self:
         if (
             self.members is not None
-            and self.attributes.grid_mapping not in self.members
-            and not isinstance(self.members[self.attributes.grid_mapping], GridMappingDataArray)
         ):
-            raise ValueError(
-                f"Grid mapping variable '{self.attributes.grid_mapping}' not found in dataset members."
-            )
+            for key, val in self.members.items():
+                if hasattr(val.attributes, "grid_mapping") and val.attributes.grid_mapping is not MISSING:
+                    grid_mapping_var: str = val.attributes.grid_mapping
+                    missing_key = grid_mapping_var not in self.members
+                    if missing_key:
+                        msg = f"Grid mapping variable {grid_mapping_var} declared by {key} was not found in dataset members."
+                        raise ValueError(msg)
+                    if not(isinstance(self.members[grid_mapping_var], GridMappingVariable)):
+                        raise ValueError(
+                            f"Grid mapping variable '{grid_mapping_var}' is not of type GridMappingVariable. "
+                            f"Found {type(self.members[grid_mapping_var])} instead."
+                        )
         return self
 
 class MultiscaleGroup(GroupSpec[MultiscaleAttrs, Dataset]):

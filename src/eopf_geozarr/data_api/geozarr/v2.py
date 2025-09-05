@@ -104,6 +104,7 @@ class GridMappingVariable(ArraySpec[GridMappingAttrs]):
 
     References
     ----------
+    https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html#grid-mappings-and-projections
     """
     ...
 
@@ -178,17 +179,19 @@ class Dataset(GroupSpec[DatasetAttrs, DataArray | GridMappingVariable]):
     def validate_grid_mapping(self) -> Self:
         if (
             self.members is not None
-        ): 
-            missing_key = self.attributes.grid_mapping not in self.members
-            if missing_key:
-                raise ValueError(
-                    f"Grid mapping variable '{self.attributes.grid_mapping}' not found in dataset members."
-            )
-            if not(isinstance(self.members[self.attributes.grid_mapping], GridMappingVariable)):
-                raise ValueError(
-                    f"Grid mapping variable '{self.attributes.grid_mapping}' is not of type GridMappingVariable. "
-                    "Found {type(self.members[self.attributes.grid_mapping])} instead."
-                )
+        ):
+            for key, val in self.members.items():
+                if hasattr(val.attributes, "grid_mapping") and val.attributes.grid_mapping is not None:
+                    grid_mapping_var: str = val.attributes.grid_mapping
+                    missing_key = grid_mapping_var not in self.members
+                    if missing_key:
+                        msg = f"Grid mapping variable {grid_mapping_var} declared by {key} was not found in dataset members."
+                        raise ValueError(msg)
+                    if not(isinstance(self.members[grid_mapping_var], GridMappingVariable)):
+                        raise ValueError(
+                            f"Grid mapping variable '{grid_mapping_var}' is not of type GridMappingVariable. "
+                            f"Found {type(self.members[grid_mapping_var])} instead."
+                        )
         
         return self
 

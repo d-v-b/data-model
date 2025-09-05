@@ -7,7 +7,7 @@ from typing import Annotated, Final, Literal
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel
-
+from pydantic.experimental.missing_sentinel import MISSING
 XARRAY_DIMS_KEY: Final = "_ARRAY_DIMENSIONS"
 
 
@@ -98,7 +98,13 @@ class GridMappingAttrs(BaseModel, extra="allow"):
     grid_mapping_name : str
         The name of the grid mapping.
 
+    Extra fields are permitted.
+
     Additional attributes might be present depending on the type of grid mapping.
+
+    References
+    ----------
+    https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html#grid-mappings-and-projections
     """
 
     grid_mapping_name: str
@@ -160,15 +166,8 @@ class DatasetAttrs(BaseModel, extra="allow"):
     Attributes for a GeoZarr dataset.
 
     A dataset is a collection of DataArrays.
-
-    Attributes
-    ----------
-    grid_mapping: str
-        The name of the grid mapping variable for this dataset.
     """
-
-    grid_mapping: str
-
+    ...
 
 class MultiscaleAttrs(BaseModel, extra="allow"):
     """
@@ -191,3 +190,4 @@ class BaseDataArrayAttrs(BaseModel, extra="allow"):
     Attributes
     ----------
     """
+    grid_mapping: str | MISSING = MISSING

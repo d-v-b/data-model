@@ -6,7 +6,7 @@ import zarr
 from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.v3 import ArraySpec, GroupSpec
 
-from eopf_geozarr.data_api.geozarr.v3 import DataArray, Dataset, check_valid_coordinates
+from eopf_geozarr.data_api.geozarr.v3 import DataArray, Dataset, MultiscaleGroup, check_valid_coordinates
 
 from .conftest import example_group
 
@@ -79,5 +79,5 @@ def test_multiscale_attrs_round_trip() -> None:
     for key, val in source_group_members.items():
         if isinstance(val, zarr.Group):
             if "multiscales" in val.attrs.asdict():
-                model_json = GroupSpec.from_zarr(val).model_dump()
-                assert Dataset(**model_json).model_dump() == tuplify_json(model_json)
+                model_json = MultiscaleGroup.from_zarr(val).model_dump()
+                assert MultiscaleGroup(**model_json).model_dump() == tuplify_json(model_json)
