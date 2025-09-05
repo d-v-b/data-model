@@ -1,3 +1,4 @@
+"""Zarr V3 Models for the GeoZarr Zarr Hierarchy."""
 from __future__ import annotations
 
 from typing import Any, Self, TypeVar
@@ -5,7 +6,7 @@ from typing import Any, Self, TypeVar
 from pydantic import model_validator
 from pydantic_zarr.v3 import ArraySpec, GroupSpec
 
-from eopf_geozarr.data_api.geozarr.common import BaseDataArrayAttrs, DatasetAttrs
+from eopf_geozarr.data_api.geozarr.common import BaseDataArrayAttrs, DatasetAttrs, GridMappingAttrs, MultiscaleAttrs
 
 
 class DataArray(ArraySpec[BaseDataArrayAttrs]):
@@ -21,12 +22,23 @@ class DataArray(ArraySpec[BaseDataArrayAttrs]):
     https://github.com/zarr-developers/geozarr-spec/blob/main/geozarr-spec.md#geozarr-dataarray
     """
 
+    # The dimension names must be a tuple of strings
     dimension_names: tuple[str, ...]
 
     @property
     def array_dimensions(self) -> tuple[str, ...]:
         return self.dimension_names
 
+class GridMappingVariable(ArraySpec[GridMappingAttrs]):
+    """
+    A Zarr array that represents a GeoZarr grid mapping variable.
+
+    The attributes of this array are defined in `GridMappingAttrs`.
+
+    References
+    ----------
+    """
+    ...
 
 T = TypeVar("T", bound=GroupSpec[Any, Any])
 
@@ -76,7 +88,7 @@ def check_valid_coordinates(model: T) -> T:
     return model
 
 
-class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
+class Dataset(GroupSpec[DatasetAttrs, DataArray]):
     """
     A GeoZarr Dataset.
     """
@@ -101,8 +113,25 @@ class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
         if (
             self.members is not None
             and self.attributes.grid_mapping not in self.members
+            and not isinstance(self.members[self.attributes.grid_mapping], GridMappingDataArray)
         ):
             raise ValueError(
                 f"Grid mapping variable '{self.attributes.grid_mapping}' not found in dataset members."
             )
         return self
+
+class MultiscaleGroup(GroupSpec[MultiscaleAttrs, Dataset]):
+    """
+    A GeoZarr Multiscale group.
+
+    Attributes
+    ----------
+    attributes: MultiscaleAttrs
+        Attributes for a multiscale GeoZarr group.
+    members: Mapping[str, Dataset]
+        A mapping of dataset names to GeoZarr Datasets.
+    ----------
+    """
+    # todo: define a validation routine that ensures the referential integrity between 
+    # multiscale attributes and the actual datasets
+    ...

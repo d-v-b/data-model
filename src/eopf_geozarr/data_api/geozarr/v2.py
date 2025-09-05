@@ -1,17 +1,19 @@
-"""GeoZarr data API for Zarr V2."""
+"""Zarr V2 Models for the GeoZarr Zarr Hierarchy."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any, Iterable, Literal, Self, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 from pydantic_zarr.v2 import ArraySpec, GroupSpec, auto_attributes
 
 from eopf_geozarr.data_api.geozarr.common import (
     XARRAY_DIMS_KEY,
     BaseDataArrayAttrs,
-    Multiscales,
+    DatasetAttrs,
+    GridMappingAttrs,
+    MultiscaleAttrs,
 )
 
 
@@ -29,7 +31,8 @@ class DataArrayAttrs(BaseDataArrayAttrs):
     # unless the variable is an auxiliary variable
     # see https://github.com/zarr-developers/geozarr-spec/blob/main/geozarr-spec.md#geozarr-coordinates
     array_dimensions: tuple[str, ...] = Field(alias="_ARRAY_DIMENSIONS")
-
+    
+    # this is necessary to serialize the `array_dimensions` attribute as `_ARRAY_DIMENSIONS`
     model_config = ConfigDict(serialize_by_alias=True)
 
 
@@ -56,6 +59,9 @@ class DataArray(ArraySpec[DataArrayAttrs]):
         compressor: Any | Literal["auto"] = "auto",
         dimension_names: Iterable[str] | Literal["auto"] = "auto",
     ) -> Self:
+        """
+        Override the default from_array method to include a dimension_names parameter.
+        """
         if attributes == "auto":
             auto_attrs = dict(auto_attributes(array))
         else:
@@ -89,6 +95,17 @@ class DataArray(ArraySpec[DataArrayAttrs]):
     @property
     def array_dimensions(self) -> tuple[str, ...]:
         return self.attributes.array_dimensions  # type: ignore[no-any-return]
+
+class GridMappingVariable(ArraySpec[GridMappingAttrs]):
+    """
+    A Zarr array that represents a GeoZarr grid mapping variable.
+
+    The attributes of this array are defined in `GridMappingAttrs`.
+
+    References
+    ----------
+    """
+    ...
 
 
 T = TypeVar("T", bound=GroupSpec[Any, Any])
@@ -137,19 +154,7 @@ def check_valid_coordinates(model: T) -> T:
     return model
 
 
-class DatasetAttrs(BaseModel):
-    """
-    Attributes for a GeoZarr dataset.
-
-    Attributes
-    ----------
-    multiscales: MultiscaleAttrs
-    """
-
-    multiscales: Multiscales
-
-
-class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
+class Dataset(GroupSpec[DatasetAttrs, DataArray | GridMappingVariable]):
     """
     A GeoZarr Dataset.
     """
@@ -168,3 +173,37 @@ class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
             The validated GeoZarr DataSet.
         """
         return check_valid_coordinates(self)
+
+    @model_validator(mode="after")
+    def validate_grid_mapping(self) -> Self:
+        if (
+            self.members is not None
+        ): 
+            missing_key = self.attributes.grid_mapping not in self.members
+            if missing_key:
+                raise ValueError(
+                    f"Grid mapping variable '{self.attributes.grid_mapping}' not found in dataset members."
+            )
+            if not(isinstance(self.members[self.attributes.grid_mapping], GridMappingVariable)):
+                raise ValueError(
+                    f"Grid mapping variable '{self.attributes.grid_mapping}' is not of type GridMappingVariable. "
+                    "Found {type(self.members[self.attributes.grid_mapping])} instead."
+                )
+        
+        return self
+
+class MultiscaleGroup(GroupSpec[MultiscaleAttrs, Dataset]):
+    """
+    A GeoZarr Multiscale group.
+
+    Attributes
+    ----------
+    attributes: MultiscaleAttrs
+        Attributes for a multiscale GeoZarr group.
+    members: Mapping[str, Dataset]
+        A mapping of dataset names to GeoZarr Datasets.
+    ----------
+    """
+    # todo: define a validation routine that ensures the referential integrity between 
+    # multiscale attributes and the actual datasets
+    ...

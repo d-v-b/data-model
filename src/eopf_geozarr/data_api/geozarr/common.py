@@ -170,7 +170,7 @@ class DatasetAttrs(BaseModel, extra="allow"):
     grid_mapping: str
 
 
-class MultiscaleDatasetAttrs(BaseModel, extra="allow"):
+class MultiscaleAttrs(BaseModel, extra="allow"):
     """
     Attributes for Multiscale GeoZarr dataset.
 
