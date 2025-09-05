@@ -31,7 +31,7 @@ class DataArrayAttrs(BaseDataArrayAttrs):
     # unless the variable is an auxiliary variable
     # see https://github.com/zarr-developers/geozarr-spec/blob/main/geozarr-spec.md#geozarr-coordinates
     array_dimensions: tuple[str, ...] = Field(alias="_ARRAY_DIMENSIONS")
-    
+
     # this is necessary to serialize the `array_dimensions` attribute as `_ARRAY_DIMENSIONS`
     model_config = ConfigDict(serialize_by_alias=True)
 
@@ -96,6 +96,7 @@ class DataArray(ArraySpec[DataArrayAttrs]):
     def array_dimensions(self) -> tuple[str, ...]:
         return self.attributes.array_dimensions  # type: ignore[no-any-return]
 
+
 class GridMappingVariable(ArraySpec[GridMappingAttrs]):
     """
     A Zarr array that represents a GeoZarr grid mapping variable.
@@ -106,6 +107,7 @@ class GridMappingVariable(ArraySpec[GridMappingAttrs]):
     ----------
     https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html#grid-mappings-and-projections
     """
+
     ...
 
 
@@ -177,23 +179,27 @@ class Dataset(GroupSpec[DatasetAttrs, DataArray | GridMappingVariable]):
 
     @model_validator(mode="after")
     def validate_grid_mapping(self) -> Self:
-        if (
-            self.members is not None
-        ):
+        if self.members is not None:
             for key, val in self.members.items():
-                if hasattr(val.attributes, "grid_mapping") and val.attributes.grid_mapping is not None:
+                if (
+                    hasattr(val.attributes, "grid_mapping")
+                    and val.attributes.grid_mapping is not None
+                ):
                     grid_mapping_var: str = val.attributes.grid_mapping
                     missing_key = grid_mapping_var not in self.members
                     if missing_key:
                         msg = f"Grid mapping variable {grid_mapping_var} declared by {key} was not found in dataset members."
                         raise ValueError(msg)
-                    if not(isinstance(self.members[grid_mapping_var], GridMappingVariable)):
+                    if not (
+                        isinstance(self.members[grid_mapping_var], GridMappingVariable)
+                    ):
                         raise ValueError(
                             f"Grid mapping variable '{grid_mapping_var}' is not of type GridMappingVariable. "
                             f"Found {type(self.members[grid_mapping_var])} instead."
                         )
-        
+
         return self
+
 
 class MultiscaleGroup(GroupSpec[MultiscaleAttrs, Dataset]):
     """
@@ -207,6 +213,7 @@ class MultiscaleGroup(GroupSpec[MultiscaleAttrs, Dataset]):
         A mapping of dataset names to GeoZarr Datasets.
     ----------
     """
-    # todo: define a validation routine that ensures the referential integrity between 
+
+    # todo: define a validation routine that ensures the referential integrity between
     # multiscale attributes and the actual datasets
     ...

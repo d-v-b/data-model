@@ -1,13 +1,20 @@
 """Zarr V3 Models for the GeoZarr Zarr Hierarchy."""
+
 from __future__ import annotations
 
 from typing import Any, Self, TypeVar
 
 from pydantic import model_validator
+from pydantic.experimental.missing_sentinel import MISSING
 from pydantic_zarr.v3 import ArraySpec, GroupSpec
 
-from eopf_geozarr.data_api.geozarr.common import BaseDataArrayAttrs, DatasetAttrs, GridMappingAttrs, MultiscaleAttrs
-from pydantic.experimental.missing_sentinel import MISSING
+from eopf_geozarr.data_api.geozarr.common import (
+    BaseDataArrayAttrs,
+    DatasetAttrs,
+    GridMappingAttrs,
+    MultiscaleAttrs,
+)
+
 
 class DataArray(ArraySpec[BaseDataArrayAttrs]):
     """
@@ -29,6 +36,7 @@ class DataArray(ArraySpec[BaseDataArrayAttrs]):
     def array_dimensions(self) -> tuple[str, ...]:
         return self.dimension_names
 
+
 class GridMappingVariable(ArraySpec[GridMappingAttrs]):
     """
     A Zarr array that represents a GeoZarr grid mapping variable.
@@ -39,7 +47,9 @@ class GridMappingVariable(ArraySpec[GridMappingAttrs]):
     ----------
     https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html#grid-mappings-and-projections
     """
+
     ...
+
 
 T = TypeVar("T", bound=GroupSpec[Any, Any])
 
@@ -111,22 +121,26 @@ class Dataset(GroupSpec[DatasetAttrs, DataArray | GridMappingVariable]):
 
     @model_validator(mode="after")
     def validate_grid_mapping(self) -> Self:
-        if (
-            self.members is not None
-        ):
+        if self.members is not None:
             for key, val in self.members.items():
-                if hasattr(val.attributes, "grid_mapping") and val.attributes.grid_mapping is not MISSING:
+                if (
+                    hasattr(val.attributes, "grid_mapping")
+                    and val.attributes.grid_mapping is not MISSING
+                ):
                     grid_mapping_var: str = val.attributes.grid_mapping
                     missing_key = grid_mapping_var not in self.members
                     if missing_key:
                         msg = f"Grid mapping variable {grid_mapping_var} declared by {key} was not found in dataset members."
                         raise ValueError(msg)
-                    if not(isinstance(self.members[grid_mapping_var], GridMappingVariable)):
+                    if not (
+                        isinstance(self.members[grid_mapping_var], GridMappingVariable)
+                    ):
                         raise ValueError(
                             f"Grid mapping variable '{grid_mapping_var}' is not of type GridMappingVariable. "
                             f"Found {type(self.members[grid_mapping_var])} instead."
                         )
         return self
+
 
 class MultiscaleGroup(GroupSpec[MultiscaleAttrs, Dataset]):
     """
@@ -140,6 +154,7 @@ class MultiscaleGroup(GroupSpec[MultiscaleAttrs, Dataset]):
         A mapping of dataset names to GeoZarr Datasets.
     ----------
     """
-    # todo: define a validation routine that ensures the referential integrity between 
+
+    # todo: define a validation routine that ensures the referential integrity between
     # multiscale attributes and the actual datasets
     ...

@@ -8,6 +8,7 @@ from typing import Annotated, Final, Literal
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel
 from pydantic.experimental.missing_sentinel import MISSING
+
 XARRAY_DIMS_KEY: Final = "_ARRAY_DIMENSIONS"
 
 
@@ -167,7 +168,9 @@ class DatasetAttrs(BaseModel, extra="allow"):
 
     A dataset is a collection of DataArrays.
     """
+
     ...
+
 
 class MultiscaleAttrs(BaseModel, extra="allow"):
     """
@@ -190,4 +193,5 @@ class BaseDataArrayAttrs(BaseModel, extra="allow"):
     Attributes
     ----------
     """
+
     grid_mapping: str | MISSING = MISSING
