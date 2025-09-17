@@ -9,7 +9,6 @@ from pydantic import ConfigDict, Field, model_validator
 from pydantic_zarr.v2 import ArraySpec, GroupSpec, auto_attributes
 
 from eopf_geozarr.data_api.geozarr.common import (
-    XARRAY_DIMS_KEY,
     BaseDataArrayAttrs,
     DatasetAttrs,
     GridMappingAttrs,
@@ -17,6 +16,7 @@ from eopf_geozarr.data_api.geozarr.common import (
     check_grid_mapping,
     check_valid_coordinates,
 )
+from eopf_geozarr.data_api.geozarr.types import XARRAY_DIMS_KEY
 
 
 class DataArrayAttrs(BaseDataArrayAttrs):

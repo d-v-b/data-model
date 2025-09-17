@@ -3,14 +3,14 @@
 import io
 import urllib
 import urllib.request
-from typing import Annotated, Any, Final, Literal, Mapping, TypedDict, TypeVar
+from typing import Annotated, Any, Mapping, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import Protocol, runtime_checkable
 
-XARRAY_DIMS_KEY: Final = "_ARRAY_DIMENSIONS"
+from eopf_geozarr.data_api.geozarr.types import ResamplingMethod
 
 
 class BaseDataArrayAttrs(BaseModel, extra="allow"):
@@ -103,25 +103,6 @@ def check_standard_name(name: str) -> str:
 
 CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
 
-ResamplingMethod = Literal[
-    "nearest",
-    "average",
-    "bilinear",
-    "cubic",
-    "cubic_spline",
-    "lanczos",
-    "mode",
-    "max",
-    "min",
-    "med",
-    "sum",
-    "q1",
-    "q3",
-    "rms",
-    "gauss",
-]
-"""A string literal indicating a resampling method"""
-
 
 @runtime_checkable
 class GroupLike(Protocol):
@@ -186,14 +167,6 @@ class DataArrayLike(Protocol):
 
     shape: tuple[int, ...]
     attributes: BaseDataArrayAttrs
-
-
-class TileMatrixLimitJSON(TypedDict):
-    tileMatrix: str
-    minTileCol: int
-    minTileRow: int
-    maxTileCol: int
-    maxTileRow: int
 
 
 class TileMatrixLimit(BaseModel):

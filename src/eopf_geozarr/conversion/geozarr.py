@@ -17,6 +17,7 @@ import dataclasses
 import os
 import shutil
 import time
+from collections.abc import Hashable, Iterable, Sequence
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -26,7 +27,15 @@ from zarr.core.sync import sync
 from zarr.storage import StoreLike
 from zarr.storage._common import make_store_path
 
-from eopf_geozarr.data_api.geozarr.common import TileMatrixLimitJSON
+from eopf_geozarr.data_api.geozarr.types import (
+    OverviewLevelJSON,
+    StandardXCoordAttrsJSON,
+    StandardYCoordAttrsJSON,
+    TileMatrixJSON,
+    TileMatrixLimitJSON,
+    TileMatrixSetJSON,
+    XarrayEncodingJSON,
+)
 
 from . import fs_utils, utils
 
@@ -612,7 +621,7 @@ def calculate_overview_levels(
     native_height: int,
     min_dimension: int = 256,
     tile_width: int = 256,
-) -> List[Dict[str, Any]]:
+) -> list[OverviewLevelJSON]:
     """
     Calculate overview levels following COG /2 downsampling logic.
 
@@ -632,7 +641,7 @@ def calculate_overview_levels(
     list
         List of overview level dictionaries
     """
-    overview_levels = []
+    overview_levels: list[OverviewLevelJSON] = []
     level = 0
     current_width = native_width
     current_height = native_height
@@ -662,10 +671,10 @@ def calculate_overview_levels(
 
 def create_native_crs_tile_matrix_set(
     native_crs: Any,
-    native_bounds: Tuple[float, float, float, float],
-    overview_levels: List[Dict[str, Any]],
+    native_bounds: tuple[float, float, float, float],
+    overview_levels: Iterable[OverviewLevelJSON],
     group_prefix: Optional[str] = "",
-) -> Dict[str, Any]:
+) -> TileMatrixSetJSON:
     """
     Create a custom Tile Matrix Set for the native CRS following GeoZarr spec.
 
@@ -686,7 +695,7 @@ def create_native_crs_tile_matrix_set(
         Tile Matrix Set definition following OGC standard
     """
     left, bottom, right, top = native_bounds
-    tile_matrices = []
+    tile_matrices: list[TileMatrixJSON] = []
 
     for overview in overview_levels:
         level = overview["level"]
@@ -844,13 +853,13 @@ def create_overview_dataset_all_vars(
 
 def write_dataset_band_by_band_with_validation(
     ds: xr.Dataset,
-    existing_dataset: Optional[xr.Dataset],
+    existing_dataset: xr.Dataset | None,
     output_path: str,
-    encoding: Dict[str, Any],
+    encoding: dict[Hashable, XarrayEncodingJSON],
     max_retries: int,
     group_name: str,
     force_overwrite: bool = False,
-) -> Tuple[bool, xr.Dataset]:
+) -> tuple[bool, xr.Dataset]:
     """
     Write dataset band by band with individual band validation.
 
@@ -1215,9 +1224,10 @@ def _find_reference_crs(geozarr_groups: Dict[str, xr.Dataset]) -> Optional[str]:
 
 def _create_encoding(
     ds: xr.Dataset, compressor: Any, spatial_chunk: int
-) -> Dict[str, Any]:
+) -> dict[Hashable, XarrayEncodingJSON]:
     """Create encoding for dataset variables."""
-    encoding: Dict[str, Any] = {}
+    encoding: dict[Hashable, XarrayEncodingJSON] = {}
+    chunking: tuple[int, ...]
     for var in ds.data_vars:
         if hasattr(ds[var].data, "chunks"):
             current_chunks = ds[var].chunks
@@ -1257,9 +1267,9 @@ def _create_encoding(
 
 def _create_geozarr_encoding(
     ds: xr.Dataset, compressor: Any, spatial_chunk: int
-) -> Dict[str, Any]:
+) -> dict[Hashable, XarrayEncodingJSON]:
     """Create encoding for GeoZarr dataset variables."""
-    encoding: Dict[str, Any] = {}
+    encoding: dict[Hashable, XarrayEncodingJSON] = {}
     for var in ds.data_vars:
         if utils.is_grid_mapping_variable(ds, var):
             encoding[var] = {"compressors": None}
@@ -1287,7 +1297,7 @@ def _create_geozarr_encoding(
     return encoding
 
 
-def _load_existing_dataset(path: str) -> Optional[xr.Dataset]:
+def _load_existing_dataset(path: str) -> xr.Dataset | None:
     """Load existing dataset if it exists."""
     try:
         if fs_utils.path_exists(path):
@@ -1306,7 +1316,7 @@ def _load_existing_dataset(path: str) -> Optional[xr.Dataset]:
 
 
 def _create_tile_matrix_limits(
-    overview_levels: List[Dict[str, Any]], tile_width: int
+    overview_levels: Iterable[OverviewLevelJSON], tile_width: int
 ) -> dict[str, TileMatrixLimitJSON]:
     """Create tile matrix limits for overview levels."""
     tile_matrix_limits: dict[str, TileMatrixLimitJSON] = {}
@@ -1326,7 +1336,7 @@ def _create_tile_matrix_limits(
     return tile_matrix_limits
 
 
-def _get_x_coord_attrs() -> Dict[str, Any]:
+def _get_x_coord_attrs() -> StandardXCoordAttrsJSON:
     """Get standard attributes for x coordinate."""
     return {
         "units": "m",
@@ -1336,7 +1346,7 @@ def _get_x_coord_attrs() -> Dict[str, Any]:
     }
 
 
-def _get_y_coord_attrs() -> Dict[str, Any]:
+def _get_y_coord_attrs() -> StandardYCoordAttrsJSON:
     """Get standard attributes for y coordinate."""
     return {
         "units": "m",
@@ -1346,7 +1356,7 @@ def _get_y_coord_attrs() -> Dict[str, Any]:
     }
 
 
-def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: List[str]) -> str:
+def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: Sequence[str]) -> str:
     """Find the grid_mapping variable name from the dataset."""
     grid_mapping_var_name = ds.attrs.get("grid_mapping", None)
     if not grid_mapping_var_name and data_vars:
