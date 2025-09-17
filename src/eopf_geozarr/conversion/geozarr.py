@@ -26,6 +26,8 @@ from zarr.core.sync import sync
 from zarr.storage import StoreLike
 from zarr.storage._common import make_store_path
 
+from eopf_geozarr.data_api.geozarr.common import TileMatrixLimitJSON
+
 from . import fs_utils, utils
 
 
@@ -1305,9 +1307,9 @@ def _load_existing_dataset(path: str) -> Optional[xr.Dataset]:
 
 def _create_tile_matrix_limits(
     overview_levels: List[Dict[str, Any]], tile_width: int
-) -> Dict[str, Any]:
+) -> dict[str, TileMatrixLimitJSON]:
     """Create tile matrix limits for overview levels."""
-    tile_matrix_limits = {}
+    tile_matrix_limits: dict[str, TileMatrixLimitJSON] = {}
     for ol in overview_levels:
         level_str = str(ol["level"])
         max_tile_col = int(np.ceil(ol["width"] / tile_width)) - 1
@@ -1320,6 +1322,7 @@ def _create_tile_matrix_limits(
             "minTileRow": 0,
             "maxTileRow": max_tile_row,
         }
+
     return tile_matrix_limits
 
 

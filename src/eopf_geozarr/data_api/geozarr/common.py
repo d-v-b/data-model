@@ -3,7 +3,7 @@
 import io
 import urllib
 import urllib.request
-from typing import Annotated, Any, Final, Literal, Mapping, TypeVar
+from typing import Annotated, Any, Final, Literal, Mapping, TypedDict, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel
@@ -186,6 +186,14 @@ class DataArrayLike(Protocol):
 
     shape: tuple[int, ...]
     attributes: BaseDataArrayAttrs
+
+
+class TileMatrixLimitJSON(TypedDict):
+    tileMatrix: str
+    minTileCol: int
+    minTileRow: int
+    maxTileCol: int
+    maxTileRow: int
 
 
 class TileMatrixLimit(BaseModel):
