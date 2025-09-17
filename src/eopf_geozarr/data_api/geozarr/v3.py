@@ -1,3 +1,5 @@
+"""Zarr V3 Models for the GeoZarr Zarr Hierarchy."""
+
 from __future__ import annotations
 
 from typing import Any, Self
@@ -26,6 +28,7 @@ class DataArray(ArraySpec[BaseDataArrayAttrs]):
     https://github.com/zarr-developers/geozarr-spec/blob/main/geozarr-spec.md#geozarr-dataarray
     """
 
+    # The dimension names must be a tuple of strings
     dimension_names: tuple[str, ...]
 
     @property

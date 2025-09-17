@@ -1,17 +1,18 @@
-"""GeoZarr data API for Zarr V2."""
+"""Zarr V2 Models for the GeoZarr Zarr Hierarchy."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any, Iterable, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 from pydantic_zarr.v2 import ArraySpec, GroupSpec, auto_attributes
 
 from eopf_geozarr.data_api.geozarr.common import (
     XARRAY_DIMS_KEY,
     BaseDataArrayAttrs,
-    Multiscales,
+    DatasetAttrs,
+    GridMappingAttrs,
     check_grid_mapping,
     check_valid_coordinates,
 )
@@ -32,6 +33,7 @@ class DataArrayAttrs(BaseDataArrayAttrs):
     # see https://github.com/zarr-developers/geozarr-spec/blob/main/geozarr-spec.md#geozarr-coordinates
     array_dimensions: tuple[str, ...] = Field(alias="_ARRAY_DIMENSIONS")
 
+    # this is necessary to serialize the `array_dimensions` attribute as `_ARRAY_DIMENSIONS`
     model_config = ConfigDict(serialize_by_alias=True)
 
 
@@ -58,6 +60,9 @@ class DataArray(ArraySpec[DataArrayAttrs]):
         compressor: Any | Literal["auto"] = "auto",
         dimension_names: Iterable[str] | Literal["auto"] = "auto",
     ) -> Self:
+        """
+        Override the default from_array method to include a dimension_names parameter.
+        """
         if attributes == "auto":
             auto_attrs = dict(auto_attributes(array))
         else:
@@ -93,19 +98,21 @@ class DataArray(ArraySpec[DataArrayAttrs]):
         return self.attributes.array_dimensions  # type: ignore[no-any-return]
 
 
-class DatasetAttrs(BaseModel):
+class GridMappingVariable(ArraySpec[GridMappingAttrs]):
     """
-    Attributes for a GeoZarr dataset.
+    A Zarr array that represents a GeoZarr grid mapping variable.
 
-    Attributes
+    The attributes of this array are defined in `GridMappingAttrs`.
+
+    References
     ----------
-    multiscales: MultiscaleAttrs
+    https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html#grid-mappings-and-projections
     """
 
-    multiscales: Multiscales
+    ...
 
 
-class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
+class Dataset(GroupSpec[DatasetAttrs, DataArray | GridMappingVariable]):
     """
     A GeoZarr Dataset.
     """

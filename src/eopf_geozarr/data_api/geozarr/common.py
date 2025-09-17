@@ -7,9 +7,42 @@ from typing import Annotated, Any, Final, Literal, Mapping, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel
+from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import Protocol, runtime_checkable
 
 XARRAY_DIMS_KEY: Final = "_ARRAY_DIMENSIONS"
+
+
+class BaseDataArrayAttrs(BaseModel, extra="allow"):
+    """
+    Base attributes for a  GeoZarr DataArray.
+
+    Attributes
+    ----------
+    """
+
+    grid_mapping: str | MISSING = MISSING
+
+
+class GridMappingAttrs(BaseModel, extra="allow"):
+    """
+    Grid mapping attributes for a GeoZarr grid mapping variable.
+
+    Attributes
+    ----------
+    grid_mapping_name : str
+        The name of the grid mapping.
+
+    Extra fields are permitted.
+
+    Additional attributes might be present depending on the type of grid mapping.
+
+    References
+    ----------
+    https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html#grid-mappings-and-projections
+    """
+
+    grid_mapping_name: str
 
 
 def get_cf_standard_names(url: str) -> tuple[str, ...]:
@@ -41,16 +74,53 @@ CF_STANDARD_NAME_URL = (
 CF_STANDARD_NAMES = get_cf_standard_names(url=CF_STANDARD_NAME_URL)
 
 
-@runtime_checkable
-class DataArrayLike(Protocol):
+def check_standard_name(name: str) -> str:
     """
-    This is a protocol that models the relevant properties of Zarr V2 and Zarr V3 DataArrays.
+    Check if the standard name is valid according to the CF conventions.
+
+    Parameters
+    ----------
+    name : str
+        The standard name to check.
+
+    Returns
+    -------
+    str
+        The validated standard name.
+
+    Raises
+    ------
+    ValueError
+        If the standard name is not valid.
     """
 
-    @property
-    def array_dimensions(self) -> tuple[str, ...]: ...
+    if name in CF_STANDARD_NAMES:
+        return name
+    raise ValueError(
+        f"Invalid standard name: {name}. This name was not found in the list of CF standard names."
+    )
 
-    shape: tuple[int, ...]
+
+CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
+
+ResamplingMethod = Literal[
+    "nearest",
+    "average",
+    "bilinear",
+    "cubic",
+    "cubic_spline",
+    "lanczos",
+    "mode",
+    "max",
+    "min",
+    "med",
+    "sum",
+    "q1",
+    "q3",
+    "rms",
+    "gauss",
+]
+"""A string literal indicating a resampling method"""
 
 
 @runtime_checkable
@@ -105,68 +175,17 @@ def check_valid_coordinates(model: TGroupLike) -> TGroupLike:
     return model
 
 
-def check_standard_name(name: str) -> str:
+@runtime_checkable
+class DataArrayLike(Protocol):
     """
-    Check if the standard name is valid according to the CF conventions.
-
-    Parameters
-    ----------
-    name : str
-        The standard name to check.
-
-    Returns
-    -------
-    str
-        The validated standard name.
-
-    Raises
-    ------
-    ValueError
-        If the standard name is not valid.
+    This is a protocol that models the relevant properties of Zarr V2 and Zarr V3 DataArrays.
     """
 
-    if name in CF_STANDARD_NAMES:
-        return name
-    raise ValueError(
-        f"Invalid standard name: {name}. This name was not found in the list of CF standard names."
-    )
+    @property
+    def array_dimensions(self) -> tuple[str, ...]: ...
 
-
-CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
-
-ResamplingMethod = Literal[
-    "nearest",
-    "average",
-    "bilinear",
-    "cubic",
-    "cubic_spline",
-    "lanczos",
-    "mode",
-    "max",
-    "min",
-    "med",
-    "sum",
-    "q1",
-    "q3",
-    "rms",
-    "gauss",
-]
-"""A string literal indicating a resampling method"""
-
-
-class GridMappingAttrs(BaseModel, extra="allow"):
-    """
-    Grid mapping attributes for a GeoZarr grid mapping variable.
-
-    Attributes
-    ----------
-    grid_mapping_name : str
-        The name of the grid mapping.
-
-    Additional attributes might be present depending on the type of grid mapping.
-    """
-
-    grid_mapping_name: str
+    shape: tuple[int, ...]
+    attributes: BaseDataArrayAttrs
 
 
 class TileMatrixLimit(BaseModel):
@@ -224,20 +243,14 @@ class DatasetAttrs(BaseModel, extra="allow"):
     """
     Attributes for a GeoZarr dataset.
 
-    A dataset is a collection of DataArrays.
-
-    Attributes
-    ----------
-    grid_mapping: str
-        The name of the grid mapping variable for this dataset.
+    A dataset is a collection of DataArrays. This class models the attributes of a dataset
     """
 
-    grid_mapping: str
+    ...
 
 
 @runtime_checkable
 class DatasetLike(Protocol):
-    attributes: DatasetAttrs
     members: Mapping[str, DataArrayLike] | None
 
 
@@ -248,10 +261,11 @@ def check_grid_mapping(model: TDataSetLike) -> TDataSetLike:
     """
     Ensure that a grid mapping variable is present, and that it refers to a member of the model.
     """
-    if model.members is not None and model.attributes.grid_mapping not in model.members:
-        raise ValueError(
-            f"Grid mapping variable '{model.attributes.grid_mapping}' not found in dataset members."
-        )
+    if model.members is not None:
+        for name, member in model.members.items():
+            if member.attributes.grid_mapping not in model.members:
+                msg = f"Grid mapping variable '{member.attributes.grid_mapping}' declared by {name} was not found in dataset members"
+                raise ValueError(msg)
     return model
 
 
@@ -267,12 +281,3 @@ class MultiscaleDatasetAttrs(BaseModel, extra="allow"):
     """
 
     multiscales: Multiscales
-
-
-class BaseDataArrayAttrs(BaseModel, extra="allow"):
-    """
-    Base attributes for a  GeoZarr DataArray.
-
-    Attributes
-    ----------
-    """
