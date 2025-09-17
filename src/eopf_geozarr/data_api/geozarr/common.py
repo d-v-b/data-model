@@ -3,10 +3,11 @@
 import io
 import urllib
 import urllib.request
-from typing import Annotated, Final, Literal
+from typing import Annotated, Any, Final, Literal, Mapping, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel
+from typing_extensions import Protocol, runtime_checkable
 
 XARRAY_DIMS_KEY: Final = "_ARRAY_DIMENSIONS"
 
@@ -38,6 +39,70 @@ CF_STANDARD_NAME_URL = (
 # this does IO against github. consider locally storing this data instead if fetching every time
 # is problematic.
 CF_STANDARD_NAMES = get_cf_standard_names(url=CF_STANDARD_NAME_URL)
+
+
+@runtime_checkable
+class DataArrayLike(Protocol):
+    """
+    This is a protocol that models the relevant properties of Zarr V2 and Zarr V3 DataArrays.
+    """
+
+    @property
+    def array_dimensions(self) -> tuple[str, ...]: ...
+
+    shape: tuple[int, ...]
+
+
+@runtime_checkable
+class GroupLike(Protocol):
+    members: Mapping[str, Any] | None
+    attributes: Any
+
+
+TGroupLike = TypeVar("TGroupLike", bound=GroupLike)
+
+
+def check_valid_coordinates(model: TGroupLike) -> TGroupLike:
+    """
+    Check if the coordinates of the DataArrayLike objects listed in GroupLike objects are valid.
+
+    For each DataArrayLike in the model, we check the dimensions associated with the DataArrayLike.
+    For each dimension associated with a data variable, a DataArrayLike with the name of that data
+    variable must be present in the members of the group.
+
+    Parameters
+    ----------
+    model : GroupLike
+        An object that implements the GroupLike protocol.
+
+    Returns
+    -------
+    GroupLike
+        A GroupLike object with referentially valid coordinates.
+    """
+    if model.members is None:
+        raise ValueError("Model members cannot be None")
+
+    arrays: dict[str, DataArrayLike] = {
+        k: v for k, v in model.members.items() if isinstance(v, DataArrayLike)
+    }
+    for key, array in arrays.items():
+        for idx, dim in enumerate(array.array_dimensions):
+            if dim not in model.members:
+                raise ValueError(
+                    f"Dimension '{dim}' for array '{key}' is not defined in the model members."
+                )
+            member = model.members[dim]
+            if isinstance(member, GroupLike):
+                raise ValueError(
+                    f"Dimension '{dim}' for array '{key}' should be a group. Found an array instead."
+                )
+            if member.shape[0] != array.shape[idx]:
+                raise ValueError(
+                    f"Dimension '{dim}' for array '{key}' has a shape mismatch: "
+                    f"{member.shape[0]} != {array.shape[idx]}."
+                )
+    return model
 
 
 def check_standard_name(name: str) -> str:
@@ -168,6 +233,26 @@ class DatasetAttrs(BaseModel, extra="allow"):
     """
 
     grid_mapping: str
+
+
+@runtime_checkable
+class DatasetLike(Protocol):
+    attributes: DatasetAttrs
+    members: Mapping[str, DataArrayLike] | None
+
+
+TDataSetLike = TypeVar("TDataSetLike", bound=DatasetLike)
+
+
+def check_grid_mapping(model: TDataSetLike) -> TDataSetLike:
+    """
+    Ensure that a grid mapping variable is present, and that it refers to a member of the model.
+    """
+    if model.members is not None and model.attributes.grid_mapping not in model.members:
+        raise ValueError(
+            f"Grid mapping variable '{model.attributes.grid_mapping}' not found in dataset members."
+        )
+    return model
 
 
 class MultiscaleDatasetAttrs(BaseModel, extra="allow"):

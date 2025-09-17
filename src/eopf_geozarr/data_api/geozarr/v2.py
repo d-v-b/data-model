@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Iterable, Literal, Self, TypeVar
+from typing import Any, Iterable, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_zarr.v2 import ArraySpec, GroupSpec, auto_attributes
@@ -12,6 +12,8 @@ from eopf_geozarr.data_api.geozarr.common import (
     XARRAY_DIMS_KEY,
     BaseDataArrayAttrs,
     Multiscales,
+    check_grid_mapping,
+    check_valid_coordinates,
 )
 
 
@@ -91,52 +93,6 @@ class DataArray(ArraySpec[DataArrayAttrs]):
         return self.attributes.array_dimensions  # type: ignore[no-any-return]
 
 
-T = TypeVar("T", bound=GroupSpec[Any, Any])
-
-
-def check_valid_coordinates(model: T) -> T:
-    """
-    Check if the coordinates of the DataArrays listed in a GeoZarr DataSet are valid.
-
-    For each DataArray in the model, we check the dimensions associated with the DataArray.
-    For each dimension associated with a data variable, an array with the name of that data variable
-    must be present in the members of the group.
-
-    Parameters
-    ----------
-    model : GroupSpec[Any, Any]
-        The GeoZarr DataArray model to check.
-
-    Returns
-    -------
-    GroupSpec[Any, Any]
-        The validated GeoZarr DataArray model.
-    """
-    if model.members is None:
-        raise ValueError("Model members cannot be None")
-
-    arrays: dict[str, DataArray] = {
-        k: v for k, v in model.members.items() if isinstance(v, DataArray)
-    }
-    for key, array in arrays.items():
-        for idx, dim in enumerate(array.array_dimensions):
-            if dim not in model.members:
-                raise ValueError(
-                    f"Dimension '{dim}' for array '{key}' is not defined in the model members."
-                )
-            member = model.members[dim]
-            if isinstance(member, GroupSpec):
-                raise ValueError(
-                    f"Dimension '{dim}' for array '{key}' should be a group. Found an array instead."
-                )
-            if member.shape[0] != array.shape[idx]:
-                raise ValueError(
-                    f"Dimension '{dim}' for array '{key}' has a shape mismatch: "
-                    f"{member.shape[0]} != {array.shape[idx]}."
-                )
-    return model
-
-
 class DatasetAttrs(BaseModel):
     """
     Attributes for a GeoZarr dataset.
@@ -168,3 +124,7 @@ class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
             The validated GeoZarr DataSet.
         """
         return check_valid_coordinates(self)
+
+    @model_validator(mode="after")
+    def check_grid_mapping(self) -> Self:
+        return check_grid_mapping(self)
