@@ -13,6 +13,7 @@ from eopf_geozarr.data_api.geozarr.common import (
     BaseDataArrayAttrs,
     DatasetAttrs,
     GridMappingAttrs,
+    MultiscaleGroupAttrs,
     check_grid_mapping,
     check_valid_coordinates,
 )
@@ -135,3 +136,11 @@ class Dataset(GroupSpec[DatasetAttrs, DataArray | GridMappingVariable]):
     @model_validator(mode="after")
     def check_grid_mapping(self) -> Self:
         return check_grid_mapping(self)
+
+
+class MultiscaleGroup(GroupSpec[MultiscaleGroupAttrs, DataArray | GroupSpec[Any, Any]]):
+    """
+    A GeoZarr Multiscale Group.
+    """
+
+    ...

@@ -269,7 +269,7 @@ def check_grid_mapping(model: TDataSetLike) -> TDataSetLike:
     return model
 
 
-class MultiscaleDatasetAttrs(BaseModel, extra="allow"):
+class MultiscaleGroupAttrs(BaseModel, extra="allow"):
     """
     Attributes for Multiscale GeoZarr dataset.
 

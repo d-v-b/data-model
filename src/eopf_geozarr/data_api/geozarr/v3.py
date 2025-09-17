@@ -10,6 +10,7 @@ from pydantic_zarr.v3 import ArraySpec, GroupSpec
 from eopf_geozarr.data_api.geozarr.common import (
     BaseDataArrayAttrs,
     DatasetAttrs,
+    MultiscaleGroupAttrs,
     check_grid_mapping,
     check_valid_coordinates,
 )
@@ -59,3 +60,11 @@ class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
     @model_validator(mode="after")
     def validate_grid_mapping(self) -> Self:
         return check_grid_mapping(self)
+
+
+class MultiscaleGroup(GroupSpec[MultiscaleGroupAttrs, DataArray | GroupSpec[Any, Any]]):
+    """
+    A GeoZarr Multiscale Group.
+    """
+
+    ...
