@@ -7,6 +7,7 @@ This module provides CLI commands for converting EOPF datasets to GeoZarr compli
 
 import argparse
 import sys
+import warnings
 from pathlib import Path
 from typing import Any, Optional
 
@@ -19,6 +20,13 @@ from .conversion.fs_utils import (
     is_s3_path,
     validate_s3_access,
 )
+
+# Suppress xarray FutureWarning about timedelta decoding
+warnings.filterwarnings("ignore", message=".*", category=FutureWarning)
+
+warnings.filterwarnings("ignore", message=".*", category=UserWarning)
+
+warnings.filterwarnings("ignore", message=".*", category=RuntimeWarning)
 
 
 def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Optional[Any]:
@@ -166,6 +174,7 @@ def convert_command(args: argparse.Namespace) -> None:
             tile_width=args.tile_width,
             max_retries=args.max_retries,
             crs_groups=args.crs_groups,
+            gcp_group=args.gcp_group,
         )
 
         print("✅ Successfully converted EOPF dataset to GeoZarr format")
@@ -1086,6 +1095,11 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         nargs="*",
         help="Groups that need CRS information added on best-effort basis (e.g., /conditions/geometry)",
+    )
+    convert_parser.add_argument(
+        "--gcp-group",
+        type=str,
+        help="Groups where Ground Control Points (GCPs) are located (e.g., /conditions/gcp) (Sentinel-1)",
     )
     convert_parser.add_argument(
         "--verbose", action="store_true", help="Enable verbose output"
