@@ -33,6 +33,8 @@ from zarr.storage._common import make_store_path
 
 from eopf_geozarr.types import (
     OverviewLevelJSON,
+    StandardLatCoordAttrsJSON,
+    StandardLonCoordAttrsJSON,
     StandardXCoordAttrsJSON,
     StandardYCoordAttrsJSON,
     TileMatrixJSON,
@@ -47,7 +49,6 @@ from .sentinel1_reprojection import reproject_sentinel1_with_gcps
 
 def create_geozarr_dataset(
     dt_input: xr.DataTree,
-    *,
     groups: Iterable[str],
     output_path: str,
     spatial_chunk: int = 4096,
@@ -147,7 +148,7 @@ def create_geozarr_dataset(
 
 def setup_datatree_metadata_geozarr_spec_compliant(
     dt: xr.DataTree, groups: Iterable[str], gcp_group: str | None = None
-) -> dict[str, xr.Dataset]:
+) -> Dict[str, xr.Dataset]:
     """
     Set up GeoZarr-spec compliant CF standard names and CRS information.
 
@@ -227,7 +228,7 @@ def iterative_copy(
     min_dimension: int = 256,
     tile_width: int = 256,
     max_retries: int = 3,
-    crs_groups: Iterable[str] | None = None,
+    crs_groups: list[str] | None = None,
     gcp_group: str | None = None,
 ) -> xr.DataTree:
     """
@@ -925,26 +926,21 @@ def create_overview_dataset_all_vars(
 
     # Check if we're dealing with geographic coordinates (EPSG:4326)
     if native_crs and native_crs.to_epsg() == 4326:
-        x_attrs = {
-            "_ARRAY_DIMENSIONS": ["x"],
-            "standard_name": "longitude",
-            "units": "degrees_east",
-            "long_name": "longitude",
+        lon_attrs = _get_lon_coord_attrs()
+        lat_attrs = _get_lat_coord_attrs()
+        overview_coords = {
+            "x": (["x"], x_coords, lon_attrs),
+            "y": (["y"], y_coords, lat_attrs),
         }
-        y_attrs = {
-            "_ARRAY_DIMENSIONS": ["y"],
-            "standard_name": "latitude",
-            "units": "degrees_north",
-            "long_name": "latitude",
-        }
-    else:
-        x_attrs = _get_x_coord_attrs()  # type: ignore[assignment]
-        y_attrs = _get_y_coord_attrs()  # type: ignore[assignment]
 
-    overview_coords = {
-        "x": (["x"], x_coords, x_attrs),
-        "y": (["y"], y_coords, y_attrs),
-    }
+    else:
+        x_attrs = _get_x_coord_attrs()
+        y_attrs = _get_y_coord_attrs()
+
+        overview_coords = {
+            "x": (["x"], x_coords, x_attrs),
+            "y": (["y"], y_coords, y_attrs),
+        }
 
     # Determine standard name based on whether this is Sentinel-1 data
     # TODO: use a better way to determine this than just checking for ds_gcp
@@ -1536,25 +1532,27 @@ def _get_y_coord_attrs() -> StandardYCoordAttrsJSON:
     }
 
 
-def _get_at_coord_attrs() -> dict[str, Any]:
-    """Get standard attributes for azimuth_time coordinate."""
+def _get_lon_coord_attrs() -> StandardLonCoordAttrsJSON:
+    """Get standard attributes for longitude coordinate."""
     return {
-        "long_name": "azimuth time",
-        "standard_name": "time",
-        "_ARRAY_DIMENSIONS": ["azimuth_time"],
+        "units": "degrees_east",
+        "long_name": "longitude",
+        "standard_name": "longitude",
+        "_ARRAY_DIMENSIONS": ["x"],
     }
 
 
-def _get_gr_coord_attrs() -> dict[str, Any]:
-    """Get standard attributes for ground_range coordinate."""
+def _get_lat_coord_attrs() -> StandardLatCoordAttrsJSON:
+    """Get standard attributes for latitude coordinate."""
     return {
-        "long_name": "ground range distance",
-        "standard_name": "projection_x_coordinate",
-        "_ARRAY_DIMENSIONS": ["ground_range"],
+        "units": "degrees_north",
+        "long_name": "latitude",
+        "standard_name": "latitude",
+        "_ARRAY_DIMENSIONS": ["y"],
     }
 
 
-def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: List[Hashable]) -> str:
+def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: list[Hashable]) -> str:
     """Find the grid_mapping variable name from the dataset."""
     grid_mapping_var_name = ds.attrs.get("grid_mapping", None)
     if not grid_mapping_var_name and data_vars:

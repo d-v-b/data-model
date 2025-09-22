@@ -32,6 +32,20 @@ class StandardYCoordAttrsJSON(TypedDict):
     _ARRAY_DIMENSIONS: list[Literal["y"]]
 
 
+class StandardLonCoordAttrsJSON(TypedDict):
+    units: Literal["degrees_east"]
+    long_name: Literal["longitude"]
+    standard_name: Literal["longitude"]
+    _ARRAY_DIMENSIONS: list[Literal["x"]]
+
+
+class StandardLatCoordAttrsJSON(TypedDict):
+    units: Literal["degrees_north"]
+    long_name: Literal["latitude"]
+    standard_name: Literal["latitude"]
+    _ARRAY_DIMENSIONS: list[Literal["y"]]
+
+
 class OverviewLevelJSON(TypedDict):
     level: int
     zoom: int
