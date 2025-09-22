@@ -18,7 +18,7 @@ import itertools
 import os
 import shutil
 import time
-from collections.abc import Hashable, Iterable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -33,6 +33,8 @@ from zarr.storage._common import make_store_path
 
 from eopf_geozarr.types import (
     OverviewLevelJSON,
+    StandardLatCoordAttrsJSON,
+    StandardLonCoordAttrsJSON,
     StandardXCoordAttrsJSON,
     StandardYCoordAttrsJSON,
     TileMatrixJSON,
@@ -924,26 +926,21 @@ def create_overview_dataset_all_vars(
 
     # Check if we're dealing with geographic coordinates (EPSG:4326)
     if native_crs and native_crs.to_epsg() == 4326:
-        x_attrs = {
-            "_ARRAY_DIMENSIONS": ["x"],
-            "standard_name": "longitude",
-            "units": "degrees_east",
-            "long_name": "longitude",
+        lon_attrs = _get_lon_coord_attrs()
+        lat_attrs = _get_lat_coord_attrs()
+        overview_coords = {
+            "x": (["x"], x_coords, lon_attrs),
+            "y": (["y"], y_coords, lat_attrs),
         }
-        y_attrs = {
-            "_ARRAY_DIMENSIONS": ["y"],
-            "standard_name": "latitude",
-            "units": "degrees_north",
-            "long_name": "latitude",
-        }
+
     else:
         x_attrs = _get_x_coord_attrs()
         y_attrs = _get_y_coord_attrs()
 
-    overview_coords = {
-        "x": (["x"], x_coords, x_attrs),
-        "y": (["y"], y_coords, y_attrs),
-    }
+        overview_coords = {
+            "x": (["x"], x_coords, x_attrs),
+            "y": (["y"], y_coords, y_attrs),
+        }
 
     # Determine standard name based on whether this is Sentinel-1 data
     # TODO: use a better way to determine this than just checking for ds_gcp
@@ -1535,7 +1532,27 @@ def _get_y_coord_attrs() -> StandardYCoordAttrsJSON:
     }
 
 
-def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: Sequence[str]) -> str:
+def _get_lon_coord_attrs() -> StandardLonCoordAttrsJSON:
+    """Get standard attributes for longitude coordinate."""
+    return {
+        "units": "degrees_east",
+        "long_name": "longitude",
+        "standard_name": "longitude",
+        "_ARRAY_DIMENSIONS": ["x"],
+    }
+
+
+def _get_lat_coord_attrs() -> StandardLatCoordAttrsJSON:
+    """Get standard attributes for latitude coordinate."""
+    return {
+        "units": "degrees_north",
+        "long_name": "latitude",
+        "standard_name": "latitude",
+        "_ARRAY_DIMENSIONS": ["y"],
+    }
+
+
+def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: list[Hashable]) -> str:
     """Find the grid_mapping variable name from the dataset."""
     grid_mapping_var_name = ds.attrs.get("grid_mapping", None)
     if not grid_mapping_var_name and data_vars:
