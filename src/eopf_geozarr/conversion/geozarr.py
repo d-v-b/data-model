@@ -904,7 +904,7 @@ def create_overview_dataset_all_vars(
     native_bounds : tuple
         Native bounds (left, bottom, right, top)
     data_vars : Sequence[Hashable]
-        Iterable of data variable names to include
+        Sequence of data variable names to include
     ds_gcp : xr.Dataset, optional
         Source dataset with Sentinel-1 ground control points
         at native resolution
