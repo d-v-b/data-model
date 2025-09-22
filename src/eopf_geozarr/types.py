@@ -93,3 +93,38 @@ ResamplingMethod = Literal[
 ]
 """A string literal indicating a resampling method"""
 XARRAY_DIMS_KEY: Final = "_ARRAY_DIMENSIONS"
+
+
+# Why is endpoint URL specified twice?
+class S3ClientOptions(TypedDict):
+    """
+    S3 client options
+    """
+
+    region_name: NotRequired[str]
+    endpoint_url: NotRequired[str]
+
+
+class S3FsOptions(TypedDict):
+    """
+    S3FS options
+    """
+
+    anon: NotRequired[bool]
+    use_ssl: NotRequired[bool]
+    client_kwargs: NotRequired[S3ClientOptions]
+    endpoint_url: NotRequired[str]
+    asynchronous: NotRequired[bool]
+
+
+class S3Credentials(TypedDict):
+    """
+    S3 credentials
+    """
+
+    aws_access_key_id: str | None
+    aws_secret_access_key: str | None
+    aws_session_token: str | None
+    aws_default_region: str
+    aws_profile: str | None
+    AWS_ENDPOINT_URL: str | None

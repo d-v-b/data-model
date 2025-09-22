@@ -18,8 +18,8 @@ import itertools
 import os
 import shutil
 import time
-from collections.abc import Hashable, Iterable, Mapping
-from typing import Any, Dict, List, Tuple
+from collections.abc import Hashable, Iterable, Mapping, Sequence
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import xarray as xr
@@ -55,7 +55,7 @@ def create_geozarr_dataset(
     min_dimension: int = 256,
     tile_width: int = 256,
     max_retries: int = 3,
-    crs_groups: list[str] | None = None,
+    crs_groups: Iterable[str] | None = None,
     gcp_group: str | None = None,
 ) -> xr.DataTree:
     """
@@ -77,8 +77,8 @@ def create_geozarr_dataset(
         Tile width for TMS compatibility
     max_retries : int, default 3
         Maximum number of retries for network operations
-    crs_groups : list[str], optional
-        List of group names that need CRS information added on best-effort basis
+    crs_groups : Iterabl[str], optional
+        Iterable of group names that need CRS information added on best-effort basis
     gcp_group : str, optional
         Group name where GCPs (Ground Control Points) are located.
 
@@ -228,7 +228,7 @@ def iterative_copy(
     min_dimension: int = 256,
     tile_width: int = 256,
     max_retries: int = 3,
-    crs_groups: list[str] | None = None,
+    crs_groups: Iterable[str] | None = None,
     gcp_group: str | None = None,
 ) -> xr.DataTree:
     """
@@ -252,8 +252,8 @@ def iterative_copy(
         Tile width for TMS compatibility
     max_retries : int, default 3
         Maximum number of retries for network operations
-    crs_groups : list[str], optional
-        List of group names that need CRS information added on best-effort basis
+    crs_groups : Iterable[str], optional
+        Iterable of group names that need CRS information added on best-effort basis
     gcp_group : str, optional
         Group name where GCPs (Ground Control Points) are located
 
@@ -273,7 +273,7 @@ def iterative_copy(
         storage_options=storage_options,
     )
 
-    written_groups = set()
+    written_groups: set[str] = set()
     reference_crs = None
 
     # Process all groups in the tree using iterative approach
@@ -811,8 +811,8 @@ def create_native_crs_tile_matrix_set(
         Native CRS of the data
     native_bounds : tuple
         Native bounds (left, bottom, right, top)
-    overview_levels : list
-        List of overview level dictionaries
+    overview_levels : Iterable[OverViewLevelJSON]
+        Iterable of overview level dictionaries
     group_prefix : str, optional
         Group prefix for the tile matrix IDs
 
@@ -883,7 +883,7 @@ def create_overview_dataset_all_vars(
     height: int,
     native_crs: Any,
     native_bounds: Tuple[float, float, float, float],
-    data_vars: List[Hashable],
+    data_vars: Sequence[Hashable],
     ds_gcp: xr.Dataset | None = None,
 ) -> xr.Dataset:
     """
@@ -903,8 +903,8 @@ def create_overview_dataset_all_vars(
         Native CRS of the data
     native_bounds : tuple
         Native bounds (left, bottom, right, top)
-    data_vars : list
-        List of data variable names to include
+    data_vars : Sequence[Hashable]
+        Sequence of data variable names to include
     ds_gcp : xr.Dataset, optional
         Source dataset with Sentinel-1 ground control points
         at native resolution
@@ -1552,7 +1552,7 @@ def _get_lat_coord_attrs() -> StandardLatCoordAttrsJSON:
     }
 
 
-def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: list[Hashable]) -> str:
+def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: Sequence[Hashable]) -> str:
     """Find the grid_mapping variable name from the dataset."""
     grid_mapping_var_name = ds.attrs.get("grid_mapping", None)
     if not grid_mapping_var_name and data_vars:
