@@ -5,13 +5,13 @@ repos:
       - id: validate-pyproject
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
+    rev: 6.0.1
     hooks:
       - id: isort
         language_version: python
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.13.1
     hooks:
       - id: ruff
         args: ["--fix"]

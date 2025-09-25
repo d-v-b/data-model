@@ -21,9 +21,9 @@ def _verify_basic_structure(output_path: pathlib.Path, groups: list[str]) -> Non
         # Check that level 0 (native resolution) exists
         level_0_path = group_path / "0"
         assert level_0_path.exists(), f"Level 0 not found for {group}"
-        assert (
-            level_0_path / "zarr.json"
-        ).exists(), f"Level 0 missing zarr.json for {group}"
+        assert (level_0_path / "zarr.json").exists(), (
+            f"Level 0 missing zarr.json for {group}"
+        )
 
 
 def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> None:
@@ -49,12 +49,12 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
     # Check 1: _ARRAY_DIMENSIONS attributes (required by GeoZarr spec)
     for var_name in ds.data_vars:
         if var_name != "spatial_ref":  # Skip grid_mapping variable
-            assert (
-                "_ARRAY_DIMENSIONS" in ds[var_name].attrs
-            ), f"Missing _ARRAY_DIMENSIONS for {var_name} in {group}"
-            assert ds[var_name].attrs["_ARRAY_DIMENSIONS"] == list(
-                ds[var_name].dims
-            ), f"Incorrect _ARRAY_DIMENSIONS for {var_name} in {group}"
+            assert "_ARRAY_DIMENSIONS" in ds[var_name].attrs, (
+                f"Missing _ARRAY_DIMENSIONS for {var_name} in {group}"
+            )
+            assert ds[var_name].attrs["_ARRAY_DIMENSIONS"] == list(ds[var_name].dims), (
+                f"Incorrect _ARRAY_DIMENSIONS for {var_name} in {group}"
+            )
             print(
                 f"    ✅ _ARRAY_DIMENSIONS: {ds[var_name].attrs['_ARRAY_DIMENSIONS']}"
             )
@@ -62,9 +62,9 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
     # Check coordinates
     for coord_name in ds.coords:
         if coord_name not in ["spatial_ref"]:  # Skip CRS coordinate
-            assert (
-                "_ARRAY_DIMENSIONS" in ds[coord_name].attrs
-            ), f"Missing _ARRAY_DIMENSIONS for coordinate {coord_name} in {group}"
+            assert "_ARRAY_DIMENSIONS" in ds[coord_name].attrs, (
+                f"Missing _ARRAY_DIMENSIONS for coordinate {coord_name} in {group}"
+            )
             print(
                 f"    ✅ {coord_name} _ARRAY_DIMENSIONS: {ds[coord_name].attrs['_ARRAY_DIMENSIONS']}"
             )
@@ -72,9 +72,9 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
     # Check 2: CF standard names (required by GeoZarr spec)
     for var_name in ds.data_vars:
         if var_name != "spatial_ref":
-            assert (
-                "standard_name" in ds[var_name].attrs
-            ), f"Missing standard_name for {var_name} in {group}"
+            assert "standard_name" in ds[var_name].attrs, (
+                f"Missing standard_name for {var_name} in {group}"
+            )
             assert (
                 ds[var_name].attrs["standard_name"] == "toa_bidirectional_reflectance"
             ), f"Incorrect standard_name for {var_name} in {group}"
@@ -83,22 +83,22 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
     # Check 3: Grid mapping attributes (required by GeoZarr spec)
     for var_name in ds.data_vars:
         if var_name != "spatial_ref":
-            assert (
-                "grid_mapping" in ds[var_name].attrs
-            ), f"Missing grid_mapping for {var_name} in {group}"
-            assert (
-                ds[var_name].attrs["grid_mapping"] == "spatial_ref"
-            ), f"Incorrect grid_mapping for {var_name} in {group}"
+            assert "grid_mapping" in ds[var_name].attrs, (
+                f"Missing grid_mapping for {var_name} in {group}"
+            )
+            assert ds[var_name].attrs["grid_mapping"] == "spatial_ref", (
+                f"Incorrect grid_mapping for {var_name} in {group}"
+            )
             print(f"    ✅ grid_mapping: {ds[var_name].attrs['grid_mapping']}")
 
     # Check 4: Spatial reference variable (as in notebook)
     assert "spatial_ref" in ds, f"Missing spatial_ref variable in {group}"
-    assert (
-        "_ARRAY_DIMENSIONS" in ds["spatial_ref"].attrs
-    ), f"Missing _ARRAY_DIMENSIONS for spatial_ref in {group}"
-    assert (
-        ds["spatial_ref"].attrs["_ARRAY_DIMENSIONS"] == []
-    ), f"Incorrect _ARRAY_DIMENSIONS for spatial_ref in {group}"
+    assert "_ARRAY_DIMENSIONS" in ds["spatial_ref"].attrs, (
+        f"Missing _ARRAY_DIMENSIONS for spatial_ref in {group}"
+    )
+    assert ds["spatial_ref"].attrs["_ARRAY_DIMENSIONS"] == [], (
+        f"Incorrect _ARRAY_DIMENSIONS for spatial_ref in {group}"
+    )
     print(
         f"    ✅ spatial_ref _ARRAY_DIMENSIONS: {ds['spatial_ref'].attrs['_ARRAY_DIMENSIONS']}"
     )
@@ -124,9 +124,9 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
                     if coord == "x"
                     else "projection_y_coordinate"
                 )
-                assert (
-                    ds[coord].attrs["standard_name"] == expected_name
-                ), f"Incorrect standard_name for {coord} coordinate in {group}"
+                assert ds[coord].attrs["standard_name"] == expected_name, (
+                    f"Incorrect standard_name for {coord} coordinate in {group}"
+                )
                 print(
                     f"    ✅ {coord} standard_name: {ds[coord].attrs['standard_name']}"
                 )
@@ -142,9 +142,9 @@ def _verify_multiscale_structure(output_path: pathlib.Path, group: str) -> None:
 
     # Check that at least one level exists (level 0 is always created)
     level_dirs = [d for d in group_path.iterdir() if d.is_dir() and d.name.isdigit()]
-    assert (
-        len(level_dirs) >= 1
-    ), f"Expected at least 1 overview level for {group}, found {len(level_dirs)}"
+    assert len(level_dirs) >= 1, (
+        f"Expected at least 1 overview level for {group}, found {len(level_dirs)}"
+    )
     print(
         f"    Found {len(level_dirs)} overview levels: {sorted([d.name for d in level_dirs])}"
     )
@@ -156,9 +156,9 @@ def _verify_multiscale_structure(output_path: pathlib.Path, group: str) -> None:
     ds_0.close()
 
     if native_size >= 512:  # Larger datasets should have multiple levels
-        assert (
-            len(level_dirs) >= 2
-        ), f"Expected multiple overview levels for large dataset {group} (size {native_size}), found {len(level_dirs)}"
+        assert len(level_dirs) >= 2, (
+            f"Expected multiple overview levels for large dataset {group} (size {native_size}), found {len(level_dirs)}"
+        )
     else:
         print(f"    Small dataset (size {native_size}), single level is acceptable")
 
@@ -176,9 +176,9 @@ def _verify_multiscale_structure(output_path: pathlib.Path, group: str) -> None:
         assert len(ds.data_vars) > 0, f"No data variables in {level_path}"
 
         # Verify that spatial dimensions exist
-        assert (
-            "x" in ds.dims and "y" in ds.dims
-        ), f"Missing spatial dimensions in {level_path}"
+        assert "x" in ds.dims and "y" in ds.dims, (
+            f"Missing spatial dimensions in {level_path}"
+        )
 
         # Store shape for progression verification
         level_shapes[level_num] = (ds.dims["y"], ds.dims["x"])
@@ -198,12 +198,12 @@ def _verify_multiscale_structure(output_path: pathlib.Path, group: str) -> None:
                 height_ratio = prev_height / curr_height
                 width_ratio = prev_width / curr_width
 
-                assert (
-                    1.8 <= height_ratio <= 2.2
-                ), f"Height ratio between level {prev_level} and {level} should be ~2, got {height_ratio:.2f}"
-                assert (
-                    1.8 <= width_ratio <= 2.2
-                ), f"Width ratio between level {prev_level} and {level} should be ~2, got {width_ratio:.2f}"
+                assert 1.8 <= height_ratio <= 2.2, (
+                    f"Height ratio between level {prev_level} and {level} should be ~2, got {height_ratio:.2f}"
+                )
+                assert 1.8 <= width_ratio <= 2.2, (
+                    f"Width ratio between level {prev_level} and {level} should be ~2, got {width_ratio:.2f}"
+                )
 
                 print(
                     f"    Level {prev_level}→{level} downsampling ratio: {height_ratio:.2f}x{width_ratio:.2f}"
@@ -253,9 +253,9 @@ def _verify_rgb_data_access(output_path: pathlib.Path, groups: list[str]) -> Non
             blue_data = ds["b02"].values
 
             # Verify data shapes match
-            assert (
-                red_data.shape == green_data.shape == blue_data.shape
-            ), f"RGB band shapes don't match in {group} level {level_num}"
+            assert red_data.shape == green_data.shape == blue_data.shape, (
+                f"RGB band shapes don't match in {group} level {level_num}"
+            )
 
             # Verify data is not empty
             assert red_data.size > 0, f"Empty red data in {group} level {level_num}"

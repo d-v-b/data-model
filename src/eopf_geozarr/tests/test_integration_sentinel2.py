@@ -368,9 +368,9 @@ def test_performance_characteristics(
             prev_pixels = timing_data[i - 1]["pixels"]
 
             # Allow some flexibility, but generally expect fewer pixels at higher levels
-            assert (
-                curr_pixels <= prev_pixels * 1.1
-            ), f"Level {timing_data[i]['level']} has more pixels than level {timing_data[i-1]['level']}"
+            assert curr_pixels <= prev_pixels * 1.1, (
+                f"Level {timing_data[i]['level']} has more pixels than level {timing_data[i - 1]['level']}"
+            )
 
     print("✅ Performance characteristics verified!")
 

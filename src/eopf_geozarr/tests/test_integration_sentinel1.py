@@ -284,18 +284,18 @@ def test_sentinel1_gcp_conversion(
     y_bounds = (ds_measurements.y.min().values, ds_measurements.y.max().values)
 
     # Should be within the original GCP bounds (15-18 lon, 39-41 lat)
-    assert (
-        14.5 <= x_bounds[0] <= 15.5
-    ), f"X min bound {x_bounds[0]} outside expected range"
-    assert (
-        17.5 <= x_bounds[1] <= 18.5
-    ), f"X max bound {x_bounds[1]} outside expected range"
-    assert (
-        38.5 <= y_bounds[0] <= 39.5
-    ), f"Y min bound {y_bounds[0]} outside expected range"
-    assert (
-        40.5 <= y_bounds[1] <= 41.5
-    ), f"Y max bound {y_bounds[1]} outside expected range"
+    assert 14.5 <= x_bounds[0] <= 15.5, (
+        f"X min bound {x_bounds[0]} outside expected range"
+    )
+    assert 17.5 <= x_bounds[1] <= 18.5, (
+        f"X max bound {x_bounds[1]} outside expected range"
+    )
+    assert 38.5 <= y_bounds[0] <= 39.5, (
+        f"Y min bound {y_bounds[0]} outside expected range"
+    )
+    assert 40.5 <= y_bounds[1] <= 41.5, (
+        f"Y max bound {y_bounds[1]} outside expected range"
+    )
 
     # Check multiscales 2 levels created: 0 (native, checked above) and 1
     assert "1" in dt["measurements"]
