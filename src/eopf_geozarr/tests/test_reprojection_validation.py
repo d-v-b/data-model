@@ -193,9 +193,9 @@ def test_titiler_compatibility():
         elif "spatial_ref" in ds_measurements:
             # CRS info should be in spatial_ref attributes
             spatial_ref = ds_measurements.spatial_ref
-            assert (
-                "crs_wkt" in spatial_ref.attrs
-            ), "Missing CRS information in spatial_ref"
+            assert "crs_wkt" in spatial_ref.attrs, (
+                "Missing CRS information in spatial_ref"
+            )
             print(
                 f"   - CRS info found in spatial_ref: {spatial_ref.attrs.get('crs_wkt', 'N/A')[:50]}..."
             )
@@ -266,14 +266,14 @@ def test_titiler_compatibility():
 
         # Check CRS for overview (may be in spatial_ref variable)
         if ds_overview.rio.crs is not None:
-            assert (
-                ds_overview.rio.crs.to_epsg() == 4326
-            ), "Expected EPSG:4326 CRS for overview"
+            assert ds_overview.rio.crs.to_epsg() == 4326, (
+                "Expected EPSG:4326 CRS for overview"
+            )
         elif "spatial_ref" in ds_overview:
             spatial_ref_overview = ds_overview.spatial_ref
-            assert (
-                "crs_wkt" in spatial_ref_overview.attrs
-            ), "Missing CRS information in overview spatial_ref"
+            assert "crs_wkt" in spatial_ref_overview.attrs, (
+                "Missing CRS information in overview spatial_ref"
+            )
             print("   - Overview CRS info found in spatial_ref")
         else:
             print("   - Warning: Overview CRS information not directly accessible")

@@ -410,9 +410,9 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
         # Generate HTML for this node
         node_html = f"""
         <div class="tree-node" style="margin-left: {level * 20}px;">
-            <details class="tree-details" {'open' if level < 2 else ''}>
+            <details class="tree-details" {"open" if level < 2 else ""}>
                 <summary class="tree-summary">
-                    <span class="tree-icon">{'📁' if children_count > 0 else '📄'}</span>
+                    <span class="tree-icon">{"📁" if children_count > 0 else "📄"}</span>
                     <span class="tree-name">{node_name}</span>
                     <span class="tree-info">({summary})</span>
                 </summary>
@@ -882,7 +882,7 @@ def _generate_html_output(
                 </div>
                 <div class="header-info-item">
                     <div class="header-info-label">Generated</div>
-                    <div class="header-info-value">{__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+                    <div class="header-info-value">{__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
                 </div>
             </div>
         </div>
