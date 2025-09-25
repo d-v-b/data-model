@@ -243,6 +243,19 @@ the `"id"` field of each `TileMatrix` object in the `"tileMatrices"` field in th
 
 `attributes.multiscales.tile_matrix_set.tileMatrices[$idx].id`
 
+#### Chunking Requirements for Downsampled Datasets
+
+When creating downsampled datasets in a multiscale hierarchy, careful consideration must be given to chunk sizes to ensure optimal performance and storage efficiency. The chunk dimensions should be aligned with the tile dimensions specified in the corresponding `TileMatrix` definition to enable efficient tile-based access patterns.
+
+Key chunking considerations:
+
+- **Chunk-Tile Alignment**: Chunk sizes should match or be divisible by the `tileWidth` and `tileHeight` values defined in the `TileMatrix` for each zoom level
+- **Consistent Chunking Strategy**: All data variables within a zoom level should use the same chunking scheme to maintain spatial coherence
+- **Memory Constraints**: Chunk sizes should be chosen to balance I/O efficiency with memory usage, typically keeping individual chunks under 100MB
+- **Decimation Factor Alignment**: When downsampling by integer factors (e.g., 2x, 3x), chunk boundaries should align across zoom levels to enable efficient pyramid generation
+
+For example, if a `TileMatrix` specifies `tileWidth: 1024` and `tileHeight: 1024`, the corresponding data arrays should use chunk shapes of `[1024, 1024]` or compatible subdivisions like `[512, 512]`.
+
 #### Extra members
 
 A multiscale Dataset should not contain any members that are not explicitly declared in the `"multiscales"` field for that multiscale Dataset. Any additional Zarr arrays and groups should be considered external to the GeoZarr model.  
