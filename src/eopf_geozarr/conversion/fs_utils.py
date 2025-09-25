@@ -2,11 +2,16 @@
 
 import json
 import os
-from typing import Any, Dict, Optional
+from collections.abc import Mapping
+from typing import Any
 from urllib.parse import urlparse
 
 import s3fs
 import zarr
+from fsspec.implementations.local import LocalFileSystem
+from s3fs import S3FileSystem
+
+from eopf_geozarr.types import S3Credentials, S3FsOptions
 
 
 def normalize_s3_path(s3_path: str) -> str:
@@ -88,7 +93,7 @@ def parse_s3_path(s3_path: str) -> tuple[str, str]:
     return bucket, key
 
 
-def get_s3_storage_options(s3_path: str, **s3_kwargs: Any) -> Dict[str, Any]:
+def get_s3_storage_options(s3_path: str, **s3_kwargs: Any) -> S3FsOptions:
     """
     Get storage options for S3 access with xarray.
 
@@ -105,7 +110,7 @@ def get_s3_storage_options(s3_path: str, **s3_kwargs: Any) -> Dict[str, Any]:
         Storage options dictionary for xarray
     """
     # Set up default S3 configuration
-    default_s3_kwargs = {
+    default_s3_kwargs: S3FsOptions = {
         "anon": False,  # Use credentials
         "use_ssl": True,
         "client_kwargs": {
@@ -121,12 +126,12 @@ def get_s3_storage_options(s3_path: str, **s3_kwargs: Any) -> Dict[str, Any]:
             client_kwargs["endpoint_url"] = os.environ["AWS_ENDPOINT_URL"]
 
     # Merge with user-provided kwargs
-    s3_config = {**default_s3_kwargs, **s3_kwargs}
+    s3_config: S3FsOptions = {**default_s3_kwargs, **s3_kwargs}  # type: ignore[typeddict-item]
 
     return s3_config
 
 
-def get_storage_options(path: str, **kwargs: Any) -> Optional[Dict[str, Any]]:
+def get_storage_options(path: str, **kwargs: Any) -> S3FsOptions | None:
     """
     Get storage options for any URL type, leveraging fsspec as the abstraction layer.
 
@@ -202,7 +207,7 @@ def create_s3_store(s3_path: str, **s3_kwargs: Any) -> str:
 
 
 def write_s3_json_metadata(
-    s3_path: str, metadata: Dict[str, Any], **s3_kwargs: Any
+    s3_path: str, metadata: Mapping[str, Any], **s3_kwargs: Any
 ) -> None:
     """
     Write JSON metadata directly to S3.
@@ -220,7 +225,7 @@ def write_s3_json_metadata(
         Additional keyword arguments for s3fs.S3FileSystem
     """
     # Set up default S3 configuration
-    default_s3_kwargs = {
+    default_s3_kwargs: S3FsOptions = {
         "anon": False,
         "use_ssl": True,
         "asynchronous": False,  # Force synchronous mode
@@ -245,7 +250,7 @@ def write_s3_json_metadata(
         f.write(json_content)
 
 
-def read_s3_json_metadata(s3_path: str, **s3_kwargs: Any) -> Dict[str, Any]:
+def read_s3_json_metadata(s3_path: str, **s3_kwargs: Any) -> dict[str, Any]:
     """
     Read JSON metadata from S3.
 
@@ -262,7 +267,7 @@ def read_s3_json_metadata(s3_path: str, **s3_kwargs: Any) -> Dict[str, Any]:
         Parsed JSON metadata
     """
     # Set up default S3 configuration
-    default_s3_kwargs = {
+    default_s3_kwargs: S3FsOptions = {
         "anon": False,
         "use_ssl": True,
         "asynchronous": False,  # Force synchronous mode
@@ -284,7 +289,7 @@ def read_s3_json_metadata(s3_path: str, **s3_kwargs: Any) -> Dict[str, Any]:
     with fs.open(s3_path, "r") as f:
         content = f.read()
 
-    result: Dict[str, Any] = json.loads(content)
+    result: dict[str, Any] = json.loads(content)
     return result
 
 
@@ -304,7 +309,7 @@ def s3_path_exists(s3_path: str, **s3_kwargs: Any) -> bool:
     bool
         True if the path exists
     """
-    default_s3_kwargs = {
+    default_s3_kwargs: S3FsOptions = {
         "anon": False,
         "use_ssl": True,
         "asynchronous": False,  # Force synchronous mode
@@ -351,7 +356,7 @@ def open_s3_zarr_group(s3_path: str, mode: str = "r", **s3_kwargs: Any) -> zarr.
     )
 
 
-def get_s3_credentials_info() -> Dict[str, Optional[str]]:
+def get_s3_credentials_info() -> S3Credentials:
     """
     Get information about available S3 credentials.
 
@@ -372,7 +377,7 @@ def get_s3_credentials_info() -> Dict[str, Optional[str]]:
     }
 
 
-def validate_s3_access(s3_path: str, **s3_kwargs: Any) -> tuple[bool, Optional[str]]:
+def validate_s3_access(s3_path: str, **s3_kwargs: Any) -> tuple[bool, str | None]:
     """
     Validate that we can access the S3 path.
 
@@ -389,9 +394,9 @@ def validate_s3_access(s3_path: str, **s3_kwargs: Any) -> tuple[bool, Optional[s
         Tuple of (success, error_message)
     """
     try:
-        bucket, key = parse_s3_path(s3_path)
+        bucket, _ = parse_s3_path(s3_path)
 
-        default_s3_kwargs = {
+        default_s3_kwargs: S3FsOptions = {
             "anon": False,
             "use_ssl": True,
             "asynchronous": False,  # Force synchronous mode
@@ -419,7 +424,7 @@ def validate_s3_access(s3_path: str, **s3_kwargs: Any) -> tuple[bool, Optional[s
         return False, str(e)
 
 
-def get_filesystem(path: str, **kwargs: Any) -> Any:
+def get_filesystem(path: str, **kwargs: Any) -> LocalFileSystem | S3FileSystem:
     """
     Get the appropriate fsspec filesystem for any path type.
 
@@ -435,18 +440,17 @@ def get_filesystem(path: str, **kwargs: Any) -> Any:
     fsspec.AbstractFileSystem
         Filesystem instance
     """
-    import fsspec
 
     if is_s3_path(path):
         # Get S3 storage options and use them for fsspec
         storage_options = get_s3_storage_options(path, **kwargs)
-        return fsspec.filesystem("s3", **storage_options)
+        return S3FileSystem(**storage_options)
     else:
         # For local paths, use the local filesystem
-        return fsspec.filesystem("file")
+        return LocalFileSystem(**kwargs)
 
 
-def write_json_metadata(path: str, metadata: Dict[str, Any], **kwargs: Any) -> None:
+def write_json_metadata(path: str, metadata: dict[str, Any], **kwargs: Any) -> None:
     """
     Write JSON metadata to any path type using fsspec.
 
@@ -473,7 +477,7 @@ def write_json_metadata(path: str, metadata: Dict[str, Any], **kwargs: Any) -> N
         f.write(json_content)
 
 
-def read_json_metadata(path: str, **kwargs: Any) -> Dict[str, Any]:
+def read_json_metadata(path: str, **kwargs: Any) -> dict[str, Any]:
     """
     Read JSON metadata from any path type using fsspec.
 
@@ -494,7 +498,7 @@ def read_json_metadata(path: str, **kwargs: Any) -> Dict[str, Any]:
     with fs.open(path, "r") as f:
         content = f.read()
 
-    result: Dict[str, Any] = json.loads(content)
+    result: dict[str, Any] = json.loads(content)
     return result
 
 
