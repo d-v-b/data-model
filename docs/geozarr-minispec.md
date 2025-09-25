@@ -109,6 +109,19 @@ as well as arbitrary sub-groups.
 
 There are no required attributes for Datasets but to qualify as a GeoZarr Dataset, the group must contain at least one DataArray with spatial reference information.
 This DataArray is referenced in the `grid_mapping` attribute of the dataset and is usually named `spatial_ref`.
+
+#### CF Compliance Requirements
+
+The implementation enforces CF (Climate and Forecast) metadata conventions compliance:
+
+- **Grid Mapping**: All data variables MUST include a `grid_mapping` attribute that references a coordinate reference system variable
+- **Standard Names**: Data variables MUST include CF-compliant `standard_name` attributes. The implementation validates these against the official CF standard names table
+- **Coordinate Variables**: Coordinate variables (x, y, time, etc.) MUST include appropriate CF standard names:
+  - For projected coordinates: `projection_x_coordinate` and `projection_y_coordinate` 
+  - For geographic coordinates: `longitude` and `latitude`
+  - Units must be specified (`m` for projected, `degrees_east`/`degrees_north` for geographic)
+- **Array Dimensions**: All arrays MUST include `_ARRAY_DIMENSIONS` attributes for Zarr V2 compatibility
+
 More information on spatial reference information can be found in the [CF conventions](https://cfconventions.org). Another interesting resource is the [rioxarray](https://corteva.github.io/rioxarray/stable/) and more specifically the documentation on [Coordinate Reference System Management](https://corteva.github.io/rioxarray/stable/getting_started/crs_management.html).
 
 ### Members
@@ -213,6 +226,16 @@ The downsampling transformation is thus well-defined for Datasets. Downsampling
 is often applied multiple times in a series, e.g. to generate multiple levels of 
 detail for a data variable. 
 
+### Implementation Approach
+
+The implementation uses a **pyramid-based downsampling approach** with the following characteristics:
+
+- **Factor-of-2 Downsampling**: Each overview level reduces dimensions by a factor of 2 (COG-style downsampling)
+- **Pyramid Generation**: Overview levels are created sequentially, with each level generated from the previous level rather than from the native resolution
+- **Minimum Dimension Threshold**: Overview generation stops when the smallest dimension falls below a configurable threshold (default: 256 pixels)
+- **Native CRS Preservation**: All overview levels maintain the same coordinate reference system as the native data
+- **Consistent Variable Structure**: Each overview level contains the same set of variables as the native resolution level
+
 GeoZarr defines a layout for downsampled Datasets (and the original dataset). Given some source Dataset `s0`, 
 that dataset and all downsampled Datasets `s1`, `s2`, ... are stored in a flat layout inside a Multiscale Dataset
  `D`. The presence of downsampled Datsets in `D` is signalled by a [special key](#attributes-3) in the attributes of `D`.
@@ -233,7 +256,7 @@ The attributes of a Multiscale Dataset function as an entry point to a collectio
 | --------------------- | ----------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `"resampling_method"` | [ResamplingMethod](#resamplingmethod)           | yes      | This is a string that declares the resampling method used to create the downsampled datasets.                                                                                                                                                                                                                                                                                                            |
 | `"tile_matrix_set"`   | [TileMatrixSet](#tilematrixset) or string       | yes      | This object declares the names of the downsampled Datasets. If `"tile_matrix_set"` is a string, it must be the name of a well-known [`TileMatrixSet`](https://docs.ogc.org/is/17-083r4/17-083r4.html#toc48), which must resolve to a JSON object consistent with the `[TileMatrixSet](#tilematrixset)` definition. For scientific coordinate systems, custom inline TileMatrixSet objects are supported. |
-| `"tile_matrix_limit"` | {`string`: [TileMatrixLimit](#tilematrixlimit)} | no       |
+| `"tile_matrix_limits"` | {`string`: [TileMatrixLimit](#tilematrixlimit)} | no       | Optional limits for each tile matrix level |
 
 ### Members
 
@@ -662,3 +685,5 @@ Key aspects of this file system layout:
 #### ResamplingMethod
 
 This is a string literal defined [here](https://zarr.dev/geozarr-spec/documents/standard/template/geozarr-spec.html#_71eeacb0-5e4e-8a8e-5714-02fc0838075b).
+
+The implementation defaults to `"average"` for creating overview levels in multiscale datasets.
