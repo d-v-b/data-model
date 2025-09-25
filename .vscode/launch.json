@@ -125,6 +125,80 @@
 
         },
         {
+            "name": "Convert to GeoZarr Sentinel-1 GRD (Local)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "eopf_geozarr",
+            "args": [
+                "convert",
+                "https://objects.eodc.eu/e05ab01a9d56408d82ac32d69a5aae2a:202509-s01siwgrh/12/products/cpm_v256/S1C_IW_GRDH_1SDV_20250912T053648_20250912T053713_004087_0081FD_5AA4.zarr",
+                "./tests-output/eopf_geozarr/s1_test.zarr",
+                "--groups", "/measurements",
+                "--gcp-group", "/conditions/gcp",
+                "--spatial-chunk", "512",
+                "--min-dimension", "256",
+                "--tile-width", "256",
+                "--max-retries", "2",
+                "--dask-cluster",
+                "--verbose"
+            ],
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/eopf_geozarr/.venv/bin"
+            },
+        },
+        {
+            "name": "Convert to GeoZarr Sentinel-1 GRD (S3)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "eopf_geozarr",
+            "args": [
+                "convert",
+                "https://objects.eodc.eu/e05ab01a9d56408d82ac32d69a5aae2a:202509-s01siwgrh/12/products/cpm_v256/S1C_IW_GRDH_1SDV_20250912T053648_20250912T053713_004087_0081FD_5AA4.zarr",
+                "s3://esa-zarr-sentinel-explorer-fra/tests-output/eopf_geozarr/S1C_IW_GRDH_1SDV_20250912T053648_20250912T053713_004087_0081FD_5AA4.zarr",
+                "--groups", "/measurements",
+                "--gcp-group", "/conditions/gcp",
+                // "--crs-groups", "/conditions/geometry",
+                "--spatial-chunk", "512",
+                "--min-dimension", "256",
+                "--tile-width", "256",
+                "--max-retries", "2",
+                "--dask-cluster",
+                "--verbose"
+            ],
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/.venv/bin",
+                "AWS_PROFILE": "eopf-explorer-vs",
+                "AWS_DEFAULT_REGION": "de",
+                "AWS_ENDPOINT_URL": "https://s3.de.io.cloud.ovh.net/"
+            },
+
+        },
+        {
+            "name": "Info EOPF Zarr (Sample Service)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "eopf_geozarr",
+            "args": [
+                "info",
+                "https://objects.eodc.eu/e05ab01a9d56408d82ac32d69a5aae2a:202508-s02msil2a/11/products/cpm_v256/S2C_MSIL2A_20250811T112131_N0511_R037_T29TPF_20250811T152216.zarr",
+                "--verbose",
+                "--html-output", "eopf_dataset_info.html"
+            ],
+            "cwd": "${workspaceFolder}",
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/.venv/bin",
+            },
+
+        },
+        {
             "name": "Info GeoZarr local",
             "type": "debugpy",
             "request": "launch",
@@ -150,7 +224,7 @@
             "module": "eopf_geozarr",
             "args": [
                 "info",
-                "s3://esa-zarr-sentinel-explorer-fra/tests-output/eopf_geozarr/S2A_MSIL2A_20250704T094051_N0511_R036_T33SWB_20250704T115824.zarr",
+                "s3://esa-zarr-sentinel-explorer-fra/tests-output/sentinel-2-l2a/S2B_MSIL2A_20250921T100029_N0511_R122_T33TTG_20250921T135752.zarr",
                 "--verbose",
                 "--html-output", "dataset_info.html"
             ],

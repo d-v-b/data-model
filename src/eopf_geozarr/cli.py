@@ -7,6 +7,7 @@ This module provides CLI commands for converting EOPF datasets to GeoZarr compli
 
 import argparse
 import sys
+import warnings
 from pathlib import Path
 from typing import Any, Optional
 
@@ -19,6 +20,13 @@ from .conversion.fs_utils import (
     is_s3_path,
     validate_s3_access,
 )
+
+# Suppress xarray FutureWarning about timedelta decoding
+warnings.filterwarnings("ignore", message=".*", category=FutureWarning)
+
+warnings.filterwarnings("ignore", message=".*", category=UserWarning)
+
+warnings.filterwarnings("ignore", message=".*", category=RuntimeWarning)
 
 
 def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Optional[Any]:
@@ -166,6 +174,7 @@ def convert_command(args: argparse.Namespace) -> None:
             tile_width=args.tile_width,
             max_retries=args.max_retries,
             crs_groups=args.crs_groups,
+            gcp_group=args.gcp_group,
         )
 
         print("✅ Successfully converted EOPF dataset to GeoZarr format")
@@ -401,9 +410,9 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
         # Generate HTML for this node
         node_html = f"""
         <div class="tree-node" style="margin-left: {level * 20}px;">
-            <details class="tree-details" {'open' if level < 2 else ''}>
+            <details class="tree-details" {"open" if level < 2 else ""}>
                 <summary class="tree-summary">
-                    <span class="tree-icon">{'📁' if children_count > 0 else '📄'}</span>
+                    <span class="tree-icon">{"📁" if children_count > 0 else "📄"}</span>
                     <span class="tree-name">{node_name}</span>
                     <span class="tree-info">({summary})</span>
                 </summary>
@@ -873,7 +882,7 @@ def _generate_html_output(
                 </div>
                 <div class="header-info-item">
                     <div class="header-info-label">Generated</div>
-                    <div class="header-info-value">{__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
+                    <div class="header-info-value">{__import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
                 </div>
             </div>
         </div>
@@ -1086,6 +1095,11 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         nargs="*",
         help="Groups that need CRS information added on best-effort basis (e.g., /conditions/geometry)",
+    )
+    convert_parser.add_argument(
+        "--gcp-group",
+        type=str,
+        help="Groups where Ground Control Points (GCPs) are located (e.g., /conditions/gcp) (Sentinel-1)",
     )
     convert_parser.add_argument(
         "--verbose", action="store_true", help="Enable verbose output"

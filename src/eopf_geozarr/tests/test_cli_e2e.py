@@ -115,9 +115,9 @@ class TestCLIEndToEnd:
             cmd_info, capture_output=True, text=True, timeout=60
         )
 
-        assert (
-            result_info.returncode == 0
-        ), f"CLI info command failed: {result_info.stderr}"
+        assert result_info.returncode == 0, (
+            f"CLI info command failed: {result_info.stderr}"
+        )
         print("✅ CLI info command succeeded")
         print(f"Info output: {result_info.stdout}")
 
@@ -142,9 +142,9 @@ class TestCLIEndToEnd:
             cmd_validate, capture_output=True, text=True, timeout=60
         )
 
-        assert (
-            result_validate.returncode == 0
-        ), f"CLI validate command failed: {result_validate.stderr}"
+        assert result_validate.returncode == 0, (
+            f"CLI validate command failed: {result_validate.stderr}"
+        )
         print("✅ CLI validate command succeeded")
         print(f"Validation output: {result_validate.stdout}")
 
@@ -189,27 +189,27 @@ class TestCLIEndToEnd:
                 first_var = data_vars[0]
 
                 # Check _ARRAY_DIMENSIONS
-                assert (
-                    "_ARRAY_DIMENSIONS" in ds[first_var].attrs
-                ), f"Missing _ARRAY_DIMENSIONS in {first_var} for {group}"
+                assert "_ARRAY_DIMENSIONS" in ds[first_var].attrs, (
+                    f"Missing _ARRAY_DIMENSIONS in {first_var} for {group}"
+                )
 
                 # Check standard_name
-                assert (
-                    "standard_name" in ds[first_var].attrs
-                ), f"Missing standard_name in {first_var} for {group}"
+                assert "standard_name" in ds[first_var].attrs, (
+                    f"Missing standard_name in {first_var} for {group}"
+                )
 
                 # Check grid_mapping
-                assert (
-                    "grid_mapping" in ds[first_var].attrs
-                ), f"Missing grid_mapping in {first_var} for {group}"
+                assert "grid_mapping" in ds[first_var].attrs, (
+                    f"Missing grid_mapping in {first_var} for {group}"
+                )
 
                 print(f"    ✅ GeoZarr compliance verified for {first_var}")
 
             # Check spatial_ref exists
             if "spatial_ref" in ds:
-                assert (
-                    "_ARRAY_DIMENSIONS" in ds["spatial_ref"].attrs
-                ), f"Missing _ARRAY_DIMENSIONS in spatial_ref for {group}"
+                assert "_ARRAY_DIMENSIONS" in ds["spatial_ref"].attrs, (
+                    f"Missing _ARRAY_DIMENSIONS in spatial_ref for {group}"
+                )
                 print("    ✅ spatial_ref variable verified")
 
             ds.close()
@@ -282,9 +282,9 @@ class TestCLIEndToEnd:
         )
         assert result.returncode == 0, "Convert help command failed"
         assert "--crs-groups" in result.stdout, "--crs-groups option should be in help"
-        assert (
-            "Groups that need CRS information added" in result.stdout
-        ), "Help text should be present"
+        assert "Groups that need CRS information added" in result.stdout, (
+            "Help text should be present"
+        )
         print("✅ --crs-groups option appears in CLI help")
 
     @pytest.mark.slow
@@ -434,9 +434,9 @@ class TestCLIEndToEnd:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
         # Should succeed (empty crs_groups list is valid)
-        assert (
-            result.returncode == 0
-        ), f"CLI with empty --crs-groups failed: {result.stderr}"
+        assert result.returncode == 0, (
+            f"CLI with empty --crs-groups failed: {result.stderr}"
+        )
         assert "CRS groups: []" in result.stdout, "Should show empty CRS groups list"
 
         print("✅ CLI with empty --crs-groups list works correctly")

@@ -14,30 +14,49 @@ Key compliance features:
 """
 
 import dataclasses
+import itertools
 import os
 import shutil
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from collections.abc import Hashable, Iterable, Mapping, Sequence
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import xarray as xr
 import zarr
+from pyproj import CRS
+from rasterio.warp import calculate_default_transform
+from zarr.codecs import BloscCodec
 from zarr.core.sync import sync
 from zarr.storage import StoreLike
 from zarr.storage._common import make_store_path
 
+from eopf_geozarr.types import (
+    OverviewLevelJSON,
+    StandardLatCoordAttrsJSON,
+    StandardLonCoordAttrsJSON,
+    StandardXCoordAttrsJSON,
+    StandardYCoordAttrsJSON,
+    TileMatrixJSON,
+    TileMatrixLimitJSON,
+    TileMatrixSetJSON,
+    XarrayEncodingJSON,
+)
+
 from . import fs_utils, utils
+from .sentinel1_reprojection import reproject_sentinel1_with_gcps
 
 
 def create_geozarr_dataset(
     dt_input: xr.DataTree,
-    groups: List[str],
+    groups: Iterable[str],
     output_path: str,
     spatial_chunk: int = 4096,
     min_dimension: int = 256,
     tile_width: int = 256,
     max_retries: int = 3,
-    crs_groups: Optional[List[str]] = None,
+    crs_groups: Iterable[str] | None = None,
+    gcp_group: str | None = None,
 ) -> xr.DataTree:
     """
     Create a GeoZarr-spec 0.4 compliant dataset from EOPF data.
@@ -47,7 +66,7 @@ def create_geozarr_dataset(
     dt_input : xr.DataTree
         Input EOPF DataTree
     groups : list[str]
-        List of group names to process as Geozarr datasets
+        List of group names to process as Geozarr datasets.
     output_path : str
         Output path for the Zarr store
     spatial_chunk : int, default 4096
@@ -58,21 +77,48 @@ def create_geozarr_dataset(
         Tile width for TMS compatibility
     max_retries : int, default 3
         Maximum number of retries for network operations
-    crs_groups : list[str], optional
-        List of group names that need CRS information added on best-effort basis
+    crs_groups : Iterabl[str], optional
+        Iterable of group names that need CRS information added on best-effort basis
+    gcp_group : str, optional
+        Group name where GCPs (Ground Control Points) are located.
 
     Returns
     -------
     xr.DataTree
         DataTree containing the GeoZarr compliant data
     """
-    from zarr.codecs import BloscCodec
-
     dt = dt_input.copy()
     compressor = BloscCodec(cname="zstd", clevel=3, shuffle="shuffle", blocksize=0)
 
+    if _is_sentinel1(dt_input):
+        if gcp_group is None:
+            raise ValueError(
+                "Detected Sentinel-1 GRD product but GCP group not provided"
+            )
+
+        # process sentinel-1 VV and VH polarization top-level groups
+        vv_vh_group_names = [f"/{name}" for name in list(dt_input.children)]
+        assert len(vv_vh_group_names) == 2, str(vv_vh_group_names)
+
+        groups = [
+            vv_vh + "/" + grp.lstrip("/")
+            for vv_vh, grp in itertools.product(vv_vh_group_names, groups)
+        ]
+        if crs_groups is not None:
+            crs_groups = [
+                vv_vh + "/" + grp.lstrip("/")
+                for vv_vh, grp in itertools.product(vv_vh_group_names, crs_groups)
+            ]
+
+        # pick only one gcp group (both groups from VV and VH should be equal)
+        gcp_group = vv_vh_group_names[0] + "/" + gcp_group.lstrip("/")
+        if gcp_group not in dt_input.groups:
+            raise ValueError(f"GCP group '{gcp_group}' not found in input datatree")
+
     # Get the measurements datasets prepared for GeoZarr compliance
-    geozarr_groups = setup_datatree_metadata_geozarr_spec_compliant(dt, groups)
+    geozarr_groups = setup_datatree_metadata_geozarr_spec_compliant(
+        dt, groups, gcp_group
+    )
 
     # Create the GeoZarr compliant store through iterative processing
     dt_geozarr = iterative_copy(
@@ -85,6 +131,7 @@ def create_geozarr_dataset(
         tile_width,
         max_retries,
         crs_groups,
+        gcp_group,
     )
 
     # Consolidate metadata at the root level AFTER all groups are written
@@ -100,7 +147,7 @@ def create_geozarr_dataset(
 
 
 def setup_datatree_metadata_geozarr_spec_compliant(
-    dt: xr.DataTree, groups: List[str]
+    dt: xr.DataTree, groups: Iterable[str], gcp_group: str | None = None
 ) -> Dict[str, xr.Dataset]:
     """
     Set up GeoZarr-spec compliant CF standard names and CRS information.
@@ -117,7 +164,7 @@ def setup_datatree_metadata_geozarr_spec_compliant(
     dict[str, xr.Dataset]
         Dictionary of datasets with GeoZarr compliance applied
     """
-    geozarr_groups = {}
+    geozarr_groups: dict[str, xr.Dataset] = {}
     grid_mapping_var_name = "spatial_ref"
 
     for key in groups:
@@ -127,20 +174,38 @@ def setup_datatree_metadata_geozarr_spec_compliant(
         print(f"Processing group for GeoZarr compliance: {key}")
         ds = dt[key].to_dataset().copy()
 
-        # Process all bands in the group
-        for band in ds.data_vars:
-            print(f"  Processing band: {band}")
+        if gcp_group is not None:
+            ds_gcp = dt[gcp_group].to_dataset()
+        else:
+            ds_gcp = None
+
+        # Apply Sentinel-1 reprojection if needed
+        if _is_sentinel1(dt) and ds_gcp is not None:
+            print(f"  Applying Sentinel-1 reprojection for group: {key}")
+            ds = reproject_sentinel1_with_gcps(ds, ds_gcp, target_crs="EPSG:4326")
+            print("  ✅ Reprojection completed, dataset now has x/y coordinates")
+
+        # Process all variables in the group
+        for var_name in ds.data_vars:
+            print(f"  Processing variable / band: {var_name}")
 
             # Set CF standard name and _ARRAY_DIMENSIONS
-            ds[band].attrs["standard_name"] = "toa_bidirectional_reflectance"
-            if hasattr(ds[band], "dims"):
-                ds[band].attrs["_ARRAY_DIMENSIONS"] = list(ds[band].dims)
-            ds[band].attrs["grid_mapping"] = grid_mapping_var_name
+            if _is_sentinel1(dt):
+                ds[var_name].attrs["standard_name"] = (
+                    "surface_backwards_scattering_coefficient_of_radar_wave"
+                )
+                ds[var_name].attrs["units"] = "1"
+            else:  # Default to optical data standard name
+                ds[var_name].attrs["standard_name"] = "toa_bidirectional_reflectance"
+
+            if hasattr(ds[var_name], "dims"):
+                ds[var_name].attrs["_ARRAY_DIMENSIONS"] = list(ds[var_name].dims)
+            ds[var_name].attrs["grid_mapping"] = grid_mapping_var_name
 
             # Set CRS if available
-            if "proj:epsg" in ds[band].attrs:
-                epsg = ds[band].attrs["proj:epsg"]
-                print(f"    Setting CRS for {band} to EPSG:{epsg}")
+            if "proj:epsg" in ds[var_name].attrs:
+                epsg = ds[var_name].attrs["proj:epsg"]
+                print(f"    Setting CRS for {var_name} to EPSG:{epsg}")
                 ds = ds.rio.write_crs(f"epsg:{epsg}")
 
         # Add _ARRAY_DIMENSIONS to coordinate variables
@@ -156,14 +221,15 @@ def setup_datatree_metadata_geozarr_spec_compliant(
 
 def iterative_copy(
     dt_input: xr.DataTree,
-    geozarr_groups: Dict[str, xr.Dataset],
+    geozarr_groups: dict[str, xr.Dataset],
     output_path: str,
     compressor: Any,
     spatial_chunk: int = 4096,
     min_dimension: int = 256,
     tile_width: int = 256,
     max_retries: int = 3,
-    crs_groups: Optional[List[str]] = None,
+    crs_groups: Iterable[str] | None = None,
+    gcp_group: str | None = None,
 ) -> xr.DataTree:
     """
     Iteratively copy groups from original DataTree to GeoZarr DataTree.
@@ -186,8 +252,10 @@ def iterative_copy(
         Tile width for TMS compatibility
     max_retries : int, default 3
         Maximum number of retries for network operations
-    crs_groups : list[str], optional
-        List of group names that need CRS information added on best-effort basis
+    crs_groups : Iterable[str], optional
+        Iterable of group names that need CRS information added on best-effort basis
+    gcp_group : str, optional
+        Group name where GCPs (Ground Control Points) are located
 
     Returns
     -------
@@ -205,21 +273,24 @@ def iterative_copy(
         storage_options=storage_options,
     )
 
-    written_groups = set()
+    written_groups: set[str] = set()
     reference_crs = None
 
     # Process all groups in the tree using iterative approach
     for relative_path, node in dt_input.subtree_with_keys:
         if relative_path == ".":
             continue
+        if relative_path.endswith("_VH") or relative_path.endswith("_VV"):
+            # skip sentinel-1 top-level polarization groups
+            continue
 
         current_group_path = "/" + relative_path
         print(f"Processing group '{current_group_path}' in iterative copy")
 
-        # Handle GeoZarr groups with special processing
         if current_group_path in geozarr_groups:
             print(f"Processing '{current_group_path}' as GeoZarr group")
             write_geozarr_group(
+                dt_input,
                 dt_result,
                 current_group_path,
                 geozarr_groups[current_group_path],
@@ -229,6 +300,7 @@ def iterative_copy(
                 max_retries=max_retries,
                 min_dimension=min_dimension,
                 tile_width=tile_width,
+                gcp_group=gcp_group,
             )
             written_groups.add(current_group_path)
             continue
@@ -272,7 +344,7 @@ def iterative_copy(
 
 
 def prepare_dataset_with_crs_info(
-    ds: xr.Dataset, reference_crs: Optional[str] = None
+    ds: xr.Dataset, reference_crs: str | None = None
 ) -> xr.Dataset:
     """
     Prepare a dataset with CRS information without writing it to disk.
@@ -324,6 +396,7 @@ def prepare_dataset_with_crs_info(
 
 
 def write_geozarr_group(
+    dt_input: xr.DataTree,
     dt_result: xr.DataTree,
     group_name: str,
     ds: xr.Dataset,
@@ -333,12 +406,15 @@ def write_geozarr_group(
     max_retries: int = 3,
     min_dimension: int = 256,
     tile_width: int = 256,
+    gcp_group: str | None = None,
 ) -> xr.DataTree:
     """
     Write a group to a GeoZarr dataset with multiscales support.
 
     Parameters
     ----------
+    dt_input : xr.DataTree
+        The original DataTree
     dt_result : xr.DataTree
         Result DataTree to update
     group_name : str
@@ -357,6 +433,10 @@ def write_geozarr_group(
         Minimum dimension for overview levels
     tile_width : int, default 256
         Tile width for TMS compatibility
+    gcp_group : str, optional
+        Group name where GCPs (Ground Control Points) are located
+        in the input DataTree (ignored if ``dt_input`` does not
+        correspond to a Sentinel-1 product)
 
     Returns
     -------
@@ -394,6 +474,14 @@ def write_geozarr_group(
         raise RuntimeError(f"Failed to write all bands for {group_name}")
 
     # Create GeoZarr-spec compliant multiscales
+    if _is_sentinel1(dt_input):
+        assert gcp_group is not None, "GCP group required for processing Sentinel-1"
+        ds_gcp = dt_input[gcp_group].to_dataset()
+        # For Sentinel-1, ds_gcp is set to None since data is now reprojected and doesn't need GCP handling
+        ds_gcp = None
+    else:
+        ds_gcp = None
+
     try:
         print(f"Creating GeoZarr-spec compliant multiscales for {group_name}")
         create_geozarr_compliant_multiscales(
@@ -403,6 +491,7 @@ def write_geozarr_group(
             min_dimension=min_dimension,
             tile_width=tile_width,
             spatial_chunk=spatial_chunk,
+            ds_gcp=ds_gcp,
         )
     except Exception as e:
         print(
@@ -427,6 +516,7 @@ def create_geozarr_compliant_multiscales(
     min_dimension: int = 256,
     tile_width: int = 256,
     spatial_chunk: int = 4096,
+    ds_gcp: xr.Dataset | None = None,
 ) -> Dict[str, Any]:
     """
     Create GeoZarr-spec compliant multiscales following the specification exactly.
@@ -445,14 +535,15 @@ def create_geozarr_compliant_multiscales(
         Tile width for TMS compatibility
     spatial_chunk : int, default 4096
         Spatial chunk size for encoding
+    ds_gcp : xr.Dataset, optional
+        Source dataset with Sentinel-1 ground control points
+        at native resolution
 
     Returns
     -------
     dict
         Dictionary with overview levels information
     """
-    from zarr.codecs import BloscCodec
-
     compressor = BloscCodec(cname="zstd", clevel=3, shuffle="shuffle")
 
     # Get spatial information from the first data variable
@@ -465,7 +556,46 @@ def create_geozarr_compliant_multiscales(
     first_var = data_vars[0]
     native_height, native_width = ds[first_var].shape[-2:]
     native_crs = ds.rio.crs
-    native_bounds = ds.rio.bounds()
+
+    if ds_gcp is None:
+        native_bounds = ds.rio.bounds()
+    else:
+        if "azimuth_time" in ds.dims and "ground_range" in ds.dims:
+            ds.rio.set_spatial_dims(
+                x_dim="ground_range", y_dim="azimuth_time", inplace=True
+            )
+
+        try:
+            if ds.rio.get_gcps() is not None:
+                transform, width, height = calculate_default_transform(
+                    ds.rio.crs,
+                    CRS.from_epsg(4326),
+                    ds.rio.width,
+                    ds.rio.height,
+                    gcps=ds.rio.get_gcps(),
+                )
+                native_bounds = (
+                    transform[2],
+                    transform[5] + height * transform[4],
+                    transform[2] + width * transform[0],
+                    transform[5],
+                )
+            else:
+                native_bounds = ds.rio.bounds()
+
+        except Exception as e:
+            print(f"Error computing native bounds: {e}")
+            # TODO: check GCP bounds vs. raster data bounds?
+            # Below we compute GCP bbox and assume that it roughly corresponds
+            # to the data bounds, which might be too crude / wrong approximation.
+            # Alternatively we could check GCPs' line/pixel values and adjust
+            # the bounds if we know approx the resolution.
+            native_bounds = (
+                ds_gcp["longitude"].values.min(),
+                ds_gcp["latitude"].values.min(),
+                ds_gcp["longitude"].values.max(),
+                ds_gcp["latitude"].values.max(),
+            )
 
     print(f"Creating GeoZarr-compliant multiscales for {group_name}")
     print(f"Native resolution: {native_width} x {native_height}")
@@ -527,6 +657,13 @@ def create_geozarr_compliant_multiscales(
             f"  Using pyramid approach: creating level {level} from level {level - 1}"
         )
 
+        if ds_gcp is not None:
+            ds_gcp_overview = utils.compute_overview_gcps(
+                ds_gcp, scale_factor, width, height
+            )
+        else:
+            ds_gcp_overview = None
+
         # Create overview dataset
         overview_ds = create_overview_dataset_all_vars(
             previous_level_ds,
@@ -536,6 +673,7 @@ def create_geozarr_compliant_multiscales(
             native_crs,
             native_bounds,
             data_vars,
+            ds_gcp_overview,
         )
 
         # Create encoding for this overview level
@@ -610,7 +748,7 @@ def calculate_overview_levels(
     native_height: int,
     min_dimension: int = 256,
     tile_width: int = 256,
-) -> List[Dict[str, Any]]:
+) -> list[OverviewLevelJSON]:
     """
     Calculate overview levels following COG /2 downsampling logic.
 
@@ -630,7 +768,7 @@ def calculate_overview_levels(
     list
         List of overview level dictionaries
     """
-    overview_levels = []
+    overview_levels: list[OverviewLevelJSON] = []
     level = 0
     current_width = native_width
     current_height = native_height
@@ -660,10 +798,10 @@ def calculate_overview_levels(
 
 def create_native_crs_tile_matrix_set(
     native_crs: Any,
-    native_bounds: Tuple[float, float, float, float],
-    overview_levels: List[Dict[str, Any]],
-    group_prefix: Optional[str] = "",
-) -> Dict[str, Any]:
+    native_bounds: tuple[float, float, float, float],
+    overview_levels: Iterable[OverviewLevelJSON],
+    group_prefix: str | None = "",
+) -> TileMatrixSetJSON:
     """
     Create a custom Tile Matrix Set for the native CRS following GeoZarr spec.
 
@@ -673,8 +811,8 @@ def create_native_crs_tile_matrix_set(
         Native CRS of the data
     native_bounds : tuple
         Native bounds (left, bottom, right, top)
-    overview_levels : list
-        List of overview level dictionaries
+    overview_levels : Iterable[OverViewLevelJSON]
+        Iterable of overview level dictionaries
     group_prefix : str, optional
         Group prefix for the tile matrix IDs
 
@@ -684,7 +822,7 @@ def create_native_crs_tile_matrix_set(
         Tile Matrix Set definition following OGC standard
     """
     left, bottom, right, top = native_bounds
-    tile_matrices = []
+    tile_matrices: list[TileMatrixJSON] = []
 
     for overview in overview_levels:
         level = overview["level"]
@@ -745,7 +883,8 @@ def create_overview_dataset_all_vars(
     height: int,
     native_crs: Any,
     native_bounds: Tuple[float, float, float, float],
-    data_vars: List[str],
+    data_vars: Sequence[Hashable],
+    ds_gcp: xr.Dataset | None = None,
 ) -> xr.Dataset:
     """
     Create an overview dataset containing all variables for a specific level.
@@ -764,8 +903,11 @@ def create_overview_dataset_all_vars(
         Native CRS of the data
     native_bounds : tuple
         Native bounds (left, bottom, right, top)
-    data_vars : list
-        List of data variable names to include
+    data_vars : Sequence[Hashable]
+        Sequence of data variable names to include
+    ds_gcp : xr.Dataset, optional
+        Source dataset with Sentinel-1 ground control points
+        at native resolution
 
     Returns
     -------
@@ -782,10 +924,32 @@ def create_overview_dataset_all_vars(
     x_coords = np.linspace(left, right, width, endpoint=False)
     y_coords = np.linspace(top, bottom, height, endpoint=False)
 
-    overview_coords = {
-        "x": (["x"], x_coords, _get_x_coord_attrs()),
-        "y": (["y"], y_coords, _get_y_coord_attrs()),
-    }
+    # Check if we're dealing with geographic coordinates (EPSG:4326)
+    if native_crs and native_crs.to_epsg() == 4326:
+        lon_attrs = _get_lon_coord_attrs()
+        lat_attrs = _get_lat_coord_attrs()
+        overview_coords = {
+            "x": (["x"], x_coords, lon_attrs),
+            "y": (["y"], y_coords, lat_attrs),
+        }
+
+    else:
+        x_attrs = _get_x_coord_attrs()
+        y_attrs = _get_y_coord_attrs()
+
+        overview_coords = {
+            "x": (["x"], x_coords, x_attrs),
+            "y": (["y"], y_coords, y_attrs),
+        }
+
+    # Determine standard name based on whether this is Sentinel-1 data
+    # TODO: use a better way to determine this than just checking for ds_gcp
+    if ds_gcp is not None:
+        standard_name = "surface_backwards_scattering_coefficient_of_radar_wave"
+    else:
+        standard_name = "toa_bidirectional_reflectance"
+
+    spatial_dims = ["y", "x"]
 
     # Find the grid_mapping variable name
     grid_mapping_var_name = _find_grid_mapping_var_name(ds, data_vars)
@@ -806,19 +970,14 @@ def create_overview_dataset_all_vars(
                 downsampled_data[i] = utils.downsample_2d_array(
                     source_data[i], height, width
                 )
-            dims = (
-                ["time", "y", "x"]
-                if "time" in ds[var].dims
-                else [ds[var].dims[0], "y", "x"]
-            )
+            dim0 = ["time"] if "time" in ds[var].dims else [ds[var].dims[0]]
+            dims = dim0 + spatial_dims
         else:
             downsampled_data = utils.downsample_2d_array(source_data, height, width)
-            dims = ["y", "x"]
+            dims = spatial_dims
 
         attrs = {
-            "standard_name": ds[var].attrs.get(
-                "standard_name", "toa_bidirectional_reflectance"
-            ),
+            "standard_name": ds[var].attrs.get("standard_name", standard_name),
             "_ARRAY_DIMENSIONS": dims,
             "grid_mapping": grid_mapping_var_name,
         }
@@ -828,27 +987,32 @@ def create_overview_dataset_all_vars(
     # Create overview dataset
     overview_ds = xr.Dataset(overview_data_vars, coords=overview_coords)
 
-    # Add grid_mapping variable
+    # Set CRS using rioxarray first
+    overview_ds.rio.write_crs(native_crs, inplace=True)
+    overview_ds.attrs["grid_mapping"] = grid_mapping_var_name
+
+    # Add grid_mapping variable after setting CRS
+    # TODO: refactor? grid mapping attributes and variables are handled
+    # below and above in different function bodies in a confusing way.
+    # ds.rio.write_crs may conflict with manual metadata handling
+    # (i.e., rioxarray writes grid_mapping attributes to Xarray encoding, not attrs)
+    # --
     _add_grid_mapping_variable(
         overview_ds, ds, grid_mapping_var_name, overview_transform, native_crs
     )
-
-    # Set CRS using rioxarray
-    overview_ds = overview_ds.rio.write_crs(native_crs)
-    overview_ds.attrs["grid_mapping"] = grid_mapping_var_name
 
     return overview_ds
 
 
 def write_dataset_band_by_band_with_validation(
     ds: xr.Dataset,
-    existing_dataset: Optional[xr.Dataset],
+    existing_dataset: xr.Dataset | None,
     output_path: str,
-    encoding: Dict[str, Any],
+    encoding: dict[Hashable, XarrayEncodingJSON],
     max_retries: int,
     group_name: str,
     force_overwrite: bool = False,
-) -> Tuple[bool, xr.Dataset]:
+) -> tuple[bool, xr.Dataset]:
     """
     Write dataset band by band with individual band validation.
 
@@ -891,17 +1055,18 @@ def write_dataset_band_by_band_with_validation(
 
     # Write data variables one by one with validation
     for var in data_vars:
-        # Check if this band already exists and is valid
+        # Check if this variable already exists and is valid
         if not force_overwrite and store_exists:
             if utils.validate_existing_band_data(existing_dataset, var, ds):
-                ds.drop_vars(var)
+                ds.drop_vars(str(var))
                 ds[var] = existing_dataset[var]  # type: ignore
                 print(f"  ✅ Band {var} already exists and is valid, skipping")
                 skipped_vars.append(var)
                 successful_vars.append(var)
                 continue
-            if os.path.exists(os.path.join(output_path, group_name, var)):
-                shutil.rmtree(os.path.join(output_path, group_name, var))
+            var_path = os.path.join(output_path, group_name.lstrip("/"), str(var))
+            if os.path.exists(var_path):
+                shutil.rmtree(var_path)
 
         print(f"  Writing data variable {var}...")
 
@@ -934,9 +1099,9 @@ def write_dataset_band_by_band_with_validation(
                         if i < len(target_chunks):
                             chunk_dict[dim] = target_chunks[i]
                     # Rechunk the dataset to match the target chunks
-                    single_var_ds = single_var_ds.chunk(chunk_dict)
+                    single_var_ds[var] = single_var_ds[var].chunk(chunk_dict)
                 else:
-                    single_var_ds = single_var_ds.chunk()
+                    single_var_ds[var] = single_var_ds[var].chunk()
 
                 # Get storage options and write variable
                 storage_options = fs_utils.get_storage_options(output_path)
@@ -1027,8 +1192,8 @@ def write_dataset_band_by_band_with_validation(
 
 def consolidate_metadata(
     store: StoreLike,
-    path: Optional[str] = None,
-    zarr_format: Optional[zarr.core.common.ZarrFormat] = None,
+    path: str | None = None,
+    zarr_format: zarr.core.common.ZarrFormat | None = None,
 ) -> zarr.Group:
     """
     Consolidate metadata of all nodes in a hierarchy.
@@ -1054,8 +1219,8 @@ def consolidate_metadata(
 
 async def async_consolidate_metadata(
     store: StoreLike,
-    path: Optional[str] = None,
-    zarr_format: Optional[zarr.core.common.ZarrFormat] = None,
+    path: str | None = None,
+    zarr_format: zarr.core.common.ZarrFormat | None = None,
 ) -> zarr.core.group.AsyncGroup:
     """
     Consolidate metadata of all nodes in a hierarchy asynchronously.
@@ -1116,23 +1281,45 @@ def _add_coordinate_metadata(ds: xr.Dataset) -> None:
     """Add proper metadata to coordinate variables."""
     for coord_name in ds.coords:
         if coord_name == "x":
-            ds[coord_name].attrs.update(
-                {
-                    "_ARRAY_DIMENSIONS": ["x"],
-                    "standard_name": "projection_x_coordinate",
-                    "units": "m",
-                    "long_name": "x coordinate of projection",
-                }
-            )
+            # Check if this is geographic coordinates (EPSG:4326)
+            if ds.rio.crs and ds.rio.crs.to_epsg() == 4326:
+                ds[coord_name].attrs.update(
+                    {
+                        "_ARRAY_DIMENSIONS": ["x"],
+                        "standard_name": "longitude",
+                        "units": "degrees_east",
+                        "long_name": "longitude",
+                    }
+                )
+            else:
+                ds[coord_name].attrs.update(
+                    {
+                        "_ARRAY_DIMENSIONS": ["x"],
+                        "standard_name": "projection_x_coordinate",
+                        "units": "m",
+                        "long_name": "x coordinate of projection",
+                    }
+                )
         elif coord_name == "y":
-            ds[coord_name].attrs.update(
-                {
-                    "_ARRAY_DIMENSIONS": ["y"],
-                    "standard_name": "projection_y_coordinate",
-                    "units": "m",
-                    "long_name": "y coordinate of projection",
-                }
-            )
+            # Check if this is geographic coordinates (EPSG:4326)
+            if ds.rio.crs and ds.rio.crs.to_epsg() == 4326:
+                ds[coord_name].attrs.update(
+                    {
+                        "_ARRAY_DIMENSIONS": ["y"],
+                        "standard_name": "latitude",
+                        "units": "degrees_north",
+                        "long_name": "latitude",
+                    }
+                )
+            else:
+                ds[coord_name].attrs.update(
+                    {
+                        "_ARRAY_DIMENSIONS": ["y"],
+                        "standard_name": "projection_y_coordinate",
+                        "units": "m",
+                        "long_name": "y coordinate of projection",
+                    }
+                )
         elif coord_name == "time":
             ds[coord_name].attrs.update(
                 {"_ARRAY_DIMENSIONS": ["time"], "standard_name": "time"}
@@ -1169,20 +1356,20 @@ def _add_coordinate_metadata(ds: xr.Dataset) -> None:
 
 def _setup_grid_mapping(ds: xr.Dataset, grid_mapping_var_name: str) -> None:
     """Set up spatial_ref variable with GeoZarr required attributes."""
+
+    # Use standard CRS and transform if available
     if ds.rio.crs and "spatial_ref" in ds:
         ds["spatial_ref"].attrs["_ARRAY_DIMENSIONS"] = []
-
-        # Add GeoTransform if available
         if ds.rio.transform():
             transform_gdal = ds.rio.transform().to_gdal()
             transform_str = " ".join([str(i) for i in transform_gdal])
             ds["spatial_ref"].attrs["GeoTransform"] = transform_str
 
-        # Update all data variables to reference the grid_mapping
-        ds.attrs["grid_mapping"] = grid_mapping_var_name
-        for band in ds.data_vars:
-            if band != "spatial_ref":
-                ds[band].attrs["grid_mapping"] = grid_mapping_var_name
+    # Update all data variables to reference the grid_mapping
+    ds.attrs["grid_mapping"] = grid_mapping_var_name
+    for band in ds.data_vars:
+        if band != "spatial_ref":
+            ds[band].attrs["grid_mapping"] = grid_mapping_var_name
 
 
 def _add_geotransform(ds: xr.Dataset, grid_mapping_var: str) -> None:
@@ -1202,9 +1389,9 @@ def _add_geotransform(ds: xr.Dataset, grid_mapping_var: str) -> None:
         ds[grid_mapping_var].attrs["GeoTransform"] = transform_str
 
 
-def _find_reference_crs(geozarr_groups: Dict[str, xr.Dataset]) -> Optional[str]:
+def _find_reference_crs(geozarr_groups: Mapping[str, xr.Dataset]) -> str | None:
     """Find the reference CRS in the geozarr groups."""
-    for key, group in geozarr_groups.items():
+    for group in geozarr_groups.values():
         if group.rio.crs:
             crs_string: str = group.rio.crs.to_string()
             return crs_string
@@ -1213,9 +1400,10 @@ def _find_reference_crs(geozarr_groups: Dict[str, xr.Dataset]) -> Optional[str]:
 
 def _create_encoding(
     ds: xr.Dataset, compressor: Any, spatial_chunk: int
-) -> Dict[str, Any]:
+) -> dict[Hashable, XarrayEncodingJSON]:
     """Create encoding for dataset variables."""
-    encoding: Dict[str, Any] = {}
+    encoding: dict[Hashable, XarrayEncodingJSON] = {}
+    chunking: tuple[int, ...]
     for var in ds.data_vars:
         if hasattr(ds[var].data, "chunks"):
             current_chunks = ds[var].chunks
@@ -1255,9 +1443,9 @@ def _create_encoding(
 
 def _create_geozarr_encoding(
     ds: xr.Dataset, compressor: Any, spatial_chunk: int
-) -> Dict[str, Any]:
+) -> dict[Hashable, XarrayEncodingJSON]:
     """Create encoding for GeoZarr dataset variables."""
-    encoding: Dict[str, Any] = {}
+    encoding: dict[Hashable, XarrayEncodingJSON] = {}
     for var in ds.data_vars:
         if utils.is_grid_mapping_variable(ds, var):
             encoding[var] = {"compressors": None}
@@ -1285,7 +1473,7 @@ def _create_geozarr_encoding(
     return encoding
 
 
-def _load_existing_dataset(path: str) -> Optional[xr.Dataset]:
+def _load_existing_dataset(path: str) -> xr.Dataset | None:
     """Load existing dataset if it exists."""
     try:
         if fs_utils.path_exists(path):
@@ -1304,10 +1492,10 @@ def _load_existing_dataset(path: str) -> Optional[xr.Dataset]:
 
 
 def _create_tile_matrix_limits(
-    overview_levels: List[Dict[str, Any]], tile_width: int
-) -> Dict[str, Any]:
+    overview_levels: Iterable[OverviewLevelJSON], tile_width: int
+) -> dict[str, TileMatrixLimitJSON]:
     """Create tile matrix limits for overview levels."""
-    tile_matrix_limits = {}
+    tile_matrix_limits: dict[str, TileMatrixLimitJSON] = {}
     for ol in overview_levels:
         level_str = str(ol["level"])
         max_tile_col = int(np.ceil(ol["width"] / tile_width)) - 1
@@ -1320,10 +1508,11 @@ def _create_tile_matrix_limits(
             "minTileRow": 0,
             "maxTileRow": max_tile_row,
         }
+
     return tile_matrix_limits
 
 
-def _get_x_coord_attrs() -> Dict[str, Any]:
+def _get_x_coord_attrs() -> StandardXCoordAttrsJSON:
     """Get standard attributes for x coordinate."""
     return {
         "units": "m",
@@ -1333,7 +1522,7 @@ def _get_x_coord_attrs() -> Dict[str, Any]:
     }
 
 
-def _get_y_coord_attrs() -> Dict[str, Any]:
+def _get_y_coord_attrs() -> StandardYCoordAttrsJSON:
     """Get standard attributes for y coordinate."""
     return {
         "units": "m",
@@ -1343,7 +1532,27 @@ def _get_y_coord_attrs() -> Dict[str, Any]:
     }
 
 
-def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: List[str]) -> str:
+def _get_lon_coord_attrs() -> StandardLonCoordAttrsJSON:
+    """Get standard attributes for longitude coordinate."""
+    return {
+        "units": "degrees_east",
+        "long_name": "longitude",
+        "standard_name": "longitude",
+        "_ARRAY_DIMENSIONS": ["x"],
+    }
+
+
+def _get_lat_coord_attrs() -> StandardLatCoordAttrsJSON:
+    """Get standard attributes for latitude coordinate."""
+    return {
+        "units": "degrees_north",
+        "long_name": "latitude",
+        "standard_name": "latitude",
+        "_ARRAY_DIMENSIONS": ["y"],
+    }
+
+
+def _find_grid_mapping_var_name(ds: xr.Dataset, data_vars: Sequence[Hashable]) -> str:
     """Find the grid_mapping variable name from the dataset."""
     grid_mapping_var_name = ds.attrs.get("grid_mapping", None)
     if not grid_mapping_var_name and data_vars:
@@ -1365,28 +1574,28 @@ def _add_grid_mapping_variable(
     native_crs: Any,
 ) -> None:
     """Add grid_mapping variable to overview dataset."""
-    if grid_mapping_var_name in ds:
-        grid_mapping_attrs = ds[grid_mapping_var_name].attrs.copy()
 
+    base_attrs: dict[str, Any] = {
+        "_ARRAY_DIMENSIONS": [],
+    }
+
+    if overview_transform is not None:
         transform_gdal = overview_transform.to_gdal()
         transform_str = " ".join([str(i) for i in transform_gdal])
-        grid_mapping_attrs["GeoTransform"] = transform_str
-        grid_mapping_attrs["_ARRAY_DIMENSIONS"] = []
+        base_attrs["GeoTransform"] = transform_str
 
-        overview_ds[grid_mapping_var_name] = xr.DataArray(
+    if grid_mapping_var_name in ds:
+        grid_mapping_attrs = ds[grid_mapping_var_name].attrs.copy()
+        grid_mapping_attrs.update(base_attrs)
+
+        overview_ds.coords[grid_mapping_var_name] = xr.DataArray(
             data=ds[grid_mapping_var_name].values,
             attrs=grid_mapping_attrs,
         )
     else:
         print(f"  Creating new grid_mapping variable '{grid_mapping_var_name}'")
 
-        transform_gdal = overview_transform.to_gdal()
-        transform_str = " ".join([str(i) for i in transform_gdal])
-
-        grid_mapping_attrs = {
-            "_ARRAY_DIMENSIONS": [],
-            "GeoTransform": transform_str,
-        }
+        grid_mapping_attrs = base_attrs.copy()
 
         if native_crs:
             if native_crs.to_epsg():
@@ -1396,7 +1605,23 @@ def _add_grid_mapping_variable(
                 grid_mapping_attrs["spatial_ref"] = native_crs.to_wkt()
                 grid_mapping_attrs["crs_wkt"] = native_crs.to_wkt()
 
-        overview_ds[grid_mapping_var_name] = xr.DataArray(
+        overview_ds.coords[grid_mapping_var_name] = xr.DataArray(
             data=np.array(b"", dtype="S1"),
             attrs=grid_mapping_attrs,
         )
+
+    # Ensure all data variables have the grid_mapping attribute
+    for var_name in overview_ds.data_vars:
+        if not utils.is_grid_mapping_variable(overview_ds, var_name):
+            if "grid_mapping" not in overview_ds[var_name].attrs:
+                overview_ds[var_name].attrs["grid_mapping"] = grid_mapping_var_name
+                print(f"  Added grid_mapping attribute to {var_name}")
+
+
+def _is_sentinel1(dt: xr.DataTree) -> bool:
+    """Return True if the input DataTree represents a Sentinel-1 product."""
+    stac_props = dt.attrs.get("stac_discovery", {}).get("properties", {})
+    if stac_props.get("product:type", "not-a-product").startswith("S01"):
+        return True
+    else:
+        return False
