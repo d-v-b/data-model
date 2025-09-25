@@ -1,6 +1,16 @@
-# GeoZarr
+# GeoZarr Mini Spec
 
-This document specifies the GeoZarr model used in this repository. It's a "mini" version of the [official GeoZarr spec](https://zarr.dev/geozarr-spec/documents/standard/template/geozarr-spec.html)
+This document specifies the GeoZarr model used in this repository. It's a "mini" version of the [official GeoZarr spec](https://zarr.dev/geozarr-spec/documents/standard/template/geozarr-spec.html) that documents the specific subset of the specification that this implementation supports, along with implementation-specific details.
+
+## Relationship to Other Documentation
+
+This mini spec is referenced by and aligns with:
+
+- **[Architecture](architecture.md)** - Technical implementation details that follow this specification
+- **[GeoZarr Specification Contribution](geozarr-specification-contribution.md)** - Our contributions to the official spec based on this implementation
+- **[Main Documentation](index.md)** - General library documentation and usage guides
+
+The implementation described in this mini spec addresses specific requirements for Earth observation data processing while maintaining compliance with the broader GeoZarr specification.
 
 ## Spec conventions
 
