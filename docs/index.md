@@ -15,6 +15,7 @@ Welcome to the EOPF GeoZarr library documentation. This library provides tools t
 - **[API Reference](api-reference.md)** - Complete Python API documentation
 - **[Examples](examples.md)** - Practical examples for common use cases
 - **[Architecture](architecture.md)** - Technical architecture and design principles
+- **[GeoZarr Mini Spec](geozarr-minispec.md)** - Implementation-specific GeoZarr specification
 
 ### Support
 
