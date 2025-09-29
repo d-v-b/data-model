@@ -13,6 +13,23 @@ from typing_extensions import Protocol, runtime_checkable
 from eopf_geozarr.data_api.geozarr.types import ResamplingMethod
 
 
+class ProjAttrs(BaseModel, extra="allow"):
+    """
+    Zarr attributes for coordinate reference system (CRS) encoding.
+
+    Attributes
+    version: str
+        The version of the metadata.
+    code: str | None
+        Authority:Code identifier.
+    wkt2 : str | None
+        WKT2 (ISO 19162) representation of the CRS.
+    projjson: ProjJson | None
+        PROJJSON representation of the CRS.
+    bbox:
+    """
+
+
 class BaseDataArrayAttrs(BaseModel, extra="allow"):
     """
     Base attributes for a  GeoZarr DataArray.
