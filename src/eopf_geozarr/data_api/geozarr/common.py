@@ -3,14 +3,30 @@
 import io
 import urllib
 import urllib.request
+from dataclasses import dataclass
 from typing import Annotated, Any, Mapping, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
-from pydantic import AfterValidator, BaseModel
+from pydantic import AfterValidator, BaseModel, Field
 from pydantic.experimental.missing_sentinel import MISSING
-from typing_extensions import Protocol, runtime_checkable
+from typing_extensions import Final, Literal, Protocol, runtime_checkable
 
+from eopf_geozarr.data_api.geozarr.projjson import ProjJSON
 from eopf_geozarr.data_api.geozarr.types import ResamplingMethod
+
+
+@dataclass(frozen=True)
+class UNSET_TYPE:
+    """
+    Sentinel value to indicate that a value is not set.
+    """
+
+    ...
+
+
+UNSET = UNSET_TYPE()
+
+GEO_PROJ_VERSION: Final = "0.1"
 
 
 class ProjAttrs(BaseModel, extra="allow"):
@@ -28,6 +44,15 @@ class ProjAttrs(BaseModel, extra="allow"):
         PROJJSON representation of the CRS.
     bbox:
     """
+
+    version: Literal["0.1"] = "0.1"
+    code: str | None = Field(pattern="^[A-Z]+:[0-9]+$")
+    wkt2: str | None = None
+    projjson: ProjJSON | None
+    bbox: tuple[float, float, float, float] | UNSET_TYPE = UNSET
+    transform: tuple[float, float, float, float, float, float] | UNSET_TYPE = UNSET
+    # TODO: enclosing object must validate these properties against the arrays
+    spatial_dimensions: tuple[str, str] | UNSET_TYPE = UNSET
 
 
 class BaseDataArrayAttrs(BaseModel, extra="allow"):
