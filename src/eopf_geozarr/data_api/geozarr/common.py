@@ -4,10 +4,10 @@ import io
 import urllib
 import urllib.request
 from dataclasses import dataclass
-from typing import Annotated, Any, Mapping, TypeVar
+from typing import Annotated, Any, Mapping, Self, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import Final, Literal, Protocol, runtime_checkable
 
@@ -53,6 +53,12 @@ class ProjAttrs(BaseModel, extra="allow"):
     transform: tuple[float, float, float, float, float, float] | UNSET_TYPE = UNSET
     # TODO: enclosing object must validate these properties against the arrays
     spatial_dimensions: tuple[str, str] | UNSET_TYPE = UNSET
+
+    @model_validator(mode="after")
+    def check_one_of(self) -> Self:
+        if self.code is None and self.wkt2 is None and self.projjson is None:
+            raise ValueError("One of 'code', 'wkt2', or 'projjson' must be provided.")
+        return self
 
 
 class BaseDataArrayAttrs(BaseModel, extra="allow"):
