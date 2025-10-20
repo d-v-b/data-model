@@ -6,7 +6,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  logo: assets/logo-eopf-sentinel-explorer-dark-icon.svg
+  logo: assets/logo-eopf-sentinel-explorer-dark-icon.png
   features:
     #- navigation.tabs
     #- navigation.tabs.sticky
@@ -66,5 +66,6 @@ nav:
   - API Reference: api-reference.md
   - Examples: examples.md
   - Architecture: architecture.md
+  - GeoZarr Mini Spec: geozarr-minispec.md
   - GeoZarr Specification: geozarr-specification-contribution.md
   - FAQ: faq.md

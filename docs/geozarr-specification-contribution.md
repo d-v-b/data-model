@@ -6,6 +6,8 @@ This document outlines our contribution to the GeoZarr specification based on ou
 
 Our implementation of GeoZarr-compliant data conversion for Earth Observation data has revealed several areas where the current specification could be improved to better support scientific use cases. We have contributed feedback to the GeoZarr specification development process through detailed GitHub issues.
 
+Our implementation follows the [GeoZarr Mini Spec](geozarr-minispec.md), which documents the specific subset of the GeoZarr specification that we implement, including implementation-specific details for chunking requirements, CF compliance, and multiscale dataset organization.
+
 ## Key Issues Identified and Reported
 
 ### 1. Arbitrary Coordinate Systems Support

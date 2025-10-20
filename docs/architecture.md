@@ -6,6 +6,8 @@ This document describes the architecture and design principles of the EOPF GeoZa
 
 The EOPF GeoZarr library is designed to convert EOPF (Earth Observation Processing Framework) datasets to GeoZarr-spec 0.4 compliant format while maintaining scientific accuracy and optimizing performance.
 
+This implementation follows our [GeoZarr Mini Spec](geozarr-minispec.md), which defines the specific subset of the GeoZarr specification that this library implements, including implementation-specific details for chunking, CF compliance, and multiscale dataset organization.
+
 ## Design Principles
 
 ### 1. Scientific Integrity First
