@@ -19,7 +19,7 @@ import os
 import shutil
 import time
 from collections.abc import Hashable, Iterable, Mapping, Sequence
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import numpy as np
 import xarray as xr
@@ -155,7 +155,7 @@ def create_geozarr_dataset(
 
 def setup_datatree_metadata_geozarr_spec_compliant(
     dt: xr.DataTree, groups: Iterable[str], gcp_group: str | None = None
-) -> Dict[str, xr.Dataset]:
+) -> dict[str, xr.Dataset]:
     """
     Set up GeoZarr-spec compliant CF standard names and CRS information.
 
@@ -529,7 +529,7 @@ def create_geozarr_compliant_multiscales(
     spatial_chunk: int = 4096,
     ds_gcp: xr.Dataset | None = None,
     enable_sharding: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create GeoZarr-spec compliant multiscales following the specification exactly.
 
@@ -897,7 +897,7 @@ def create_overview_dataset_all_vars(
     width: int,
     height: int,
     native_crs: Any,
-    native_bounds: Tuple[float, float, float, float],
+    native_bounds: tuple[float, float, float, float],
     data_vars: Sequence[Hashable],
     ds_gcp: xr.Dataset | None = None,
     enable_sharding: bool = False,
