@@ -24,8 +24,6 @@ class UNSET_TYPE:
     ...
 
 
-UNSET = UNSET_TYPE()
-
 GEO_PROJ_VERSION: Final = "0.1"
 
 
@@ -46,16 +44,16 @@ class ProjAttrs(BaseModel, extra="allow"):
     """
 
     version: Literal["0.1"] = "0.1"
-    code: str | None = Field(pattern="^[A-Z]+:[0-9]+$")
+    code: str | None = Field(None, pattern="^[A-Z]+:[0-9]+$")
     wkt2: str | None = None
-    projjson: ProjJSON | None
-    bbox: tuple[float, float, float, float] | UNSET_TYPE = UNSET
-    transform: tuple[float, float, float, float, float, float] | UNSET_TYPE = UNSET
+    projjson: ProjJSON | None = None
+    bbox: tuple[float, float, float, float] | None = None
+    transform: tuple[float, float, float, float, float, float] | None = None
     # TODO: enclosing object must validate these properties against the arrays
-    spatial_dimensions: tuple[str, str] | UNSET_TYPE = UNSET
+    spatial_dimensions: tuple[str, str] | None = None
 
     @model_validator(mode="after")
-    def check_one_of(self) -> Self:
+    def encure_crs(self) -> Self:
         if self.code is None and self.wkt2 is None and self.projjson is None:
             raise ValueError("One of 'code', 'wkt2', or 'projjson' must be provided.")
         return self
