@@ -9,7 +9,7 @@ import xarray as xr
 class S2ResamplingEngine:
     """Handles downsampling operations for S2 multiscale creation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.resampling_methods = {
             "reflectance": self._downsample_reflectance,
             "classification": self._downsample_classification,
