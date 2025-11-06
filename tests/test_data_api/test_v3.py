@@ -61,7 +61,7 @@ class TestCheckValidCoordinates:
             check_valid_coordinates(group)
 
 
-def test_dataarray_round_trip(example_group) -> None:
+def test_dataarray_round_trip(example_group: Any) -> None:
     """
     Ensure that we can round-trip dataarray attributes through the `Multiscales` model.
     """
@@ -73,7 +73,7 @@ def test_dataarray_round_trip(example_group) -> None:
             assert DataArray(**model_json).model_dump() == model_json
 
 
-def test_multiscale_attrs_round_trip(example_group) -> None:
+def test_multiscale_attrs_round_trip(example_group: Any) -> None:
     """
     Test that multiscale datasets round-trip through the `Multiscales` model
     """
