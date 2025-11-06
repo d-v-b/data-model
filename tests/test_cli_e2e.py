@@ -374,11 +374,11 @@ class TestCLIEndToEnd:
 
         print("✅ CLI convert with --crs-groups test completed successfully")
 
-    def test_cli_crs_groups_empty_list(self, temp_output_dir: str) -> None:
+    def test_cli_crs_groups_empty_list(self, tmp_path: str) -> None:
         """Test CLI with --crs-groups but no groups specified (empty list)."""
         # Create a minimal test dataset
-        test_input = Path(temp_output_dir) / "test_input.zarr"
-        test_output = Path(temp_output_dir) / "test_output.zarr"
+        test_input = Path(tmp_path) / "test_input.zarr"
+        test_output = Path(tmp_path) / "test_output.zarr"
 
         # Create a simple test dataset
         import numpy as np
