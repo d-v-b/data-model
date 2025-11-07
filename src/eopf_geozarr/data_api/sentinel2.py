@@ -6,9 +6,8 @@ Uses the new pyz.GroupSpec with TypedDict members to enforce strict structure va
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Mapping, Self, Union
+from typing import Annotated, Any, Literal, Self
 
-import numpy as np
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import TypedDict
 
@@ -52,28 +51,44 @@ class BandMetadata(BaseModel):
 class BandDescription(BaseModel):
     """Collection of band metadata for all Sentinel-2 bands.
 
-    Maps band identifiers (e.g., '01', '02', '8A', 'b02') to their metadata.
+    Maps Sentinel-2 band identifiers to their spectral and technical metadata.
+    All standard bands should be present in Sentinel-2 L1C and L2A products.
+
+    Preserves both numeric (01, 02, ..., 8A) and named (b01, b02, ..., b8a) band keys
+    from the original JSON structure for round-trip compatibility.
     """
 
-    # Allow arbitrary band IDs as keys with BandMetadata values
-    model_config = {"extra": "allow"}
+    # Numeric band keys (JSON format)
+    band_01: Annotated[BandMetadata, Field(alias="01")]
+    band_02: Annotated[BandMetadata, Field(alias="02")]
+    band_03: Annotated[BandMetadata, Field(alias="03")]
+    band_04: Annotated[BandMetadata, Field(alias="04")]
+    band_05: Annotated[BandMetadata, Field(alias="05")]
+    band_06: Annotated[BandMetadata, Field(alias="06")]
+    band_07: Annotated[BandMetadata, Field(alias="07")]
+    band_08: Annotated[BandMetadata, Field(alias="08")]
+    band_09: Annotated[BandMetadata, Field(alias="09")]
+    band_10: Annotated[BandMetadata, Field(alias="10")]
+    band_11: Annotated[BandMetadata, Field(alias="11")]
+    band_12: Annotated[BandMetadata, Field(alias="12")]
+    band_8a: Annotated[BandMetadata, Field(alias="8A")]
 
-    def __getitem__(self, key: str) -> BandMetadata:
-        """Get band metadata by band ID."""
-        value = getattr(self, key, None)
-        if value is None:
-            raise KeyError(f"Band {key} not found")
-        return value
+    # Named band keys (human-readable format)
+    band_b01: Annotated[BandMetadata, Field(alias="b01")]
+    band_b02: Annotated[BandMetadata, Field(alias="b02")]
+    band_b03: Annotated[BandMetadata, Field(alias="b03")]
+    band_b04: Annotated[BandMetadata, Field(alias="b04")]
+    band_b05: Annotated[BandMetadata, Field(alias="b05")]
+    band_b06: Annotated[BandMetadata, Field(alias="b06")]
+    band_b07: Annotated[BandMetadata, Field(alias="b07")]
+    band_b08: Annotated[BandMetadata, Field(alias="b08")]
+    band_b09: Annotated[BandMetadata, Field(alias="b09")]
+    band_b10: Annotated[BandMetadata, Field(alias="b10")]
+    band_b11: Annotated[BandMetadata, Field(alias="b11")]
+    band_b12: Annotated[BandMetadata, Field(alias="b12")]
+    band_b8a: Annotated[BandMetadata, Field(alias="b8a")]
 
-    def __iter__(self):
-        """Iterate over band IDs."""
-        for key in self.model_fields:
-            yield key
-
-    def items(self):
-        """Get (band_id, metadata) pairs."""
-        for key in self.model_fields:
-            yield key, getattr(self, key)
+    model_config = {"populate_by_name": True}
 
 
 class OtherMetadata(BaseModel):
@@ -109,7 +124,7 @@ class OtherMetadata(BaseModel):
 
     # Band information
     band_description: Annotated[
-        dict[str, BandMetadata], Field(description="Spectral band metadata")
+        BandDescription, Field(description="Spectral band metadata for all bands")
     ]
 
     # Accuracy declarations
@@ -196,8 +211,17 @@ class OtherMetadata(BaseModel):
         str, Field(description="Reference spectral band")
     ]
 
-    # Allow extra fields for extensibility
-    model_config = {"extra": "allow"}
+    # Radiometric correction
+    reflectance_correction_factor_from_the_Sun_Earth_distance_variation_computed_using_the_acquisition_date: Annotated[
+        float | None,
+        Field(
+            default=None,
+            alias="reflectance_correction_factor_from_the_Sun-Earth_distance_variation_computed_using_the_acquisition_date",
+            description="Reflectance correction factor for Sun-Earth distance variation",
+        ),
+    ]
+
+    model_config = {"populate_by_name": True}
 
 
 class Sentinel2ArrayAttributes(BaseModel):
@@ -208,21 +232,127 @@ class Sentinel2ArrayAttributes(BaseModel):
     - stac_discovery: STAC-compliant discovery metadata
     """
 
-    other_metadata: Annotated[OtherMetadata, Field(description="Product metadata")]
-    stac_discovery: Annotated[
-        dict[str, Any] | None, Field(description="STAC discovery metadata")
-    ]
-
-    # Allow extra fields for extensibility
-    model_config = {"extra": "allow"}
+    other_metadata: dict[str, object]  # unvalidated
+    stac_discovery: dict[str, object]  # unvalidated
 
 
 # Resolution levels
 ResolutionLevel = Literal["r10m", "r20m", "r60m", "r120m", "r360m", "r720m"]
 
-# Member type for groups with any nested structures (groups or arrays)
-# Used for groups with dynamic or variable nested structures
-AnyMembers = Mapping[str, Union[GroupSpec[Any, Any], ArraySpec[Any]]]
+
+# Resolution-level members for probability data arrays
+class ProbabilityArrayMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
+    """Members for probability arrays at a specific resolution (r10m, r20m, r60m).
+
+    Closed TypedDict - contains probability arrays (cld, snw) and per-band/coordinate arrays.
+    All fields are optional since not all data products are always present.
+    """
+
+    cld: ArraySpec[Any]
+    snw: ArraySpec[Any]
+    band: Any  # Per-band probability data (may be group or array)
+    x: ArraySpec[Any]  # Coordinate arrays
+    y: ArraySpec[Any]
+
+
+# Probability resolution groups (r10m, r20m, r60m)
+class ProbabilityResolutionMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
+    """Members for probability data containing resolution-level groups (r10m, r20m, r60m).
+
+    Closed TypedDict - contains resolution groups as subgroups.
+    All fields are optional since not all resolutions are always present.
+    """
+
+    r10m: GroupSpec[Any, ProbabilityArrayMembers]  # type: ignore[type-var]
+    r20m: GroupSpec[Any, ProbabilityArrayMembers]  # type: ignore[type-var]
+    r60m: GroupSpec[Any, ProbabilityArrayMembers]  # type: ignore[type-var]
+
+
+# Resolution-level members for quicklook data arrays
+class QuicklookArrayMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
+    """Members for quicklook arrays at a specific resolution.
+
+    Closed TypedDict - typically contains TCI (True Color Image) and optional band/coordinate arrays.
+    All fields are optional for flexibility.
+    """
+
+    tci: ArraySpec[Any]
+    band: Any  # May contain per-band data
+    x: ArraySpec[Any]  # Coordinate arrays
+    y: ArraySpec[Any]
+
+
+# Quicklook resolution groups (r10m, r20m, r60m)
+class QuicklookResolutionMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
+    """Members for quicklook data containing resolution-level groups (r10m, r20m, r60m).
+
+    Closed TypedDict - contains resolution groups as subgroups.
+    All fields are optional since not all resolutions are always present.
+    """
+
+    r10m: GroupSpec[Any, QuicklookArrayMembers]  # type: ignore[type-var]
+    r20m: GroupSpec[Any, QuicklookArrayMembers]  # type: ignore[type-var]
+    r60m: GroupSpec[Any, QuicklookArrayMembers]  # type: ignore[type-var]
+
+
+# Mask members - contains resolution-level groups or various classification/detector groups
+class ConditionsMaskMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
+    """Members for mask subgroup in conditions.
+
+    Closed TypedDict - can contain either:
+    1. Resolution-level groups (r10m, r20m, r60m) with mask arrays, OR
+    2. Classification and detector footprint groups/arrays
+
+    All fields are optional since not all mask types are always present.
+    Using Any to handle flexible deep hierarchies.
+    """
+
+    r10m: Any  # Resolution-level mask group
+    r20m: Any  # Resolution-level mask group
+    r60m: Any  # Resolution-level mask group
+    detector_footprint: Any  # May have r10m/r20m/r60m array subgroups
+    l1c_classification: Any  # May have r20m/r60m array subgroups
+    l2a_classification: Any  # May have r20m/r60m array subgroups
+
+
+# Geometry members - contains angle and orientation groups/arrays
+class GeometryMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
+    """Members for geometry group containing sun and viewing angles.
+
+    Closed TypedDict - contains angle and geometry groups/arrays with flexible internal structure.
+    Common members include sun angles, viewing angles, band angles, detector angles.
+    All fields are optional since not all angles are always present.
+
+    Note: Members can be either GroupSpec (for hierarchical data) or ArraySpec (for direct arrays),
+    allowing for flexible deep hierarchies. Using Any to handle Union[GroupSpec[Any, Any], ArraySpec[Any]].
+    """
+
+    angle: Any  # Contains resolution-level angle data (group or array)
+    band: Any  # Contains per-band angle data (group or array)
+    detector: Any  # Contains per-detector angle data (group or array)
+    sun_angles: Any  # Sun geometry data (group or array)
+    viewing_incidence_angles: Any  # Viewing geometry data (group or array)
+    mean_sun_angles: Any  # Mean sun angles (group or array)
+    mean_viewing_incidence_angles: Any  # Mean viewing angles (group or array)
+    x: Any  # Coordinate arrays (group or array)
+    y: Any
+    time: Any
+
+
+# Meteorology members - contains CAMS and ECMWF atmospheric data
+class MeteorologyMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
+    """Members for meteorology group containing CAMS and ECMWF atmospheric data.
+
+    Closed TypedDict - contains subgroups for different meteorological data sources.
+    All fields are optional since different meteorological data sources have different variables.
+
+    Note: Both CAMS and ECMWF subgroups can have flexible internal structure with
+    atmospheric parameter arrays/groups.
+    """
+
+    cams: GroupSpec[Any, Any]  # Contains CAMS atmospheric data
+    ecmwf: GroupSpec[Any, Any]  # Contains ECMWF atmospheric data
+
 
 # Sentinel-2 spectral band identifiers
 BandName = Literal[
@@ -329,112 +459,25 @@ class Sentinel2DataArrayAttrs(BaseDataArrayAttrs):
     long_name: str
     standard_name: CFStandardName | str | None = None
     units: str = "1"
-    model_config = {"extra": "allow"}
 
 
 class Sentinel2RootAttrs(BaseModel):
     """Root-level attributes for Sentinel-2 DataTree."""
 
-    Conventions: str | None = Field(default=None)
-    title: str | None = Field(default=None)
-    institution: str | None = Field(default=None)
-    source: str | None = Field(default=None)
-    history: str | None = Field(default=None)
-    model_config = {"extra": "allow"}
+    other_metadata: dict[str, object]  # no validation
+    stac_discovery: dict[str, object]  # no validation
 
 
 class Sentinel2DataArray(ArraySpec[Sentinel2DataArrayAttrs]):
     """Sentinel-2 data array integrated with pydantic-zarr."""
 
-    @classmethod
-    def from_band(
-        cls,
-        band_name: BandName,
-        data: np.ndarray,
-        crs_name: str = "crs",
-    ) -> Sentinel2DataArray:
-        """Create a Sentinel-2 band array from numpy data."""
-        band_info = Sentinel2BandInfo.from_band_name(band_name)
-
-        attrs = Sentinel2DataArrayAttrs(
-            long_name=band_info.long_name,
-            standard_name=band_info.standard_name,
-            units=band_info.units,
-            grid_mapping=crs_name,
-        )
-
-        return cls.from_array(data, attributes=attrs)
-
-    @classmethod
-    def from_zarr(cls, zarr_array: Any) -> Self:
-        """Load from zarr array and convert dict attributes to Pydantic model."""
-        # Call parent from_zarr to load the array
-        result = super().from_zarr(zarr_array)
-
-        # Convert dict attributes to Sentinel2DataArrayAttrs if needed
-        if isinstance(result.attributes, dict):
-            attrs = Sentinel2DataArrayAttrs(**result.attributes)
-            result = result.model_copy(update={"attributes": attrs})
-
-        return result
+    ...
 
 
 class Sentinel2CoordinateArray(ArraySpec[Sentinel2DataArrayAttrs]):
     """Coordinate array for Sentinel-2 data."""
 
-    @classmethod
-    def create_x_coordinate(
-        cls,
-        values: np.ndarray,
-        units: str = "m",
-    ) -> Sentinel2CoordinateArray:
-        """Create X coordinate array."""
-        attrs = Sentinel2DataArrayAttrs(
-            long_name="x coordinate of projection",
-            standard_name="projection_x_coordinate",
-            units=units,
-        )
-        return cls.from_array(values, attributes=attrs)
-
-    @classmethod
-    def create_y_coordinate(
-        cls,
-        values: np.ndarray,
-        units: str = "m",
-    ) -> Sentinel2CoordinateArray:
-        """Create Y coordinate array."""
-        attrs = Sentinel2DataArrayAttrs(
-            long_name="y coordinate of projection",
-            standard_name="projection_y_coordinate",
-            units=units,
-        )
-        return cls.from_array(values, attributes=attrs)
-
-    @classmethod
-    def create_time_coordinate(
-        cls,
-        values: np.ndarray,
-    ) -> Sentinel2CoordinateArray:
-        """Create time coordinate array."""
-        attrs = Sentinel2DataArrayAttrs(
-            long_name="time",
-            standard_name="time",
-            units="seconds since 1970-01-01",
-        )
-        return cls.from_array(values, attributes=attrs)
-
-    @classmethod
-    def from_zarr(cls, zarr_array: Any) -> Self:
-        """Load from zarr array and convert dict attributes to Pydantic model."""
-        # Call parent from_zarr to load the array
-        result = super().from_zarr(zarr_array)
-
-        # Convert dict attributes to Sentinel2DataArrayAttrs if needed
-        if isinstance(result.attributes, dict):
-            attrs = Sentinel2DataArrayAttrs(**result.attributes)
-            result = result.model_copy(update={"attributes": attrs})
-
-        return result
+    ...
 
 
 # TypedDict definitions for members structure
@@ -466,30 +509,11 @@ class Sentinel2ResolutionMembers(TypedDict, closed=True, total=False):  # type: 
 class Sentinel2ResolutionDataset(GroupSpec[DatasetAttrs, Sentinel2ResolutionMembers]):  # type: ignore[type-var]
     """A single resolution dataset within reflectance (r10m, r20m, r60m)."""
 
-    resolution_level: ResolutionLevel = Field(default="r10m")
-
-    def get_coordinates(self) -> dict[str, ArraySpec[Any]] | None:
-        """Get coordinate arrays (x, y, time)."""
-        coords = {}
-        for name in ["x", "y", "time"]:
-            if name in self.members:
-                coords[name] = self.members[name]  # type: ignore[literal-required]
-        return coords if coords else None
-
-    def get_bands(self) -> dict[str, ArraySpec[Any]]:
-        """Get all band arrays."""
-        bands = {}
-        for band in ALL_BAND_NAMES:
-            if band in self.members:
-                bands[band] = self.members[band]  # type: ignore[literal-required]
-        return bands
-
 
 class Sentinel2ReflectanceMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for reflectance group.
 
     Closed TypedDict - only r10m, r20m, r60m keys are allowed.
-    All fields are optional since not all resolutions are always present.
     """
 
     r10m: Sentinel2ResolutionDataset
@@ -499,16 +523,6 @@ class Sentinel2ReflectanceMembers(TypedDict, closed=True, total=False):  # type:
 
 class Sentinel2ReflectanceGroup(GroupSpec[DatasetAttrs, Sentinel2ReflectanceMembers]):  # type: ignore[type-var]
     """Reflectance data organized by resolution."""
-
-    def get_resolution_dataset(
-        self, resolution: ResolutionLevel
-    ) -> Sentinel2ResolutionDataset | None:
-        """Get a resolution dataset by name."""
-        return self.members.get(resolution)  # type: ignore[return-value]
-
-    def list_resolutions(self) -> list[str]:
-        """List available resolutions."""
-        return [k for k in self.members.keys() if k.startswith("r")]
 
 
 class Sentinel2MeasurementsMembers(TypedDict, closed=True):  # type: ignore[call-arg]
@@ -546,8 +560,8 @@ class Sentinel2AtmosphereResolutionMembers(TypedDict, closed=True, total=False):
 
 
 class Sentinel2AtmosphereResolutionDataset(
-    GroupSpec[DatasetAttrs, Sentinel2AtmosphereResolutionMembers]
-):  # type: ignore[type-var]
+    GroupSpec[DatasetAttrs, Sentinel2AtmosphereResolutionMembers]  # type: ignore[type-var]
+):
     """Atmosphere data at a single resolution."""
 
     pass
@@ -567,19 +581,21 @@ class Sentinel2AtmosphereDataset(GroupSpec[DatasetAttrs, Sentinel2AtmosphereMemb
     pass
 
 
-class Sentinel2ProbabilityDataset(GroupSpec[DatasetAttrs, AnyMembers]):
+class Sentinel2ProbabilityDataset(
+    GroupSpec[DatasetAttrs, ProbabilityResolutionMembers]  # type: ignore[type-var]
+):
     """Probability data (cloud, snow) at multiple resolutions."""
 
     pass
 
 
-class Sentinel2QuicklookDataset(GroupSpec[DatasetAttrs, AnyMembers]):
+class Sentinel2QuicklookDataset(GroupSpec[DatasetAttrs, QuicklookResolutionMembers]):  # type: ignore[type-var]
     """True Color Image (TCI) quicklook data at multiple resolutions."""
 
     pass
 
 
-class Sentinel2MaskDataset(GroupSpec[DatasetAttrs, AnyMembers]):
+class Sentinel2MaskDataset(GroupSpec[DatasetAttrs, ConditionsMaskMembers]):  # type: ignore[type-var]
     """Mask data containing classification and detector footprints."""
 
     pass
@@ -600,37 +616,37 @@ class Sentinel2QualityMembers(TypedDict, closed=True):  # type: ignore[call-arg]
 class Sentinel2QualityGroup(GroupSpec[DatasetAttrs, Sentinel2QualityMembers]):  # type: ignore[type-var]
     """Quality group containing atmosphere, probability, classification, and quicklook data."""
 
-    def get_atmosphere_data(self) -> Sentinel2AtmosphereDataset | None:
+    def atmosphere(self) -> Sentinel2AtmosphereDataset | None:
         """Get atmosphere subgroup."""
         return self.members.get("atmosphere")
 
-    def get_probability_data(self) -> Sentinel2ProbabilityDataset | None:
+    def probability(self) -> Sentinel2ProbabilityDataset | None:
         """Get probability subgroup."""
         return self.members.get("probability")
 
-    def get_quicklook_data(self) -> Sentinel2QuicklookDataset | None:
+    def quicklook(self) -> Sentinel2QuicklookDataset | None:
         """Get L2A quicklook subgroup."""
         return self.members.get("l2a_quicklook")
 
-    def get_mask_data(self) -> Sentinel2MaskDataset | None:
+    def mask(self) -> Sentinel2MaskDataset | None:
         """Get mask subgroup."""
         return self.members.get("mask")
 
 
 # Conditions groups
-class Sentinel2GeometryGroup(GroupSpec[DatasetAttrs, AnyMembers]):
+class Sentinel2GeometryGroup(GroupSpec[DatasetAttrs, GeometryMembers]):  # type: ignore[type-var]
     """Geometry group containing sun and viewing angles."""
 
     pass
 
 
-class Sentinel2MeteorologyGroup(GroupSpec[DatasetAttrs, AnyMembers]):
+class Sentinel2MeteorologyGroup(GroupSpec[DatasetAttrs, MeteorologyMembers]):  # type: ignore[type-var]
     """Meteorology group containing CAMS and ECMWF atmospheric data."""
 
     pass
 
 
-class Sentinel2ConditionsMaskGroup(GroupSpec[DatasetAttrs, AnyMembers]):
+class Sentinel2ConditionsMaskGroup(GroupSpec[DatasetAttrs, ConditionsMaskMembers]):  # type: ignore[type-var]
     """Mask subgroup in conditions."""
 
     pass
@@ -650,15 +666,15 @@ class Sentinel2ConditionsMembers(TypedDict, closed=True):  # type: ignore[call-a
 class Sentinel2ConditionsGroup(GroupSpec[DatasetAttrs, Sentinel2ConditionsMembers]):  # type: ignore[type-var]
     """Conditions group containing geometry and meteorology data."""
 
-    def get_geometry_data(self) -> Sentinel2GeometryGroup | None:
+    def geometry(self) -> Sentinel2GeometryGroup | None:
         """Get geometry subgroup."""
         return self.members.get("geometry")
 
-    def get_mask_data(self) -> Sentinel2ConditionsMaskGroup | None:
+    def mask(self) -> Sentinel2ConditionsMaskGroup | None:
         """Get mask subgroup."""
         return self.members.get("mask")
 
-    def get_meteorology_data(self) -> Sentinel2MeteorologyGroup | None:
+    def meteorology(self) -> Sentinel2MeteorologyGroup | None:
         """Get meteorology subgroup."""
         return self.members.get("meteorology")
 
@@ -722,7 +738,3 @@ class Sentinel2Root(GroupSpec[Sentinel2RootAttrs, Sentinel2RootMembers]):  # typ
     def conditions(self) -> Sentinel2ConditionsGroup:
         """Get conditions group."""
         return self.members["conditions"]
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert model to dictionary representation."""
-        return self.model_dump(exclude_none=True)

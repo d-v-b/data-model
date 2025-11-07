@@ -39,9 +39,9 @@ TMembers = TypeVar("TMembers", bound=TBaseMember)
 TArraySpecType = TypeVar("TArraySpecType")
 
 
-class GroupSpec(GroupSpecV2[TAttr, TMembers]):  # type: ignore[type-var]
+class GroupSpec(GroupSpecV2[TAttr, TMembers]):
     attributes: TAttr
-    members: TMembers  # type: ignore[assignment]
+    members: TMembers
 
     def __repr__(self) -> str:
         """Return a condensed text representation of the GroupSpec."""
@@ -62,7 +62,7 @@ class GroupSpec(GroupSpecV2[TAttr, TMembers]):  # type: ignore[type-var]
         )
 
 
-class ArraySpec(ArraySpecV2[Any], Generic[TArraySpecType]):  # type: ignore[type-var]
+class ArraySpec(ArraySpecV2[Any], Generic[TArraySpecType]):
     """Zarr V2 ArraySpec with enhanced HTML representation for Jupyter/IPython."""
 
     def _repr_html_(self) -> str:

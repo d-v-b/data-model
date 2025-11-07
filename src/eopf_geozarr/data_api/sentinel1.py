@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Self, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 from typing_extensions import TypedDict
 
 from eopf_geozarr.data_api.geozarr.common import (
@@ -29,18 +29,13 @@ class Sentinel1DataArrayAttrs(BaseDataArrayAttrs):
     long_name: str
     standard_name: CFStandardName | str | None = None
     units: str = "1"
-    model_config = {"extra": "allow"}
 
 
 class Sentinel1RootAttrs(BaseModel):
     """Root-level attributes for Sentinel-1 DataTree."""
 
-    Conventions: str | None = Field(default=None)
-    title: str | None = Field(default=None)
-    institution: str | None = Field(default=None)
-    source: str | None = Field(default=None)
-    history: str | None = Field(default=None)
-    model_config = {"extra": "allow"}
+    other_metadata: dict[str, object]
+    stac_discovery: dict[str, object]
 
 
 class Sentinel1DataArray(ArraySpec[Sentinel1DataArrayAttrs]):
@@ -64,8 +59,8 @@ class Sentinel1AntennaPatternMembers(TypedDict, closed=True, total=False):  # ty
 
 
 class Sentinel1AntennaPatternGroup(
-    GroupSpec[DatasetAttrs, Sentinel1AntennaPatternMembers]
-):  # type: ignore[type-var]
+    GroupSpec[DatasetAttrs, Sentinel1AntennaPatternMembers]  # type: ignore[type-var]
+):
     """Antenna pattern group containing antenna characteristics."""
 
     @property
@@ -193,8 +188,8 @@ class Sentinel1AzimuthFmRateMembers(TypedDict, closed=True, total=False):  # typ
 
 
 class Sentinel1AzimuthFmRateGroup(
-    GroupSpec[DatasetAttrs, Sentinel1AzimuthFmRateMembers]
-):  # type: ignore[type-var]
+    GroupSpec[DatasetAttrs, Sentinel1AzimuthFmRateMembers]  # type: ignore[type-var]
+):
     """Azimuth FM rate group."""
 
     @property
@@ -225,8 +220,8 @@ class Sentinel1CoordinateConversionMembers(TypedDict, closed=True, total=False):
 
 
 class Sentinel1CoordinateConversionGroup(
-    GroupSpec[DatasetAttrs, Sentinel1CoordinateConversionMembers]
-):  # type: ignore[type-var]
+    GroupSpec[DatasetAttrs, Sentinel1CoordinateConversionMembers]  # type: ignore[type-var]
+):
     """Coordinate conversion group."""
 
     @property
@@ -275,8 +270,8 @@ class Sentinel1DopplerCentroidMembers(TypedDict, closed=True, total=False):  # t
 
 
 class Sentinel1DopplerCentroidGroup(
-    GroupSpec[DatasetAttrs, Sentinel1DopplerCentroidMembers]
-):  # type: ignore[type-var]
+    GroupSpec[DatasetAttrs, Sentinel1DopplerCentroidMembers]  # type: ignore[type-var]
+):
     """Doppler centroid group."""
 
     @property
@@ -446,8 +441,8 @@ class Sentinel1ReferenceReplicaMembers(TypedDict, closed=True, total=False):  # 
 
 
 class Sentinel1ReferenceReplicaGroup(
-    GroupSpec[DatasetAttrs, Sentinel1ReferenceReplicaMembers]
-):  # type: ignore[type-var]
+    GroupSpec[DatasetAttrs, Sentinel1ReferenceReplicaMembers]  # type: ignore[type-var]
+):
     """Reference replica group."""
 
     @property
@@ -553,8 +548,8 @@ class Sentinel1TerrainHeightMembers(TypedDict, closed=True, total=False):  # typ
 
 
 class Sentinel1TerrainHeightGroup(
-    GroupSpec[DatasetAttrs, Sentinel1TerrainHeightMembers]
-):  # type: ignore[type-var]
+    GroupSpec[DatasetAttrs, Sentinel1TerrainHeightMembers]  # type: ignore[type-var]
+):
     """Terrain height group."""
 
     @property
@@ -961,7 +956,3 @@ class Sentinel1Root(GroupSpec[Sentinel1RootAttrs, AnyMembers]):
                 if isinstance(member, Sentinel1PolarizationGroup):
                     return member
         return None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert model to dictionary representation."""
-        return self.model_dump(exclude_none=True)
