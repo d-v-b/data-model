@@ -54,7 +54,9 @@ def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Any | None:
         from dask.distributed import Client
 
         # Set up local cluster with high memory limits
-        client = Client(n_workers=3, memory_limit="8GB")  # set up local cluster with 3 workers and 8GB memory each
+        client = Client(
+            n_workers=3, memory_limit="8GB"
+        )  # set up local cluster with 3 workers and 8GB memory each
         # client = Client()  # set up local cluster
 
         if verbose:
@@ -1170,7 +1172,7 @@ def add_s2_optimization_commands(subparsers):
         "--spatial-chunk",
         type=int,
         default=256,
-        help='Spatial chunk size (default: 256)'
+        help="Spatial chunk size (default: 256)",
     )
     s2_parser.add_argument(
         "--enable-sharding", action="store_true", help="Enable Zarr v3 sharding"
@@ -1223,7 +1225,7 @@ def convert_s2_optimized_command(args):
         )
 
         # Convert
-        dt_optimized = convert_s2_optimized(
+        convert_s2_optimized(
             dt_input=dt_input,
             output_path=args.output_path,
             enable_sharding=args.enable_sharding,

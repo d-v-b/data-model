@@ -1,7 +1,8 @@
 from collections.abc import Mapping
-from pydantic import BaseModel
-from typing import TypeAlias, Any
 from html import escape
+from typing import Any, TypeAlias
+
+from pydantic import BaseModel
 
 TBaseAttr: TypeAlias = Mapping[str, object] | BaseModel
 
@@ -15,7 +16,9 @@ def get_member_names(members: Any) -> list[str]:
     return []
 
 
-def format_text_repr(class_name: str, member_names: list[str], max_members: int = 5) -> str:
+def format_text_repr(
+    class_name: str, member_names: list[str], max_members: int = 5
+) -> str:
     """Format a condensed text representation of a GroupSpec.
 
     Args:
@@ -41,14 +44,14 @@ def format_text_repr(class_name: str, member_names: list[str], max_members: int 
 def _get_array_info(arr: Any) -> str:
     """Get concise info about an array or ArraySpec."""
     # ArraySpec objects (from pydantic-zarr) have shape and either dtype or data_type
-    if hasattr(arr, 'shape'):
+    if hasattr(arr, "shape"):
         shape_tuple = str(arr.shape)  # e.g., "(100, 200)"
 
         # Try to get dtype first (V2 or real arrays)
-        dtype = getattr(arr, 'dtype', None)
+        dtype = getattr(arr, "dtype", None)
         if dtype is None:
             # Try data_type (V3 ArraySpec)
-            dtype = getattr(arr, 'data_type', None)
+            dtype = getattr(arr, "data_type", None)
 
         if dtype is None:
             return f"Array{shape_tuple}"
@@ -62,7 +65,7 @@ def _format_array_html(arr: Any) -> str:
 
     Shows all array properties in key-value format with attributes as an expandable section.
     """
-    if not hasattr(arr, 'shape'):
+    if not hasattr(arr, "shape"):
         return f"<div><i>{type(arr).__name__}</i></div>"
 
     class_name = type(arr).__name__
@@ -76,8 +79,16 @@ def _format_array_html(arr: Any) -> str:
 
     # Define the order of properties to display (most important first)
     property_names = [
-        'zarr_format', 'shape', 'dtype', 'data_type', 'chunks', 'order',
-        'dimension_separator', 'fill_value', 'compressor', 'filters'
+        "zarr_format",
+        "shape",
+        "dtype",
+        "data_type",
+        "chunks",
+        "order",
+        "dimension_separator",
+        "fill_value",
+        "compressor",
+        "filters",
     ]
 
     for prop_name in property_names:
@@ -88,16 +99,16 @@ def _format_array_html(arr: Any) -> str:
             continue
 
         # Handle dtype specially - may come from dtype or data_type
-        if prop_name == 'dtype':
+        if prop_name == "dtype":
             if value is None:
-                value = getattr(arr, 'data_type', None)
+                value = getattr(arr, "data_type", None)
             if value is None:
                 continue
             dtype_str = str(value).strip()
-            value_str = dtype_str if dtype_str else '(not set)'
+            value_str = dtype_str if dtype_str else "(not set)"
         # Skip data_type if we already handled it via dtype
-        elif prop_name == 'data_type':
-            if getattr(arr, 'dtype', None) is not None:
+        elif prop_name == "data_type":
+            if getattr(arr, "dtype", None) is not None:
                 continue
             if value is None:
                 continue
@@ -105,25 +116,27 @@ def _format_array_html(arr: Any) -> str:
             if not value_str:
                 continue
         # Skip empty/None filters and compressor
-        elif prop_name in ('filters', 'compressor'):
+        elif prop_name in ("filters", "compressor"):
             if value is None:
                 continue
             value_str = str(value)
         else:
             # For all other properties, show them
-            value_str = repr(value) if prop_name == 'fill_value' else str(value)
+            value_str = repr(value) if prop_name == "fill_value" else str(value)
 
-        if 'value_str' in locals():
+        if "value_str" in locals():
             metadata[prop_name] = value_str
             del value_str
 
     # Display metadata in key-value format
     for key, value in metadata.items():
         escaped_value = escape(str(value))
-        html_parts.append(f"<div>• {key}: <code style='background: none; padding: 0;'>{escaped_value}</code></div>")
+        html_parts.append(
+            f"<div>• {key}: <code style='background: none; padding: 0;'>{escaped_value}</code></div>"
+        )
 
     # Get attributes if available
-    attributes = getattr(arr, 'attributes', None)
+    attributes = getattr(arr, "attributes", None)
 
     # Show attributes if present and non-empty
     # Handle both dict and Pydantic BaseModel
@@ -167,12 +180,16 @@ def _format_array_html(arr: Any) -> str:
                     html_parts.append("</details>")
                 else:
                     value_repr = escape(repr(value))
-                    html_parts.append(f"<div>• {key}: <code style='background: none; padding: 0;'>{value_repr}</code></div>")
+                    html_parts.append(
+                        f"<div>• {key}: <code style='background: none; padding: 0;'>{value_repr}</code></div>"
+                    )
 
-            html_parts.extend([
-                "</div>",
-                "</details>",
-            ])
+            html_parts.extend(
+                [
+                    "</div>",
+                    "</details>",
+                ]
+            )
 
     html_parts.append("</div>")
 
@@ -186,7 +203,11 @@ def _get_attributes_repr(attributes: Any) -> str:
 
     if isinstance(attributes, BaseModel):
         # For Pydantic models, show the model dump
-        fields = attributes.model_fields_set if hasattr(attributes, 'model_fields_set') else set()
+        fields = (
+            attributes.model_fields_set
+            if hasattr(attributes, "model_fields_set")
+            else set()
+        )
         if fields:
             return f"{type(attributes).__name__}({', '.join(sorted(fields))})"
         else:
@@ -251,7 +272,9 @@ def _render_list_html(lst: list[Any]) -> str:
             html_parts.append("</details>")
         else:
             item_repr = escape(repr(item))
-            html_parts.append(f"<div>• [{i}]: <code style='background: none; padding: 0;'>{item_repr}</code></div>")
+            html_parts.append(
+                f"<div>• [{i}]: <code style='background: none; padding: 0;'>{item_repr}</code></div>"
+            )
 
     if len(lst) > 15:
         remaining = len(lst) - 15
@@ -291,7 +314,9 @@ def _render_dict_html(d: dict[str, Any], indent: int = 0) -> str:
             html_parts.append("</details>")
         else:
             value_repr = escape(repr(value))
-            html_parts.append(f"<div>• {key}: <code style='background: none; padding: 0;'>{value_repr}</code></div>")
+            html_parts.append(
+                f"<div>• {key}: <code style='background: none; padding: 0;'>{value_repr}</code></div>"
+            )
 
     if len(d) > 15:
         remaining = len(d) - 15
@@ -324,7 +349,7 @@ def format_html_repr(
 
     html_parts = [
         f"<div style='font-family: monospace; margin: 5px 0; margin-left: {indent}px;'>",
-        f"<details open>",
+        "<details open>",
         f"<summary style='cursor: pointer; font-weight: bold; user-select: none;'>{class_name}</summary>",
         "<div style='margin-left: 20px; margin-top: 8px;'>",
     ]
@@ -334,7 +359,9 @@ def format_html_repr(
         attrs_repr = _get_attributes_repr(attributes)
         html_parts.append(
             "<details style='margin-bottom: 10px;'>"
-            "<summary style='cursor: pointer; font-style: italic;'>attributes: " + attrs_repr + "</summary>"
+            "<summary style='cursor: pointer; font-style: italic;'>attributes: "
+            + attrs_repr
+            + "</summary>"
             "<div style='margin-left: 20px; margin-top: 5px;'>"
         )
 
@@ -343,7 +370,9 @@ def format_html_repr(
             for attr_name in attrs_list:
                 attr_value = attributes[attr_name]
                 value_repr = escape(_format_value_repr(attr_value))
-                html_parts.append(f"<div>• {attr_name}: <code style='background: none; padding: 0;'>{value_repr}</code></div>")
+                html_parts.append(
+                    f"<div>• {attr_name}: <code style='background: none; padding: 0;'>{value_repr}</code></div>"
+                )
             if len(attributes) > 10:
                 remaining = len(attributes) - 10
                 html_parts.append(f"<div><i>+{remaining} more attributes</i></div>")
@@ -372,17 +401,21 @@ def format_html_repr(
                     html_parts.append("</details>")
                 else:
                     value_repr = escape(_format_value_repr(field_value))
-                    html_parts.append(f"<div>• {field_name}: <code style='background: none; padding: 0;'>{value_repr}</code></div>")
+                    html_parts.append(
+                        f"<div>• {field_name}: <code style='background: none; padding: 0;'>{value_repr}</code></div>"
+                    )
             if len(attrs_dict) > 10:
                 remaining = len(attrs_dict) - 10
                 html_parts.append(f"<div><i>+{remaining} more fields</i></div>")
         else:
             html_parts.append(f"<div>{type(attributes).__name__}</div>")
 
-        html_parts.extend([
-            "</div>",
-            "</details>",
-        ])
+        html_parts.extend(
+            [
+                "</div>",
+                "</details>",
+            ]
+        )
 
     # Show members section
     if not member_names:
@@ -400,37 +433,51 @@ def format_html_repr(
                 member_obj = members_dict[member_name]
 
             # Check if member is a GroupSpec (has _repr_html_ method)
-            if member_obj is not None and hasattr(member_obj, '_repr_html_'):
+            if member_obj is not None and hasattr(member_obj, "_repr_html_"):
                 # Recursively render nested group
-                html_parts.append(f"<div style='margin: 8px 0;'><b>{member_name}</b>:</div>")
+                html_parts.append(
+                    f"<div style='margin: 8px 0;'><b>{member_name}</b>:</div>"
+                )
                 # Add indented nested repr
                 nested_html = member_obj._repr_html_()
                 # Wrap nested content with proper indentation
-                html_parts.append(f"<div style='margin-left: 20px;'>{nested_html}</div>")
+                html_parts.append(
+                    f"<div style='margin-left: 20px;'>{nested_html}</div>"
+                )
             else:
                 # Render as simple item - arrays get detailed html, others get simple text
                 if member_obj is not None:
-                    if hasattr(member_obj, 'shape'):
+                    if hasattr(member_obj, "shape"):
                         # It's an array or ArraySpec - use detailed HTML repr
-                        html_parts.append(f"<div style='margin: 5px 0;'><b>{member_name}</b>:</div>")
+                        html_parts.append(
+                            f"<div style='margin: 5px 0;'><b>{member_name}</b>:</div>"
+                        )
                         array_html = _format_array_html(member_obj)
-                        html_parts.append(f"<div style='margin-left: 20px;'>{array_html}</div>")
+                        html_parts.append(
+                            f"<div style='margin-left: 20px;'>{array_html}</div>"
+                        )
                     else:
                         # Unknown object - show type name
                         member_info = _get_array_info(member_obj)
-                        html_parts.append(f"<div>• {member_name}: <i>{member_info}</i></div>")
+                        html_parts.append(
+                            f"<div>• {member_name}: <i>{member_info}</i></div>"
+                        )
                 else:
                     html_parts.append(f"<div>• {member_name}: <i>Unknown</i></div>")
 
-        html_parts.extend([
+        html_parts.extend(
+            [
+                "</div>",
+                "</details>",
+            ]
+        )
+
+    html_parts.extend(
+        [
             "</div>",
             "</details>",
-        ])
-
-    html_parts.extend([
-        "</div>",
-        "</details>",
-        "</div>",
-    ])
+            "</div>",
+        ]
+    )
 
     return "".join(html_parts)

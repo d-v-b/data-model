@@ -12,7 +12,6 @@ Note: All tests use MemoryStore() for fast in-memory storage.
 
 import numpy as np
 import pytest
-from tests.test_data_api.conftest import SENTINEL2_EXAMPLES
 from zarr.storage import MemoryStore
 
 from eopf_geozarr.data_api.geozarr.common import DatasetAttrs
@@ -27,6 +26,7 @@ from eopf_geozarr.data_api.sentinel2 import (
     Sentinel2ResolutionDataset,
     Sentinel2Root,
 )
+from tests.test_data_api.conftest import SENTINEL2_EXAMPLES
 
 
 class TestSentinel2DataArrayZarr:
@@ -137,7 +137,9 @@ class TestSentinel2ResolutionDataset:
         assert coords is not None
         assert "x" in coords or "y" in coords or "time" in coords
 
-    def test_get_bands(self, sample_resolution_dataset: Sentinel2ResolutionDataset) -> None:
+    def test_get_bands(
+        self, sample_resolution_dataset: Sentinel2ResolutionDataset
+    ) -> None:
         """Test accessing band arrays."""
         bands = sample_resolution_dataset.get_bands()
         assert "b02" in bands

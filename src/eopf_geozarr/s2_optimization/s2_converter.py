@@ -6,20 +6,14 @@ import time
 from typing import Dict
 
 import xarray as xr
-from zarr import consolidate_metadata
 
-from eopf_geozarr.conversion import fs_utils
 from eopf_geozarr.conversion.fs_utils import get_storage_options
-from eopf_geozarr.conversion.geozarr import (
-    _create_tile_matrix_limits,
-    create_native_crs_tile_matrix_set,
-)
 
 from .s2_multiscale import S2MultiscalePyramid
 from .s2_validation import S2OptimizationValidator
 
 try:
-    import distributed
+    import distributed # noqa: F401
 
     DISTRIBUTED_AVAILABLE = True
 except ImportError:
@@ -81,14 +75,14 @@ class S2OptimizedConverter:
 
         # Step 1: Process data while preserving original structure
         print("Step 1: Processing data with original structure preserved...")
-        
+
         # Step 2: Create multiscale pyramids for each group in the original structure
         print("Step 2: Creating multiscale pyramids (preserving original hierarchy)...")
         datasets = self.pyramid_creator.create_multiscale_from_datatree(
             dt_input, output_path, verbose
         )
         print(f"  Created multiscale pyramids for {len(datasets)} groups")
-        
+
         # Step 3: Root-level consolidation
         print("Step 3: Final root-level metadata consolidation...")
         self._simple_root_consolidation(output_path, datasets)
@@ -134,14 +128,13 @@ class S2OptimizedConverter:
         )
         return found_indicators >= 2
 
-
     def _simple_root_consolidation(
         self, output_path: str, datasets: Dict[str, Dict]
     ) -> None:
         """Simple root-level metadata consolidation with proper zarr group creation."""
         try:
             print("  Performing root consolidation...")
-            
+
             # create missing intermediary groups (/conditions, /quality, etc.)
             # using the keys of the datasets dict
             missing_groups = set()
@@ -152,7 +145,7 @@ class S2OptimizedConverter:
                     parent_path = "/" + "/".join(parts[:i])
                     if parent_path not in datasets:
                         missing_groups.add(parent_path)
-                        
+
             for group_path in missing_groups:
                 dt_parent = xr.DataTree()
                 dt_parent.to_zarr(
@@ -185,7 +178,7 @@ class S2OptimizedConverter:
                 print("  ✅ Root consolidation completed")
             except Exception as e:
                 print(f"  ⚠️ Warning: Metadata consolidation failed: {e}")
-             
+
         except Exception as e:
             print(f"  ⚠️ Warning: Root consolidation failed: {e}")
 
@@ -227,7 +220,9 @@ class S2OptimizedConverter:
         )
 
         # Show structure
-        print("\nNew structure: (original hierarchy preserved with multiscale pyramids)")
+        print(
+            "\nNew structure: (original hierarchy preserved with multiscale pyramids)"
+        )
         for group in dt_output.groups:
             if group != ".":
                 print(f"  {group}")

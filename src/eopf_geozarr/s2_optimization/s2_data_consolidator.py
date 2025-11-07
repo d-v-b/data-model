@@ -10,8 +10,8 @@ class S2DataConsolidator:
 
     def __init__(self, dt_input: xr.DataTree):
         self.dt_input = dt_input
-        self.measurements_data: dict[str, object] = {}
-        self.geometry_data: dict[str, object]  = {}
+        self.measurements_data: dict[str | int, object] = {}
+        self.geometry_data: dict[str, object] = {}
         self.meteorology_data: dict[str, object] = {}
 
     def consolidate_all_data(self) -> tuple[dict, dict, dict]:

@@ -3,12 +3,13 @@ Pydantic-zarr integrated models for Sentinel-1 EOPF Zarr data structure.
 
 Uses the new pyz.GroupSpec with TypedDict members to enforce strict structure validation.
 """
+
 from __future__ import annotations
 
 from typing import Any, Mapping, Self, Union
-from typing_extensions import TypedDict
 
 from pydantic import BaseModel, Field, model_validator
+from typing_extensions import TypedDict
 
 from eopf_geozarr.data_api.geozarr.common import (
     BaseDataArrayAttrs,
@@ -62,7 +63,9 @@ class Sentinel1AntennaPatternMembers(TypedDict, closed=True, total=False):  # ty
     terrain_height: ArraySpec[Any]
 
 
-class Sentinel1AntennaPatternGroup(GroupSpec[DatasetAttrs, Sentinel1AntennaPatternMembers]):  # type: ignore[type-var]
+class Sentinel1AntennaPatternGroup(
+    GroupSpec[DatasetAttrs, Sentinel1AntennaPatternMembers]
+):  # type: ignore[type-var]
     """Antenna pattern group containing antenna characteristics."""
 
     @property
@@ -189,7 +192,9 @@ class Sentinel1AzimuthFmRateMembers(TypedDict, closed=True, total=False):  # typ
     t0: ArraySpec[Any]
 
 
-class Sentinel1AzimuthFmRateGroup(GroupSpec[DatasetAttrs, Sentinel1AzimuthFmRateMembers]):  # type: ignore[type-var]
+class Sentinel1AzimuthFmRateGroup(
+    GroupSpec[DatasetAttrs, Sentinel1AzimuthFmRateMembers]
+):  # type: ignore[type-var]
     """Azimuth FM rate group."""
 
     @property
@@ -219,7 +224,9 @@ class Sentinel1CoordinateConversionMembers(TypedDict, closed=True, total=False):
     srgr_coefficients: ArraySpec[Any]
 
 
-class Sentinel1CoordinateConversionGroup(GroupSpec[DatasetAttrs, Sentinel1CoordinateConversionMembers]):  # type: ignore[type-var]
+class Sentinel1CoordinateConversionGroup(
+    GroupSpec[DatasetAttrs, Sentinel1CoordinateConversionMembers]
+):  # type: ignore[type-var]
     """Coordinate conversion group."""
 
     @property
@@ -267,7 +274,9 @@ class Sentinel1DopplerCentroidMembers(TypedDict, closed=True, total=False):  # t
     t0: ArraySpec[Any]
 
 
-class Sentinel1DopplerCentroidGroup(GroupSpec[DatasetAttrs, Sentinel1DopplerCentroidMembers]):  # type: ignore[type-var]
+class Sentinel1DopplerCentroidGroup(
+    GroupSpec[DatasetAttrs, Sentinel1DopplerCentroidMembers]
+):  # type: ignore[type-var]
     """Doppler centroid group."""
 
     @property
@@ -391,7 +400,6 @@ class Sentinel1GcpGroup(GroupSpec[DatasetAttrs, Sentinel1GcpMembers]):  # type: 
         return self.members["slant_range_time_gcp"]
 
 
-
 class Sentinel1OrbitMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for orbit group."""
 
@@ -425,7 +433,6 @@ class Sentinel1OrbitGroup(GroupSpec[DatasetAttrs, Sentinel1OrbitMembers]):  # ty
         return self.members["velocity"]
 
 
-
 class Sentinel1ReferenceReplicaMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for reference_replica group.
 
@@ -438,7 +445,9 @@ class Sentinel1ReferenceReplicaMembers(TypedDict, closed=True, total=False):  # 
     reference_replica_phase_coefficients: ArraySpec[Any]
 
 
-class Sentinel1ReferenceReplicaGroup(GroupSpec[DatasetAttrs, Sentinel1ReferenceReplicaMembers]):  # type: ignore[type-var]
+class Sentinel1ReferenceReplicaGroup(
+    GroupSpec[DatasetAttrs, Sentinel1ReferenceReplicaMembers]
+):  # type: ignore[type-var]
     """Reference replica group."""
 
     @property
@@ -455,7 +464,6 @@ class Sentinel1ReferenceReplicaGroup(GroupSpec[DatasetAttrs, Sentinel1ReferenceR
     def reference_replica_phase_coefficients(self) -> ArraySpec[Any]:
         """Get reference_replica_phase_coefficients array."""
         return self.members["reference_replica_phase_coefficients"]
-
 
 
 class Sentinel1ReplicaMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
@@ -537,7 +545,6 @@ class Sentinel1ReplicaGroup(GroupSpec[DatasetAttrs, Sentinel1ReplicaMembers]):  
         return self.members["relative_pg_product_valid_flag"]
 
 
-
 class Sentinel1TerrainHeightMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for terrain_height group."""
 
@@ -545,7 +552,9 @@ class Sentinel1TerrainHeightMembers(TypedDict, closed=True, total=False):  # typ
     terrain_height: ArraySpec[Any]
 
 
-class Sentinel1TerrainHeightGroup(GroupSpec[DatasetAttrs, Sentinel1TerrainHeightMembers]):  # type: ignore[type-var]
+class Sentinel1TerrainHeightGroup(
+    GroupSpec[DatasetAttrs, Sentinel1TerrainHeightMembers]
+):  # type: ignore[type-var]
     """Terrain height group."""
 
     @property
@@ -557,7 +566,6 @@ class Sentinel1TerrainHeightGroup(GroupSpec[DatasetAttrs, Sentinel1TerrainHeight
     def terrain_height(self) -> ArraySpec[Any]:
         """Get terrain_height array."""
         return self.members["terrain_height"]
-
 
 
 class Sentinel1ConditionsMembers(TypedDict, closed=True):  # type: ignore[call-arg]
@@ -680,7 +688,6 @@ class Sentinel1CalibrationGroup(GroupSpec[DatasetAttrs, Sentinel1CalibrationMemb
         return self.members["sigma_nought"]
 
 
-
 class Sentinel1NoiseMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for noise group."""
 
@@ -706,7 +713,6 @@ class Sentinel1NoiseGroup(GroupSpec[DatasetAttrs, Sentinel1NoiseMembers]):  # ty
     def number_of_noise_lines(self) -> ArraySpec[Any]:
         """Get number_of_noise_lines array."""
         return self.members["number_of_noise_lines"]
-
 
 
 class Sentinel1NoiseAzimuthMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
@@ -760,7 +766,6 @@ class Sentinel1NoiseAzimuthGroup(GroupSpec[DatasetAttrs, Sentinel1NoiseAzimuthMe
         return self.members["swath"]
 
 
-
 class Sentinel1NoiseRangeMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for noise_range group."""
 
@@ -798,7 +803,6 @@ class Sentinel1NoiseRangeGroup(GroupSpec[DatasetAttrs, Sentinel1NoiseRangeMember
     def pixel(self) -> ArraySpec[Any]:
         """Get pixel array."""
         return self.members["pixel"]
-
 
 
 class Sentinel1QualityMembers(TypedDict, closed=True):  # type: ignore[call-arg]
@@ -871,7 +875,6 @@ class Sentinel1MeasurementsGroup(GroupSpec[DatasetAttrs, Sentinel1MeasurementsMe
     def pixel(self) -> ArraySpec[Any]:
         """Get pixel array."""
         return self.members["pixel"]
-
 
 
 # Polarization group
