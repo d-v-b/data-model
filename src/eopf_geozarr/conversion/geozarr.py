@@ -173,6 +173,9 @@ def setup_datatree_metadata_geozarr_spec_compliant(
     """
     geozarr_groups: dict[str, xr.Dataset] = {}
     grid_mapping_var_name = "spatial_ref"
+    epsg_CPM_260 = dt.attrs.get("other_metadata", {}).get("horizontal_CRS_code", None)
+    if epsg_CPM_260 is not None:
+        epsg_CPM_260 = epsg_CPM_260.split(":")[-1]
 
     for key in groups:
         if not dt[key].data_vars:
@@ -214,6 +217,11 @@ def setup_datatree_metadata_geozarr_spec_compliant(
                 epsg = ds[var_name].attrs["proj:epsg"]
                 print(f"    Setting CRS for {var_name} to EPSG:{epsg}")
                 ds = ds.rio.write_crs(f"epsg:{epsg}")
+            elif epsg_CPM_260:
+                print(
+                    f"    Setting CRS for {var_name} to EPSG:{epsg_CPM_260} (CPM 2.6.0 default)"
+                )
+                ds = ds.rio.write_crs(f"epsg:{epsg_CPM_260}")
 
         # Add _ARRAY_DIMENSIONS to coordinate variables
         _add_coordinate_metadata(ds)
