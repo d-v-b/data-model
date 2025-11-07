@@ -304,6 +304,19 @@ class Sentinel2DataArray(ArraySpec[Sentinel2DataArrayAttrs]):
 
         return cls.from_array(data, attributes=attrs)
 
+    @classmethod
+    def from_zarr(cls, zarr_array: Any) -> Self:
+        """Load from zarr array and convert dict attributes to Pydantic model."""
+        # Call parent from_zarr to load the array
+        result = super().from_zarr(zarr_array)
+
+        # Convert dict attributes to Sentinel2DataArrayAttrs if needed
+        if isinstance(result.attributes, dict):
+            attrs = Sentinel2DataArrayAttrs(**result.attributes)
+            result = result.model_copy(update={"attributes": attrs})
+
+        return result
+
 
 class Sentinel2CoordinateArray(ArraySpec[Sentinel2DataArrayAttrs]):
     """Coordinate array for Sentinel-2 data."""
@@ -348,6 +361,19 @@ class Sentinel2CoordinateArray(ArraySpec[Sentinel2DataArrayAttrs]):
             units="seconds since 1970-01-01",
         )
         return cls.from_array(values, attributes=attrs)
+
+    @classmethod
+    def from_zarr(cls, zarr_array: Any) -> Self:
+        """Load from zarr array and convert dict attributes to Pydantic model."""
+        # Call parent from_zarr to load the array
+        result = super().from_zarr(zarr_array)
+
+        # Convert dict attributes to Sentinel2DataArrayAttrs if needed
+        if isinstance(result.attributes, dict):
+            attrs = Sentinel2DataArrayAttrs(**result.attributes)
+            result = result.model_copy(update={"attributes": attrs})
+
+        return result
 
 
 # TypedDict definitions for members structure

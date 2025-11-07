@@ -28,14 +28,14 @@ classifiers = [
 requires-python = ">=3.11"
 dependencies = [
     "pydantic-zarr>=0.8.0",
-    "pydantic>=2.12.0a1",
+    "pydantic>=2.12",
     "zarr>=3.1.1",
     "xarray>=2025.7.1",
     "dask[array,distributed]>=2025.5.1",
     "numpy>=2.3.1",
     "rioxarray>=0.13.0",
     "cf-xarray>=0.8.0",
-    "typing-extensions>=4.0.0",
+    "typing-extensions>=4.15.0",
     "aiohttp>=3.8.1",
     "s3fs>=2024.6.0",
     "boto3>=1.34.0",
