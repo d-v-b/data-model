@@ -2,8 +2,9 @@
 Main S2 optimization converter.
 """
 
+import importlib.util
 import time
-from typing import Dict
+from typing import Any, Dict
 
 import xarray as xr
 
@@ -12,12 +13,7 @@ from eopf_geozarr.conversion.fs_utils import get_storage_options
 from .s2_multiscale import S2MultiscalePyramid
 from .s2_validation import S2OptimizationValidator
 
-try:
-    import distributed # noqa: F401
-
-    DISTRIBUTED_AVAILABLE = True
-except ImportError:
-    DISTRIBUTED_AVAILABLE = False
+DISTRIBUTED_AVAILABLE = importlib.util.find_spec("distributed") is not None
 
 
 class S2OptimizedConverter:
@@ -231,7 +227,7 @@ class S2OptimizedConverter:
 
 
 def convert_s2_optimized(
-    dt_input: xr.DataTree, output_path: str, **kwargs
+    dt_input: xr.DataTree, output_path: str, **kwargs: Any
 ) -> xr.DataTree:
     """
     Convenience function for S2 optimization.
