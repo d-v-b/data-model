@@ -6,9 +6,9 @@ Uses the new pyz.GroupSpec with TypedDict members to enforce strict structure va
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Self, Union
+from typing import Any, Mapping, Union
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 from typing_extensions import TypedDict
 
 from eopf_geozarr.data_api.geozarr.common import (
@@ -904,7 +904,9 @@ class Sentinel1PolarizationGroup(GroupSpec[DatasetAttrs, Sentinel1PolarizationMe
 
 
 # Root model - uses any members since polarizations can have variable names (VH_xxx, VV_xxx)
-class Sentinel1Root(GroupSpec[Sentinel1RootAttrs, AnyMembers]):
+class Sentinel1Root(
+    GroupSpec[Sentinel1RootAttrs, dict[str, Sentinel1PolarizationGroup]]
+):
     """Complete Sentinel-1 EOPF Zarr hierarchy.
 
     The hierarchy follows EOPF organization with separate groups for each
@@ -920,18 +922,6 @@ class Sentinel1Root(GroupSpec[Sentinel1RootAttrs, AnyMembers]):
         ├── measurements/
         └── quality/
     """
-
-    @model_validator(mode="after")
-    def validate_sentinel1_structure(self) -> Self:
-        """Validate overall Sentinel-1 dataset structure."""
-        # Check for at least one polarization group (VH or VV)
-        pol_groups = [k for k in self.members.keys() if "VH" in k or "VV" in k]
-        if not pol_groups:
-            raise ValueError(
-                "Sentinel-1 dataset must contain at least one polarization group (VH or VV)"
-            )
-
-        return self
 
     def get_polarization_groups(self) -> dict[str, Sentinel1PolarizationGroup]:
         """Get all polarization groups (VH, VV, etc.)."""

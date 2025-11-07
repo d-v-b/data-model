@@ -6,9 +6,9 @@ Uses the new pyz.GroupSpec with TypedDict members to enforce strict structure va
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 from eopf_geozarr.data_api.geozarr.common import (
@@ -711,18 +711,6 @@ class Sentinel2Root(GroupSpec[Sentinel2RootAttrs, Sentinel2RootMembers]):  # typ
         ├── mask/
         └── meteorology/
     """
-
-    @model_validator(mode="after")
-    def validate_sentinel2_structure(self) -> Self:
-        """Validate overall Sentinel-2 dataset structure."""
-        # Ensure required groups exist
-        required = {"measurements", "quality", "conditions"}
-        existing = set(self.members.keys())
-        missing = required - existing
-        if missing:
-            raise ValueError(f"Sentinel-2 dataset must contain groups: {missing}")
-
-        return self
 
     @property
     def measurements(self) -> Sentinel2MeasurementsGroup:
