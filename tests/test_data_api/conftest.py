@@ -45,24 +45,51 @@ def _load_projjson_file(filename: str) -> dict[str, Any]:
         return json.load(f)
 
 
-def _load_sentinel1_examples() -> tuple[dict[str, object], ...]:
-    examples_dir = Path(__file__).parent / "sentinel1_examples"
+def _load_sentinel1a_examples() -> tuple[dict[str, object], ...]:
+    examples_dir = Path(__file__).parent / "s1a_examples"
     return tuple(
         json.loads((examples_dir / filename).read_text())
         for filename in sorted(examples_dir.glob("*.json"))
     )
 
 
-def _load_sentinel2_examples() -> tuple[dict[str, object], ...]:
-    examples_dir = Path(__file__).parent / "sentinel2_examples"
+def _load_sentinel1c_examples() -> tuple[dict[str, object], ...]:
+    examples_dir = Path(__file__).parent / "s1c_examples"
     return tuple(
         json.loads((examples_dir / filename).read_text())
         for filename in sorted(examples_dir.glob("*.json"))
     )
 
 
-SENTINEL1_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel1_examples()
-SENTINEL2_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel2_examples()
+def _load_sentinel2a_examples() -> tuple[dict[str, object], ...]:
+    examples_dir = Path(__file__).parent / "s2a_examples"
+    return tuple(
+        json.loads((examples_dir / filename).read_text())
+        for filename in sorted(examples_dir.glob("*.json"))
+    )
+
+
+def _load_sentinel2b_examples() -> tuple[dict[str, object], ...]:
+    examples_dir = Path(__file__).parent / "s2b_examples"
+    return tuple(
+        json.loads((examples_dir / filename).read_text())
+        for filename in sorted(examples_dir.glob("*.json"))
+    )
+
+
+def _load_sentinel2c_examples() -> tuple[dict[str, object], ...]:
+    examples_dir = Path(__file__).parent / "s2c_examples"
+    return tuple(
+        json.loads((examples_dir / filename).read_text())
+        for filename in sorted(examples_dir.glob("*.json"))
+    )
+
+
+S1A_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel1a_examples()
+S1C_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel1c_examples()
+S2A_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel2a_examples()
+S2B_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel2b_examples()
+S2C_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel2c_examples()
 
 
 @pytest.fixture

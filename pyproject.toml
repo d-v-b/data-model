@@ -61,6 +61,7 @@ test = [
     "pytest-mock>=3.10.0",
     "pytest-xdist>=3.0.0",
     "jsondiff>=2.0.0",
+    "pytest-examples>=0.0.18",
 ]
 docs = [
     "mkdocs>=1.4.0",

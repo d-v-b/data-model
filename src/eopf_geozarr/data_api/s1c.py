@@ -1,5 +1,5 @@
 """
-Pydantic-zarr integrated models for Sentinel-1 EOPF Zarr data structure.
+Pydantic-zarr integrated models for Sentinel-1C EOPF Zarr data structure.
 
 Uses the new pyz.GroupSpec with TypedDict members to enforce strict structure validation.
 """
@@ -53,7 +53,7 @@ class Sentinel1AntennaPatternMembers(TypedDict, closed=True, total=False):  # ty
     elevation_angle: ArraySpec[Any]
     incidence_angle: ArraySpec[Any]
     roll: ArraySpec[Any]
-    slant_range_time_ap: ArraySpec[Any]
+    slant_range_time: ArraySpec[Any]
     swath: ArraySpec[Any]
     terrain_height: ArraySpec[Any]
 
@@ -89,9 +89,9 @@ class Sentinel1AntennaPatternGroup(
         return self.members["roll"]
 
     @property
-    def slant_range_time_ap(self) -> ArraySpec[Any]:
-        """Get slant_range_time_ap array."""
-        return self.members["slant_range_time_ap"]
+    def slant_range_time(self) -> ArraySpec[Any]:
+        """Get slant_range_time array."""
+        return self.members["slant_range_time"]
 
     @property
     def swath(self) -> ArraySpec[Any]:
@@ -333,7 +333,7 @@ class Sentinel1GcpMembers(TypedDict, closed=True, total=False):  # type: ignore[
     line: ArraySpec[Any]
     longitude: ArraySpec[Any]
     pixel: ArraySpec[Any]
-    slant_range_time_gcp: ArraySpec[Any]
+    slant_range_time: ArraySpec[Any]
 
 
 class Sentinel1GcpGroup(GroupSpec[DatasetAttrs, Sentinel1GcpMembers]):  # type: ignore[type-var]
@@ -390,9 +390,9 @@ class Sentinel1GcpGroup(GroupSpec[DatasetAttrs, Sentinel1GcpMembers]):  # type: 
         return self.members["pixel"]
 
     @property
-    def slant_range_time_gcp(self) -> ArraySpec[Any]:
-        """Get slant_range_time_gcp array."""
-        return self.members["slant_range_time_gcp"]
+    def slant_range_time(self) -> ArraySpec[Any]:
+        """Get slant_range_time array."""
+        return self.members["slant_range_time"]
 
 
 class Sentinel1OrbitMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
@@ -800,7 +800,7 @@ class Sentinel1NoiseRangeGroup(GroupSpec[DatasetAttrs, Sentinel1NoiseRangeMember
         return self.members["pixel"]
 
 
-class Sentinel1QualityMembers(TypedDict, closed=True):  # type: ignore[call-arg]
+class Sentinel1QualityMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for quality group.
 
     Closed TypedDict - only calibration, noise, noise_azimuth, noise_range keys are allowed.
@@ -904,8 +904,8 @@ class Sentinel1PolarizationGroup(GroupSpec[DatasetAttrs, Sentinel1PolarizationMe
 
 
 # Root model - uses any members since polarizations can have variable names (VH_xxx, VV_xxx)
-class Sentinel1Root(
-    GroupSpec[Sentinel1RootAttrs, dict[str, Sentinel1PolarizationGroup]]
+class Sentinel1CRoot(
+    GroupSpec[Sentinel1RootAttrs, Mapping[str, Sentinel1PolarizationGroup]]
 ):
     """Complete Sentinel-1 EOPF Zarr hierarchy.
 

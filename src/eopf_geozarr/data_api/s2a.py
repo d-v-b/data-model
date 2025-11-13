@@ -691,7 +691,7 @@ class Sentinel2RootMembers(TypedDict, closed=True):  # type: ignore[call-arg]
     conditions: Sentinel2ConditionsGroup
 
 
-class Sentinel2Root(GroupSpec[Sentinel2RootAttrs, Sentinel2RootMembers]):  # type: ignore[type-var]
+class Sentinel2ARoot(GroupSpec[Sentinel2RootAttrs, Sentinel2RootMembers]):  # type: ignore[type-var]
     """Complete Sentinel-2 EOPF Zarr hierarchy.
 
     The hierarchy follows EOPF organization:
