@@ -1,5 +1,5 @@
 """
-Pydantic-zarr integrated models for Sentinel-1C EOPF Zarr data structure.
+Pydantic-zarr integrated models for Sentinel-1A EOPF Zarr data structure.
 
 Uses the new pyz.GroupSpec with TypedDict members to enforce strict structure validation.
 """
@@ -46,14 +46,18 @@ class Sentinel1DataArray(ArraySpec[Sentinel1DataArrayAttrs]):
 
 # Conditions groups
 class Sentinel1AntennaPatternMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
-    """Members for antenna_pattern group."""
+    """Members for antenna_pattern group.
+
+    All fields are optional to support different product variants.
+    """
 
     azimuth_time: ArraySpec[Any]
     count: ArraySpec[Any]
     elevation_angle: ArraySpec[Any]
     incidence_angle: ArraySpec[Any]
     roll: ArraySpec[Any]
-    slant_range_time: ArraySpec[Any]
+    slant_range_time: ArraySpec[Any]  # S1C variant
+    slant_range_time_ap: ArraySpec[Any]
     swath: ArraySpec[Any]
     terrain_height: ArraySpec[Any]
 
@@ -89,9 +93,9 @@ class Sentinel1AntennaPatternGroup(
         return self.members["roll"]
 
     @property
-    def slant_range_time(self) -> ArraySpec[Any]:
-        """Get slant_range_time array."""
-        return self.members["slant_range_time"]
+    def slant_range_time_ap(self) -> ArraySpec[Any]:
+        """Get slant_range_time_ap array."""
+        return self.members["slant_range_time_ap"]
 
     @property
     def swath(self) -> ArraySpec[Any]:
@@ -321,7 +325,10 @@ class Sentinel1DopplerCentroidGroup(
 
 
 class Sentinel1GcpMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
-    """Members for GCP (Ground Control Points) group."""
+    """Members for GCP (Ground Control Points) group.
+
+    All fields are optional to support different product variants (S1A, S1C).
+    """
 
     azimuth_time: ArraySpec[Any]
     azimuth_time_gcp: ArraySpec[Any]
@@ -333,7 +340,8 @@ class Sentinel1GcpMembers(TypedDict, closed=True, total=False):  # type: ignore[
     line: ArraySpec[Any]
     longitude: ArraySpec[Any]
     pixel: ArraySpec[Any]
-    slant_range_time: ArraySpec[Any]
+    slant_range_time: ArraySpec[Any]  # S1C variant
+    slant_range_time_gcp: ArraySpec[Any]
 
 
 class Sentinel1GcpGroup(GroupSpec[DatasetAttrs, Sentinel1GcpMembers]):  # type: ignore[type-var]
@@ -390,9 +398,9 @@ class Sentinel1GcpGroup(GroupSpec[DatasetAttrs, Sentinel1GcpMembers]):  # type: 
         return self.members["pixel"]
 
     @property
-    def slant_range_time(self) -> ArraySpec[Any]:
-        """Get slant_range_time array."""
-        return self.members["slant_range_time"]
+    def slant_range_time_gcp(self) -> ArraySpec[Any]:
+        """Get slant_range_time_gcp array."""
+        return self.members["slant_range_time_gcp"]
 
 
 class Sentinel1OrbitMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
@@ -803,7 +811,9 @@ class Sentinel1NoiseRangeGroup(GroupSpec[DatasetAttrs, Sentinel1NoiseRangeMember
 class Sentinel1QualityMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for quality group.
 
-    Closed TypedDict - only calibration, noise, noise_azimuth, noise_range keys are allowed.
+    Closed TypedDict with optional fields to support different product variants:
+    - S1A: calibration, noise, noise_azimuth, noise_range
+    - S1C: calibration, noise (no noise_azimuth or noise_range)
     """
 
     calibration: Sentinel1CalibrationGroup
@@ -813,23 +823,26 @@ class Sentinel1QualityMembers(TypedDict, closed=True, total=False):  # type: ign
 
 
 class Sentinel1QualityGroup(GroupSpec[DatasetAttrs, Sentinel1QualityMembers]):  # type: ignore[type-var]
-    """Quality group containing quality assurance and calibration data."""
+    """Quality group containing quality assurance and calibration data.
+
+    Supports both S1A (with noise_azimuth, noise_range) and S1C (without them) products.
+    """
 
     def get_calibration(self) -> Sentinel1CalibrationGroup | None:
         """Get calibration subgroup."""
-        return self.members["calibration"]
+        return self.members.get("calibration")
 
     def get_noise(self) -> Sentinel1NoiseGroup | None:
         """Get noise subgroup."""
-        return self.members["noise"]
+        return self.members.get("noise")
 
     def get_noise_azimuth(self) -> Sentinel1NoiseAzimuthGroup | None:
-        """Get noise azimuth subgroup."""
-        return self.members["noise_azimuth"]
+        """Get noise azimuth subgroup (S1A only)."""
+        return self.members.get("noise_azimuth")
 
     def get_noise_range(self) -> Sentinel1NoiseRangeGroup | None:
-        """Get noise range subgroup."""
-        return self.members["noise_range"]
+        """Get noise range subgroup (S1A only)."""
+        return self.members.get("noise_range")
 
 
 # Measurements
@@ -904,8 +917,8 @@ class Sentinel1PolarizationGroup(GroupSpec[DatasetAttrs, Sentinel1PolarizationMe
 
 
 # Root model - uses any members since polarizations can have variable names (VH_xxx, VV_xxx)
-class Sentinel1CRoot(
-    GroupSpec[Sentinel1RootAttrs, Mapping[str, Sentinel1PolarizationGroup]]
+class Sentinel1Root(
+    GroupSpec[Sentinel1RootAttrs, dict[str, Sentinel1PolarizationGroup]]
 ):
     """Complete Sentinel-1 EOPF Zarr hierarchy.
 

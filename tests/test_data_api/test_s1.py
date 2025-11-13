@@ -12,14 +12,14 @@ from the markdown files in docs/models/sentinel1.md
 
 import pytest
 
-from eopf_geozarr.data_api.s1a import Sentinel1ARoot
-from tests.test_data_api.conftest import S1A_EXAMPLES
+from eopf_geozarr.data_api.s1 import Sentinel1Root
+from tests.test_data_api.conftest import S1_EXAMPLES
 
 
-@pytest.mark.parametrize("example", S1A_EXAMPLES)
+@pytest.mark.parametrize("example", S1_EXAMPLES)
 def test_sentinel1_roundtrip(example: dict[str, object]) -> None:
     """Test that we can round-trip JSON data without loss"""
-    model1 = Sentinel1ARoot(**example)
+    model1 = Sentinel1Root(**example)
     dumped = model1.model_dump()
-    model2 = Sentinel1ARoot(**dumped)
+    model2 = Sentinel1Root(**dumped)
     assert model1.model_dump() == model2.model_dump()

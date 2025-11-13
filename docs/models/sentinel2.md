@@ -11,7 +11,7 @@ This document demonstrates the basic usage of models for Sentinel-2 L2 data prod
 To load the schema for Sentinel-2A product from a Zarr store:
 
 ```python
-from eopf_geozarr.data_api.s2a import Sentinel2ARoot
+from eopf_geozarr.data_api.s2 import Sentinel2Root
 import zarr
 
 # Open the Zarr group from remote S3 or local path
@@ -21,7 +21,7 @@ store = zarr.open_group(
 )
 
 # Create a Sentinel2Root model instance from the group
-model = Sentinel2ARoot.from_zarr(store)
+model = Sentinel2Root.from_zarr(store)
 
 print(model.members.keys())
 #> dict_keys(['measurements', 'quality', 'conditions'])
@@ -39,7 +39,7 @@ print(model.conditions.members)
 To load the schema for a Sentinel-2B product from a Zarr store:
 
 ```python
-from eopf_geozarr.data_api.s2b import Sentinel2BRoot
+from eopf_geozarr.data_api.s2 import Sentinel2Root
 import zarr
 
 # Open the Zarr group from remote S3 or local path
@@ -49,7 +49,7 @@ store = zarr.open_group(
 )
 
 # Create a Sentinel2Root model instance from the group
-model = Sentinel2BRoot.from_zarr(store)
+model = Sentinel2Root.from_zarr(store)
 
 print(model.members.keys())
 #> dict_keys(['measurements', 'quality', 'conditions'])
@@ -67,7 +67,7 @@ print(model.conditions.members)
 To load the schema for a Sentinel-2C product from a Zarr store:
 
 ```python
-from eopf_geozarr.data_api.s2c import Sentinel2CRoot
+from eopf_geozarr.data_api.s2 import Sentinel2Root
 import zarr
 
 # Open the Zarr group from remote S3 or local path
@@ -77,7 +77,7 @@ store = zarr.open_group(
 )
 
 # Create a Sentinel2Root model instance from the group
-model = Sentinel2CRoot.from_zarr(store)
+model = Sentinel2Root.from_zarr(store)
 print(model.members.keys())
 #> dict_keys(['measurements', 'quality', 'conditions'])
 

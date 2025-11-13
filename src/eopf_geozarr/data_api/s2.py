@@ -601,32 +601,38 @@ class Sentinel2MaskDataset(GroupSpec[DatasetAttrs, ConditionsMaskMembers]):  # t
     pass
 
 
-class Sentinel2QualityMembers(TypedDict, closed=True):  # type: ignore[call-arg]
+class Sentinel2QualityMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for quality group.
 
-    Closed TypedDict - only atmosphere, probability, l2a_quicklook, mask keys are allowed.
+    Closed TypedDict with optional fields to accommodate different product levels:
+    - Sentinel-2A/C (L2A): atmosphere, probability, l2a_quicklook, mask
+    - Sentinel-2B (L1C): l1c_quicklook, mask
     """
 
     atmosphere: Sentinel2AtmosphereDataset
     probability: Sentinel2ProbabilityDataset
     l2a_quicklook: Sentinel2QuicklookDataset
+    l1c_quicklook: Sentinel2QuicklookDataset
     mask: Sentinel2MaskDataset
 
 
 class Sentinel2QualityGroup(GroupSpec[DatasetAttrs, Sentinel2QualityMembers]):  # type: ignore[type-var]
-    """Quality group containing atmosphere, probability, classification, and quicklook data."""
+    """Quality group containing atmosphere, probability, classification, and quicklook data.
+
+    Supports both L2A products (Sentinel-2A, 2C) and L1C products (Sentinel-2B).
+    """
 
     def atmosphere(self) -> Sentinel2AtmosphereDataset | None:
-        """Get atmosphere subgroup."""
+        """Get atmosphere subgroup (L2A only)."""
         return self.members.get("atmosphere")
 
     def probability(self) -> Sentinel2ProbabilityDataset | None:
-        """Get probability subgroup."""
+        """Get probability subgroup (L2A only)."""
         return self.members.get("probability")
 
     def quicklook(self) -> Sentinel2QuicklookDataset | None:
-        """Get L2A quicklook subgroup."""
-        return self.members.get("l2a_quicklook")
+        """Get quicklook subgroup (L2A: l2a_quicklook or L1C: l1c_quicklook)."""
+        return self.members.get("l2a_quicklook") or self.members.get("l1c_quicklook")
 
     def mask(self) -> Sentinel2MaskDataset | None:
         """Get mask subgroup."""
@@ -691,7 +697,7 @@ class Sentinel2RootMembers(TypedDict, closed=True):  # type: ignore[call-arg]
     conditions: Sentinel2ConditionsGroup
 
 
-class Sentinel2ARoot(GroupSpec[Sentinel2RootAttrs, Sentinel2RootMembers]):  # type: ignore[type-var]
+class Sentinel2Root(GroupSpec[Sentinel2RootAttrs, Sentinel2RootMembers]):  # type: ignore[type-var]
     """Complete Sentinel-2 EOPF Zarr hierarchy.
 
     The hierarchy follows EOPF organization:
