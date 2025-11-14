@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import pytest
 from zarr import open_group
@@ -43,6 +43,26 @@ def _load_projjson_file(filename: str) -> dict[str, Any]:
     file_path = examples_dir / filename
     with open(file_path, "r") as f:
         return json.load(f)
+
+
+def _load_sentinel1_examples() -> tuple[dict[str, object], ...]:
+    examples_dir = Path(__file__).parent / "s1_examples"
+    return tuple(
+        json.loads((examples_dir / filename).read_text())
+        for filename in sorted(examples_dir.glob("*.json"))
+    )
+
+
+def _load_sentinel2_examples() -> tuple[dict[str, object], ...]:
+    examples_dir = Path(__file__).parent / "s2_examples"
+    return tuple(
+        json.loads((examples_dir / filename).read_text())
+        for filename in sorted(examples_dir.glob("*.json"))
+    )
+
+
+S1_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel1_examples()
+S2_EXAMPLES: Final[tuple[dict[str, object], ...]] = _load_sentinel2_examples()
 
 
 @pytest.fixture

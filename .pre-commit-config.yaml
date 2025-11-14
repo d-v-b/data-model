@@ -25,5 +25,5 @@ repos:
         exclude: tests/.*
         additional_dependencies:
         - types-attrs
+        - typing-extensions>=4.15.0
         - pydantic>=2.12
-        - typing-extensions>=4.15

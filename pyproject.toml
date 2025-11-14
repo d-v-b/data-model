@@ -28,7 +28,7 @@ classifiers = [
 requires-python = ">=3.11"
 dependencies = [
     "pydantic-zarr>=0.8.0",
-    "pydantic>=2.12.0a1",
+    "pydantic>=2.12",
     "zarr>=3.1.1",
     "xarray>=2025.7.1",
     "dask[array,distributed]>=2025.5.1",
@@ -61,6 +61,8 @@ test = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "pytest-xdist>=3.0.0",
+    "jsondiff>=2.0.0",
+    "pytest-examples>=0.0.18",
 ]
 docs = [
     "mkdocs>=1.4.0",
