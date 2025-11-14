@@ -190,3 +190,14 @@ def json_code_blocks_from_readme(
     readme_path = Path(request.param)
     content = readme_path.read_text(encoding="utf-8")
     return extract_json_code_blocks(content)
+
+
+def _load_multiscales_examples() -> dict[str, dict[str, object]]:
+    """Load a multiscale example."""
+    examples_dir = Path(__file__).parent / "multiscales_examples"
+    return {
+        path.name: json.loads(path.read_text()) for path in examples_dir.glob("*.json")
+    }
+
+
+MULTISCALES_EXAMPLES = _load_multiscales_examples()
