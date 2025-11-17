@@ -225,7 +225,9 @@ def view_json_diff(
     sort_keys: bool = True,
     indent: int = 2,
 ) -> str:
-    # Convert each JSON object to a normalized, pretty string
+    """
+    Generate a human-readable diff between two JSON objects
+    """
     a_str = json.dumps(a, indent=indent, sort_keys=sort_keys)
     b_str = json.dumps(b, indent=indent, sort_keys=sort_keys)
 
