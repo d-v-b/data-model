@@ -2,23 +2,21 @@ from __future__ import annotations
 
 from typing import Literal, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import TypedDict
 
 ConventionID = Literal["d35379db-88df-4056-af3a-620245f8e347"]
 
 
-class MultiscaleConvention(BaseModel):
+class MultiscaleConvention(TypedDict):
     version: Literal["0.1.0"]
-    schema_url: Literal[
+    schema: Literal[
         "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v0.1.0/schema.json"
-    ] = Field(alias="schema")
-    name: Literal["multiscales"] = "multiscales"
-    description: str = "Multiscale layout of zarr datasets"
-    spec: Literal[
-        "https://github.com/zarr-conventions/geo-proj/blob/v0.1.0/README.md"
-    ] = "https://github.com/zarr-conventions/geo-proj/blob/v0.1.0/README.md"
+    ]
+    name: Literal["multiscales"]
+    description: Literal["Multiscale layout of zarr datasets"]
+    spec: Literal["https://github.com/zarr-conventions/geo-proj/blob/v0.1.0/README.md"]
 
 
 MultiscaleConventions = TypedDict(  # type: ignore[misc]

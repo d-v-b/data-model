@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import json
 import re
 from pathlib import Path
@@ -201,3 +202,39 @@ def _load_multiscales_examples() -> dict[str, dict[str, object]]:
 
 
 MULTISCALES_EXAMPLES = _load_multiscales_examples()
+
+
+def _load_json_examples(
+    *, prefix: Path, glob_str: str = "*.json"
+) -> dict[str, dict[str, object]]:
+    """
+    Loads JSON examples from a prefix / directory. By default all files ending with .json are collected.
+    """
+    return {path.name: json.loads(path.read_text()) for path in prefix.glob(glob_str)}
+
+
+GEOPROJ_EXAMPLES = _load_json_examples(
+    prefix=Path(__file__).parent / "geoproj_examples"
+)
+
+
+def view_json_diff(
+    a: dict[str, object],
+    b: dict[str, object],
+    *,
+    sort_keys: bool = True,
+    indent: int = 2,
+) -> str:
+    # Convert each JSON object to a normalized, pretty string
+    a_str = json.dumps(a, indent=indent, sort_keys=sort_keys)
+    b_str = json.dumps(b, indent=indent, sort_keys=sort_keys)
+
+    # difflib.unified_diff returns an iterable of lines
+    diff = difflib.unified_diff(
+        a_str.splitlines(keepends=True),
+        b_str.splitlines(keepends=True),
+        fromfile="expected",
+        tofile="actual",
+        lineterm="",
+    )
+    return "".join(diff)
