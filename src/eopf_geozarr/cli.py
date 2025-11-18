@@ -11,6 +11,7 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+import structlog
 import xarray as xr
 
 from eopf_geozarr.s2_optimization.s2_converter import convert_s2_optimized
@@ -22,6 +23,8 @@ from .conversion.fs_utils import (
     is_s3_path,
     validate_s3_access,
 )
+
+log = structlog.get_logger()
 
 # Suppress xarray FutureWarning about timedelta decoding
 warnings.filterwarnings("ignore", message=".*", category=FutureWarning)
@@ -60,11 +63,11 @@ def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Any | None:
         # client = Client()  # set up local cluster
 
         if verbose:
-            print(f"🚀 Dask cluster started: {client}")
-            print(f"   Dashboard: {client.dashboard_link}")
-            print(f"   Workers: {len(client.scheduler_info()['workers'])}")
+            log.info("🚀 Dask cluster started", client=str(client))
+            log.info("   Dashboard", dashboard=client.dashboard_link)
+            log.info("   Workers", worker_count=len(client.scheduler_info()["workers"]))
         else:
-            print("🚀 Dask cluster started for parallel processing")
+            log.info("🚀 Dask cluster started for parallel processing")
 
         return client
 
@@ -74,7 +77,7 @@ def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Any | None:
         )
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Error starting dask cluster: {e}")
+        log.info("❌ Error starting dask cluster", error=str(e))
         sys.exit(1)
 
 
@@ -102,7 +105,7 @@ def convert_command(args: argparse.Namespace) -> None:
             # Local path - validate existence
             input_path = Path(input_path_str)
             if not input_path.exists():
-                print(f"Error: Input path {input_path} does not exist")
+                log.info("Error: Input path does not exist", input_path=str(input_path))
                 sys.exit(1)
             input_path = str(input_path)
 
@@ -110,32 +113,32 @@ def convert_command(args: argparse.Namespace) -> None:
         output_path_str = args.output_path
         if is_s3_path(output_path_str):
             # S3 path - validate S3 access
-            print("🔍 Validating S3 access...")
+            log.info("🔍 Validating S3 access...")
             success, error_msg = validate_s3_access(output_path_str)
             if not success:
-                print(f"❌ Error: Cannot access S3 path {output_path_str}")
-                print(f"   Reason: {error_msg}")
-                print("\n💡 S3 Configuration Help:")
-                print("   Make sure you have S3 credentials configured:")
+                log.info("❌ Error: Cannot access S3 path", path=output_path_str)
+                log.info("   Reason", error=error_msg)
+                log.info("\n💡 S3 Configuration Help:")
+                log.info("   Make sure you have S3 credentials configured:")
                 print(
                     "   - Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables"
                 )
-                print("   - Set AWS_DEFAULT_REGION (default: us-east-1)")
+                log.info("   - Set AWS_DEFAULT_REGION (default: us-east-1)")
                 print(
                     "   - For custom S3 providers (e.g., OVH Cloud), set AWS_ENDPOINT_URL"
                 )
-                print("   - Or configure AWS CLI with 'aws configure'")
-                print("   - Or use IAM roles if running on EC2")
+                log.info("   - Or configure AWS CLI with 'aws configure'")
+                log.info("   - Or use IAM roles if running on EC2")
 
                 if args.verbose:
                     creds_info = get_s3_credentials_info()
-                    print("\n🔧 Current AWS configuration:")
+                    log.info("\n🔧 Current AWS configuration:")
                     for key, value in creds_info.items():
-                        print(f"   {key}: {value or 'Not set'}")
+                        log.info("   ", key=key, value=value or "Not set")
 
                 sys.exit(1)
 
-            print("✅ S3 access validated successfully")
+            log.info("✅ S3 access validated successfully")
             output_path = output_path_str
         else:
             # Local path - create directory if it doesn't exist
@@ -144,16 +147,16 @@ def convert_command(args: argparse.Namespace) -> None:
             output_path = str(output_path)
 
         if args.verbose:
-            print(f"Loading EOPF dataset from: {input_path}")
-            print(f"Groups to convert: {args.groups}")
-            print(f"CRS groups: {args.crs_groups}")
-            print(f"Output path: {output_path}")
-            print(f"Spatial chunk size: {args.spatial_chunk}")
-            print(f"Min dimension: {args.min_dimension}")
-            print(f"Tile width: {args.tile_width}")
+            log.info("Loading EOPF dataset from", input_path=input_path)
+            log.info("Groups to convert", groups=args.groups)
+            log.info("CRS groups", crs_groups=args.crs_groups)
+            log.info("Output path", output_path=output_path)
+            log.info("Spatial chunk size", spatial_chunk=args.spatial_chunk)
+            log.info("Min dimension", min_dimension=args.min_dimension)
+            log.info("Tile width", tile_width=args.tile_width)
 
         # Load the EOPF DataTree with appropriate storage options
-        print("Loading EOPF dataset...")
+        log.info("Loading EOPF dataset...")
         storage_options = get_storage_options(input_path)
         dt = xr.open_datatree(
             str(input_path),
@@ -163,13 +166,13 @@ def convert_command(args: argparse.Namespace) -> None:
         )
 
         if args.verbose:
-            print(f"Loaded DataTree with {len(dt.children)} groups")
-            print("Available groups:")
+            log.info("Loaded DataTree with groups", group_count=len(dt.children))
+            log.info("Available groups:")
             for group_name in dt.children:
-                print(f"  - {group_name}")
+                log.info("  -", group_name=group_name)
 
         # Convert to GeoZarr compliant format
-        print("Converting to GeoZarr compliant format...")
+        log.info("Converting to GeoZarr compliant format...")
         dt_geozarr = create_geozarr_dataset(
             dt_input=dt,
             groups=args.groups,
@@ -183,21 +186,24 @@ def convert_command(args: argparse.Namespace) -> None:
             enable_sharding=args.enable_sharding,
         )
 
-        print("✅ Successfully converted EOPF dataset to GeoZarr format")
-        print(f"Output saved to: {output_path}")
+        log.info("✅ Successfully converted EOPF dataset to GeoZarr format")
+        log.info("Output saved to", output_path=output_path)
 
         if args.verbose:
             # Check if dt_geozarr is a DataTree or Dataset
             if hasattr(dt_geozarr, "children"):
-                print(f"Converted DataTree has {len(dt_geozarr.children)} groups")
-                print("Converted groups:")
+                log.info(
+                    "Converted DataTree has groups",
+                    group_count=len(dt_geozarr.children),
+                )
+                log.info("Converted groups:")
                 for group_name in dt_geozarr.children:
-                    print(f"  - {group_name}")
+                    log.info("  -", group_name=group_name)
             else:
-                print("Converted dataset (single group)")
+                log.info("Converted dataset (single group)")
 
     except Exception as e:
-        print(f"❌ Error during conversion: {e}")
+        log.info("❌ Error during conversion", error=str(e))
         if args.verbose:
             import traceback
 
@@ -210,10 +216,10 @@ def convert_command(args: argparse.Namespace) -> None:
                 if hasattr(dask_client, "close"):
                     dask_client.close()
                 if args.verbose:
-                    print("🔄 Dask cluster closed")
+                    log.info("🔄 Dask cluster closed")
             except Exception as e:
                 if args.verbose:
-                    print(f"Warning: Error closing dask cluster: {e}")
+                    log.warning("Error closing dask cluster", error=str(e))
 
 
 def info_command(args: argparse.Namespace) -> None:
@@ -234,12 +240,12 @@ def info_command(args: argparse.Namespace) -> None:
         # Local path - validate existence
         input_path = Path(input_path_str)
         if not input_path.exists():
-            print(f"Error: Input path {input_path} does not exist")
+            log.info("Error: Input path does not exist", input_path=str(input_path))
             sys.exit(1)
         input_path = str(input_path)
 
     try:
-        print(f"Loading dataset from: {input_path}")
+        log.info("Loading dataset from", input_path=input_path)
         # Use unified storage options for S3 support
         storage_options = get_storage_options(input_path)
         dt = xr.open_datatree(
@@ -251,15 +257,15 @@ def info_command(args: argparse.Namespace) -> None:
             _generate_html_output(dt, args.html_output, input_path, args.verbose)
         else:
             # Standard console output
-            print("\nDataset Information:")
-            print("==================")
-            print(f"Total groups: {len(dt.children)}")
+            log.info("\nDataset Information:")
+            log.info("==================")
+            log.info("Total groups", group_count=len(dt.children))
 
-            print("\nGroup structure:")
+            log.info("\nGroup structure:")
             print(dt)
 
     except Exception as e:
-        print(f"❌ Error reading dataset: {e}")
+        log.info("❌ Error reading dataset", error=str(e))
         if args.verbose:
             import traceback
 
@@ -317,8 +323,6 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
             return ""
 
         # Create a temporary dataset with just these variables to get xarray's HTML
-        import xarray as xr
-
         temp_ds = xr.Dataset(data_vars)
 
         # Get xarray's HTML representation and extract just the variables section
@@ -914,25 +918,29 @@ def _generate_html_output(
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-        print(f"✅ HTML visualization generated: {output_file}")
+        log.info("✅ HTML visualization generated", output_file=str(output_file))
 
         if verbose:
-            print(f"   File size: {output_file.stat().st_size / 1024:.1f} KB")
-            print(f"   Groups included: {len(dt.children)}")
+            log.info(
+                "   File size", file_size_kb=round(output_file.stat().st_size / 1024, 1)
+            )
+            log.info("   Groups included", group_count=len(dt.children))
 
         # Try to open in browser if possible
         try:
             import webbrowser
 
             webbrowser.open(f"file://{output_file.absolute()}")
-            print("🌐 Opening in default browser...")
+            log.info("🌐 Opening in default browser...")
         except Exception as e:
             if verbose:
-                print(f"   Note: Could not auto-open browser: {e}")
-            print(f"   You can open the file manually: {output_file.absolute()}")
+                log.info("   Note: Could not auto-open browser", error=str(e))
+            log.info(
+                "   You can open the file manually", path=str(output_file.absolute())
+            )
 
     except Exception as e:
-        print(f"❌ Error generating HTML output: {e}")
+        log.info("❌ Error generating HTML output", error=str(e))
         if verbose:
             import traceback
 
@@ -958,12 +966,12 @@ def validate_command(args: argparse.Namespace) -> None:
         # Local path - validate existence
         input_path = Path(input_path_str)
         if not input_path.exists():
-            print(f"Error: Input path {input_path} does not exist")
+            log.info("Error: Input path does not exist", input_path=str(input_path))
             sys.exit(1)
         input_path = str(input_path)
 
     try:
-        print(f"Validating GeoZarr compliance for: {input_path}")
+        log.info("Validating GeoZarr compliance for", input_path=input_path)
         # Use unified storage options for S3 support
         storage_options = get_storage_options(input_path)
         dt = xr.open_datatree(
@@ -974,14 +982,14 @@ def validate_command(args: argparse.Namespace) -> None:
         total_variables = 0
         compliant_variables = 0
 
-        print("\nValidation Results:")
-        print("==================")
+        log.info("\nValidation Results:")
+        log.info("==================")
 
         for group_name, group in dt.children.items():
-            print(f"\nGroup: {group_name}")
+            log.info("\nGroup", group_name=group_name)
 
             if not hasattr(group, "data_vars") or not group.data_vars:
-                print("  ⚠️  No data variables found")
+                log.info("  ⚠️  No data variables found")
                 continue
 
             for var_name, var in group.data_vars.items():
@@ -1004,30 +1012,33 @@ def validate_command(args: argparse.Namespace) -> None:
                     issues.append("Missing grid_mapping attribute")
 
                 if issues:
-                    print(f"  ❌ {var_name}: {', '.join(issues)}")
+                    log.info("  ❌", var_name=var_name, issues=", ".join(issues))
                     compliance_issues.extend(issues)
                 else:
-                    print(f"  ✅ {var_name}: Compliant")
+                    log.info("  ✅", var_name=var_name, status="Compliant")
                     compliant_variables += 1
 
-        print("\nSummary:")
-        print("========")
-        print(f"Total variables checked: {total_variables}")
-        print(f"Compliant variables: {compliant_variables}")
-        print(f"Non-compliant variables: {total_variables - compliant_variables}")
+        log.info("\nSummary:")
+        log.info("========")
+        log.info("Total variables checked", total_variables=total_variables)
+        log.info("Compliant variables", compliant_variables=compliant_variables)
+        log.info(
+            "Non-compliant variables",
+            non_compliant=total_variables - compliant_variables,
+        )
 
         if compliance_issues:
-            print("\n❌ Dataset is NOT GeoZarr compliant")
-            print(f"Issues found: {len(compliance_issues)}")
+            log.info("\n❌ Dataset is NOT GeoZarr compliant")
+            log.info("Issues found", issue_count=len(compliance_issues))
             if args.verbose:
-                print("Detailed issues:")
+                log.info("Detailed issues:")
                 for issue in set(compliance_issues):
-                    print(f"  - {issue}")
+                    log.info("  -", issue=issue)
         else:
-            print("\n✅ Dataset appears to be GeoZarr compliant")
+            log.info("\n✅ Dataset appears to be GeoZarr compliant")
 
     except Exception as e:
-        print(f"❌ Error validating dataset: {e}")
+        log.info("❌ Error validating dataset", error=str(e))
         if args.verbose:
             import traceback
 
@@ -1215,7 +1226,7 @@ def convert_s2_optimized_command(args: Any) -> int:
 
     try:
         # Load input dataset
-        print(f"Loading Sentinel-2 dataset from: {args.input_path}")
+        log.info("Loading Sentinel-2 dataset from", input_path=args.input_path)
         storage_options = get_storage_options(str(args.input_path))
         dt_input = xr.open_datatree(
             str(args.input_path),
@@ -1237,11 +1248,11 @@ def convert_s2_optimized_command(args: Any) -> int:
             verbose=args.verbose,
         )
 
-        print(f"✅ S2 optimization completed: {args.output_path}")
+        log.info("✅ S2 optimization completed", output_path=args.output_path)
         return 0
 
     except Exception as e:
-        print(f"❌ Error during S2 optimization: {e}")
+        log.info("❌ Error during S2 optimization", error=str(e))
         if args.verbose:
             import traceback
 
@@ -1254,10 +1265,10 @@ def convert_s2_optimized_command(args: Any) -> int:
                 if hasattr(dask_client, "close"):
                     dask_client.close()
                 if args.verbose:
-                    print("🔄 Dask cluster closed")
+                    log.info("🔄 Dask cluster closed")
             except Exception as e:
                 if args.verbose:
-                    print(f"Warning: Error closing dask cluster: {e}")
+                    log.warning("Error closing dask cluster", error=str(e))
 
 
 def main() -> None:

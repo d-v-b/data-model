@@ -2,7 +2,10 @@
 
 import numpy as np
 import rasterio  # noqa: F401  # Import to enable .rio accessor
+import structlog
 import xarray as xr
+
+log = structlog.get_logger()
 
 
 def downsample_2d_array(
@@ -194,8 +197,8 @@ def validate_existing_band_data(
                 ).values.mean()
                 if np.isnan(test):
                     return False
-            except Exception as e:
-                print(f"Error validating variable {var_name}: {e}")
+            except Exception:
+                log.info("Error validating variable {var_name}: {e}")
                 return False
 
         return True
