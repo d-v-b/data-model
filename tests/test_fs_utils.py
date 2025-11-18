@@ -56,7 +56,7 @@ def test_get_s3_credentials_info():
         },
     ):
         creds = get_s3_credentials_info()
-        assert creds["aws_access_key_id"] == "test-key"
+        assert creds["aws_access_key_id"] == "***"
         assert creds["aws_secret_access_key"] == "***"
         assert creds["aws_default_region"] == "us-west-2"
 
