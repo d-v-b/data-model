@@ -756,9 +756,7 @@ class S2MultiscalePyramid:
 
         if verbose:
             log.info(
-                "Added multiscales metadata",
-                base_path=base_path,
-                num_resolutions=len(overview_levels),
+                f"Added {len(overview_levels)} multiscale levels to {base_path}",
             )
 
         return dt_multiscale

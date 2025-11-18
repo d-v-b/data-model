@@ -464,7 +464,7 @@ def write_geozarr_group(
     xarray.DataTree
         The written GeoZarr DataTree with multiscale groups as children
     """
-    log.info("\n=== Processing with GeoZarr-spec compliance ===", group_name=group_name)
+    log.info(f"Processing group {group_name} with GeoZarr-spec compliance")
 
     # Create a new container for the group
     dt = xr.DataTree()
@@ -524,11 +524,11 @@ def write_geozarr_group(
         log.info("Continuing with next group...")
 
     # Consolidate metadata
-    log.info("  Consolidating metadata for group", group_name=group_name)
+    log.info(f"Consolidating metadata for group {group_name}")
     group_path = fs_utils.normalize_path(f"{output_path}/{group_name.lstrip('/')}")
     zarr_group = fs_utils.open_zarr_group(group_path, mode="r+")
     consolidate_metadata(zarr_group.store)
-    log.info("  ✅ Metadata consolidated")
+    log.info("✅ Metadata consolidated")
 
     return dt
 
@@ -622,16 +622,16 @@ def create_geozarr_compliant_multiscales(
                 ds_gcp["latitude"].values.max(),
             )
 
-    log.info("Creating GeoZarr-compliant multiscales", group_name=group_name)
+    log.info(f"Creating GeoZarr-compliant multiscales in group {group_name}")
     log.info("Native resolution", width=native_width, height=native_height)
-    log.info("Native CRS", crs=str(native_crs))
+    log.info(f"Native CRS: {native_crs}")
 
     # Calculate overview levels
     overview_levels = calculate_overview_levels(
         native_width, native_height, min_dimension, tile_width
     )
 
-    log.info("Total overview levels", count=len(overview_levels))
+    log.info(f"Total overview levels: {len(overview_levels)}")
     for ol in overview_levels:
         log.info(
             "Overview level",
@@ -660,7 +660,7 @@ def create_geozarr_compliant_multiscales(
     }
     fs_utils.write_json_metadata(zarr_json_path, zarr_json)
 
-    log.info("Added multiscales metadata to", group_name=group_name)
+    log.info(f"Added multiscales metadata to group {group_name}")
 
     # Create overview levels as children groups
     timing_data = []
@@ -682,13 +682,11 @@ def create_geozarr_compliant_multiscales(
         scale_factor = overview["scale_factor"]
 
         log.info(
-            "\nCreating overview level (scale)", level=level, scale_factor=scale_factor
+            f"Creating overview level (scale) {level} with scale factor {scale_factor}"
         )
-        log.info("Target dimensions", width=width, height=height)
+        log.info("Target dimensions:", width=width, height=height)
         log.info(
-            "  Using pyramid approach: creating level from previous level",
-            level=level,
-            from_level=level - 1,
+            f"Using pyramid approach: creating level {level} from previous level {level - 1}",
         )
 
         if ds_gcp is not None:
@@ -721,9 +719,7 @@ def create_geozarr_compliant_multiscales(
         start_time = time.time()
 
         storage_options = fs_utils.get_storage_options(overview_path)
-        log.info(
-            "Writing overview level at path", level=level, overview_path=overview_path
-        )
+        log.info(f"Writing overview level at path {overview_path}")
 
         # Ensure the directory exists for local paths
         if not fs_utils.is_s3_path(overview_path):
@@ -759,9 +755,7 @@ def create_geozarr_compliant_multiscales(
         )
 
         log.info(
-            "Level successfully created",
-            level=level,
-            proc_time_seconds=round(proc_time, 2),
+            f"Level {level} created in {round(proc_time, 2)} seconds",
         )
 
         # Consolidate metadata
@@ -770,13 +764,13 @@ def create_geozarr_compliant_multiscales(
         )
         zarr_group = fs_utils.open_zarr_group(group_path, mode="r+")
         consolidate_metadata(zarr_group.store)
-        log.info("  ✅ Metadata consolidated for overview level", level=level)
+        log.info(f"✅ Metadata consolidated for overview level {level}")
 
         # Update previous_level_ds for the next iteration
         previous_level_ds = overview_ds
 
     log.info(
-        "\n✅ Created GeoZarr-compliant overview levels using pyramid approach",
+        "✅ Created GeoZarr-compliant overview levels using pyramid approach",
         count=len(overview_levels),
     )
 
@@ -1007,7 +1001,7 @@ def create_overview_dataset_all_vars(
     # Downsample all data variables
     overview_data_vars = {}
     for var in data_vars:
-        log.info("  Downsampling", var=var)
+        log.info(f"Downsampling variable {var}")
 
         source_data = ds[var].values
 
@@ -1249,38 +1243,27 @@ def write_dataset_band_by_band_with_validation(
     zarr_group = fs_utils.open_zarr_group(group_path, mode="r+")
     consolidate_metadata(zarr_group.store)
 
-    log.info("  ✅ Metadata consolidated for variables", count=len(successful_vars))
+    log.info(f"✅ Metadata consolidated for {len(successful_vars)} variables")
 
     # Report results
     if failed_vars:
         log.error(
-            "❌ Failed to write variables",
-            failed_count=len(failed_vars),
-            group_name=group_name,
-            failed_vars=failed_vars,
+            f"❌ Failed to write {len(failed_vars)} variables in {group_name}: {failed_vars}",
         )
         log.info(
-            "✅ Successfully wrote new variables",
-            count=len(successful_vars) - len(skipped_vars),
+            f"✅ Successfully wrote {len(successful_vars) - len(skipped_vars)} new variables"
         )
         log.info(
-            "⏭️  Skipped existing valid variables",
-            count=len(skipped_vars),
-            skipped_vars=skipped_vars,
+            f"Skipped {len(skipped_vars)} existing valid variables: {skipped_vars}"
         )
         return False, ds
     else:
         log.info(
-            "✅ Successfully processed all variables",
-            count=len(successful_vars),
-            group_name=group_name,
+            f"✅ Successfully processed {len(successful_vars)} variables in {group_name}",
         )
         if skipped_vars:
-            log.info(
-                "   - Wrote new variables",
-                count=len(successful_vars) - len(skipped_vars),
-            )
-            log.info("   - Skipped existing valid variables", count=len(skipped_vars))
+            log.info(f"Wrote {len(successful_vars) - len(skipped_vars)} new variables")
+            log.info(f"Skipped {len(skipped_vars)} existing valid variables")
         return True, ds
 
 
@@ -1769,7 +1752,7 @@ def _add_grid_mapping_variable(
         if not utils.is_grid_mapping_variable(overview_ds, var_name):
             if "grid_mapping" not in overview_ds[var_name].attrs:
                 overview_ds[var_name].attrs["grid_mapping"] = grid_mapping_var_name
-                log.info("  Added grid_mapping attribute", var_name=var_name)
+                log.info(f"Added grid_mapping attribute to {var_name}")
 
 
 def _calculate_shard_dimension(data_dim: int, chunk_dim: int) -> int:

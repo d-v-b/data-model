@@ -180,7 +180,7 @@ def convert_command(args: argparse.Namespace) -> None:
         )
 
         log.info("✅ Successfully converted EOPF dataset to GeoZarr format")
-        log.info("Output saved to", output_path=output_path)
+        log.info(f"Output saved to {output_path}")
 
         if args.verbose:
             # Check if dt_geozarr is a DataTree or Dataset
