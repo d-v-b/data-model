@@ -415,7 +415,7 @@ class TestCLIEndToEnd:
         assert result.returncode == 0, (
             f"CLI with empty --crs-groups failed: {result.stderr}"
         )
-        assert "crs_groups=[]" in result.stdout, "Should show empty CRS groups list"
+        assert "CRS groups: []" in result.stdout, "Should show empty CRS groups list"
 
         print("✅ CLI with empty --crs-groups list works correctly")
 
