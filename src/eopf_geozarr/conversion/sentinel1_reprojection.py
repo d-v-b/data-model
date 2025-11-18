@@ -44,7 +44,7 @@ def reproject_sentinel1_with_gcps(
     xr.Dataset
         Reprojected dataset with x/y coordinates in target CRS and proper nodata handling
     """
-    log.info("Reprojecting Sentinel-1 data to {target_crs} using GCPs...")
+    log.info("Reprojecting Sentinel-1 data using GCPs", target_crs=target_crs)
 
     # Set up GCPs from the GCP dataset
     gcps = _create_gcps_from_dataset(ds_gcp)
@@ -61,7 +61,7 @@ def reproject_sentinel1_with_gcps(
     if nodata_value is None:
         nodata_value = _determine_nodata_value(ds[first_var])
 
-    log.info("Using nodata value: {nodata_value}")
+    log.info("Using nodata value", nodata_value=nodata_value)
 
     # Calculate the target transform and dimensions
     transform, width, height = calculate_default_transform(
@@ -72,8 +72,8 @@ def reproject_sentinel1_with_gcps(
         gcps=gcps,
     )
 
-    log.info("Calculated target dimensions: {width} x {height}")
-    log.info("Transform: {transform}")
+    log.info("Calculated target dimensions", width=width, height=height)
+    log.info("Transform", transform=str(transform))
 
     # Create target coordinate arrays
     target_coords = _create_target_coordinates(transform, width, height, target_crs)
@@ -81,7 +81,7 @@ def reproject_sentinel1_with_gcps(
     # Reproject all data variables
     reprojected_data_vars = {}
     for var_name in data_vars:
-        log.info("  Reprojecting variable: {var_name}")
+        log.info("  Reprojecting variable", var_name=var_name)
         reprojected_var = _reproject_data_variable(
             ds[var_name],
             gcps,
@@ -102,7 +102,7 @@ def reproject_sentinel1_with_gcps(
     # Set CRS information
     reprojected_ds = reprojected_ds.rio.write_crs(target_crs)
 
-    log.info("✅ Successfully reprojected Sentinel-1 data to {target_crs}")
+    log.info("✅ Successfully reprojected Sentinel-1 data", target_crs=target_crs)
     return reprojected_ds
 
 
@@ -132,7 +132,7 @@ def _create_gcps_from_dataset(
         )
         gcps.append(gcp)
 
-    log.info("Created {len(gcps)} Ground Control Points")
+    log.info("Created Ground Control Points", count=len(gcps))
     return gcps
 
 

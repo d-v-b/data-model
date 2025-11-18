@@ -197,8 +197,8 @@ def validate_existing_band_data(
                 ).values.mean()
                 if np.isnan(test):
                     return False
-            except Exception:
-                log.info("Error validating variable {var_name}: {e}")
+            except Exception as e:
+                log.info("Error validating variable", var_name=var_name, error=str(e))
                 return False
 
         return True

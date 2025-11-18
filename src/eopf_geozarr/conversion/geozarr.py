@@ -149,8 +149,8 @@ def create_geozarr_dataset(
         zarr_group = fs_utils.open_zarr_group(output_path, mode="r+")
         consolidate_metadata(zarr_group.store)
         log.info("✅ Root level metadata consolidation completed")
-    except Exception:
-        log.warning("Root level consolidation failed: {e}")
+    except Exception as e:
+        log.warning("Root level consolidation failed", error=str(e))
 
     return dt_geozarr
 
@@ -183,7 +183,7 @@ def setup_datatree_metadata_geozarr_spec_compliant(
         if not dt[key].data_vars:
             continue
 
-        log.info("Processing group for GeoZarr compliance: {key}")
+        log.info("Processing group for GeoZarr compliance", key=key)
         ds = dt[key].to_dataset().copy()
 
         if gcp_group is not None:
@@ -193,13 +193,13 @@ def setup_datatree_metadata_geozarr_spec_compliant(
 
         # Apply Sentinel-1 reprojection if needed
         if _is_sentinel1(dt) and ds_gcp is not None:
-            log.info("  Applying Sentinel-1 reprojection for group: {key}")
+            log.info("  Applying Sentinel-1 reprojection for group", key=key)
             ds = reproject_sentinel1_with_gcps(ds, ds_gcp, target_crs="EPSG:4326")
             log.info("  ✅ Reprojection completed, dataset now has x/y coordinates")
 
         # Process all variables in the group
         for var_name in ds.data_vars:
-            log.info("  Processing variable / band: {var_name}")
+            log.info("  Processing variable / band", var_name=var_name)
 
             # Set CF standard name and _ARRAY_DIMENSIONS
             if _is_sentinel1(dt):
@@ -217,7 +217,9 @@ def setup_datatree_metadata_geozarr_spec_compliant(
             # Set CRS if available
             if "proj:epsg" in ds[var_name].attrs:
                 epsg = ds[var_name].attrs["proj:epsg"]
-                log.info("    Setting CRS for {var_name} to EPSG:{epsg}")
+                log.info(
+                    "    Setting CRS for variable to EPSG", var_name=var_name, epsg=epsg
+                )
                 ds = ds.rio.write_crs(f"epsg:{epsg}")
             elif epsg_CPM_260:
                 print(
@@ -303,10 +305,14 @@ def iterative_copy(
             continue
 
         current_group_path = "/" + relative_path
-        log.info("Processing group '{current_group_path}' in iterative copy")
+        log.info(
+            "Processing group in iterative copy", current_group_path=current_group_path
+        )
 
         if current_group_path in geozarr_groups:
-            log.info("Processing '{current_group_path}' as GeoZarr group")
+            log.info(
+                "Processing as GeoZarr group", current_group_path=current_group_path
+            )
             write_geozarr_group(
                 dt_input,
                 dt_result,
@@ -329,7 +335,10 @@ def iterative_copy(
 
         # Add CRS information if needed
         if crs_groups and current_group_path in crs_groups:
-            log.info("Adding CRS information for group '{current_group_path}'")
+            log.info(
+                "Adding CRS information for group",
+                current_group_path=current_group_path,
+            )
             if reference_crs is None:
                 reference_crs = _find_reference_crs(geozarr_groups)
             ds = prepare_dataset_with_crs_info(ds, reference_crs=reference_crs)
@@ -387,7 +396,7 @@ def prepare_dataset_with_crs_info(
 
     # Add CRS information if we have spatial coordinates and a reference CRS
     if "x" in ds.coords and "y" in ds.coords and reference_crs:
-        log.info("  Adding CRS information: {reference_crs}")
+        log.info("  Adding CRS information", reference_crs=reference_crs)
         ds = ds.rio.write_crs(reference_crs)
         ds.attrs["grid_mapping"] = "spatial_ref"
 
@@ -463,7 +472,7 @@ def write_geozarr_group(
     xarray.DataTree
         The written GeoZarr DataTree with multiscale groups as children
     """
-    log.info("\n=== Processing {group_name} with GeoZarr-spec compliance ===")
+    log.info("\n=== Processing with GeoZarr-spec compliance ===", group_name=group_name)
 
     # Create a new container for the group
     dt = xr.DataTree()
@@ -503,7 +512,9 @@ def write_geozarr_group(
         ds_gcp = None
 
     try:
-        log.info("Creating GeoZarr-spec compliant multiscales for {group_name}")
+        log.info(
+            "Creating GeoZarr-spec compliant multiscales for", group_name=group_name
+        )
         create_geozarr_compliant_multiscales(
             ds=ds,
             output_path=output_path,
@@ -521,7 +532,7 @@ def write_geozarr_group(
         log.info("Continuing with next group...")
 
     # Consolidate metadata
-    log.info("  Consolidating metadata for group {group_name}...")
+    log.info("  Consolidating metadata for group", group_name=group_name)
     group_path = fs_utils.normalize_path(f"{output_path}/{group_name.lstrip('/')}")
     zarr_group = fs_utils.open_zarr_group(group_path, mode="r+")
     consolidate_metadata(zarr_group.store)
@@ -605,8 +616,8 @@ def create_geozarr_compliant_multiscales(
             else:
                 native_bounds = ds.rio.bounds()
 
-        except Exception:
-            log.info("Error computing native bounds: {e}")
+        except Exception as e:
+            log.info("Error computing native bounds", error=str(e))
             # TODO: check GCP bounds vs. raster data bounds?
             # Below we compute GCP bbox and assume that it roughly corresponds
             # to the data bounds, which might be too crude / wrong approximation.
@@ -619,16 +630,16 @@ def create_geozarr_compliant_multiscales(
                 ds_gcp["latitude"].values.max(),
             )
 
-    log.info("Creating GeoZarr-compliant multiscales for {group_name}")
-    log.info("Native resolution: {native_width} x {native_height}")
-    log.info("Native CRS: {native_crs}")
+    log.info("Creating GeoZarr-compliant multiscales for", group_name=group_name)
+    log.info("Native resolution", width=native_width, height=native_height)
+    log.info("Native CRS", crs=str(native_crs))
 
     # Calculate overview levels
     overview_levels = calculate_overview_levels(
         native_width, native_height, min_dimension, tile_width
     )
 
-    log.info("Total overview levels: {len(overview_levels)}")
+    log.info("Total overview levels", count=len(overview_levels))
     for ol in overview_levels:
         print(
             f"Overview level {ol['level']}: {ol['width']} x {ol['height']} "
@@ -654,7 +665,7 @@ def create_geozarr_compliant_multiscales(
     }
     fs_utils.write_json_metadata(zarr_json_path, zarr_json)
 
-    log.info("Added multiscales metadata to {group_name}")
+    log.info("Added multiscales metadata to", group_name=group_name)
 
     # Create overview levels as children groups
     timing_data = []
@@ -675,8 +686,10 @@ def create_geozarr_compliant_multiscales(
         height = overview["height"]
         scale_factor = overview["scale_factor"]
 
-        log.info("\nCreating overview level {level} (1:{scale_factor} scale)...")
-        log.info("Target dimensions: {width} x {height}")
+        log.info(
+            "\nCreating overview level (scale)", level=level, scale_factor=scale_factor
+        )
+        log.info("Target dimensions", width=width, height=height)
         print(
             f"  Using pyramid approach: creating level {level} from level {level - 1}"
         )
@@ -711,7 +724,9 @@ def create_geozarr_compliant_multiscales(
         start_time = time.time()
 
         storage_options = fs_utils.get_storage_options(overview_path)
-        log.info("Writing overview level {level} at {overview_path}")
+        log.info(
+            "Writing overview level at path", level=level, overview_path=overview_path
+        )
 
         # Ensure the directory exists for local paths
         if not fs_utils.is_s3_path(overview_path):
@@ -746,7 +761,11 @@ def create_geozarr_compliant_multiscales(
             }
         )
 
-        log.info("Level {level}: Successfully created in {proc_time:.2f}s")
+        log.info(
+            "Level successfully created",
+            level=level,
+            proc_time_seconds=round(proc_time, 2),
+        )
 
         # Consolidate metadata
         group_path = fs_utils.normalize_path(
@@ -754,7 +773,7 @@ def create_geozarr_compliant_multiscales(
         )
         zarr_group = fs_utils.open_zarr_group(group_path, mode="r+")
         consolidate_metadata(zarr_group.store)
-        log.info("  ✅ Metadata consolidated for overview level {level}")
+        log.info("  ✅ Metadata consolidated for overview level", level=level)
 
         # Update previous_level_ds for the next iteration
         previous_level_ds = overview_ds
@@ -990,7 +1009,7 @@ def create_overview_dataset_all_vars(
     # Downsample all data variables
     overview_data_vars = {}
     for var in data_vars:
-        log.info("  Downsampling {var}...")
+        log.info("  Downsampling", var=var)
 
         source_data = ds[var].values
 
@@ -1100,8 +1119,12 @@ def write_dataset_band_by_band_with_validation(
             fs.rm(target_path, recursive=True)
         except FileNotFoundError:
             pass
-        except Exception:
-            log.info("    ⚠️ Failed to remove {target_path}: {cleanup_error}")
+        except Exception as cleanup_error:
+            log.info(
+                "    ⚠️ Failed to remove",
+                target_path=target_path,
+                error=str(cleanup_error),
+            )
 
     # Write data variables one by one with validation
     for var in data_vars:
@@ -1110,15 +1133,15 @@ def write_dataset_band_by_band_with_validation(
             if utils.validate_existing_band_data(existing_dataset, var, ds):
                 ds.drop_vars(str(var))
                 ds[var] = existing_dataset[var]  # type: ignore
-                log.info("  ✅ Band {var} already exists and is valid, skipping")
+                log.info("  ✅ Band already exists and is valid, skipping", var=var)
                 skipped_vars.append(var)
                 successful_vars.append(var)
                 continue
             # Remove invalid existing variable using filesystem-agnostic method
-            log.info("    🧹 Removing invalid existing variable {var}...")
+            log.info("    🧹 Removing invalid existing variable", var=var)
             cleanup_prefix(f"{group_name.lstrip('/')}/{var}")
 
-        log.info("  Writing data variable {var}...")
+        log.info("  Writing data variable", var=var)
 
         # Create a single-variable dataset with its coordinates
         single_var_ds = ds[[var]]
@@ -1177,7 +1200,7 @@ def write_dataset_band_by_band_with_validation(
                     storage_options=store_storage_options,
                 )
 
-                log.info("    ✅ Successfully wrote {var}")
+                log.info("    ✅ Successfully wrote", var=var)
                 successful_vars.append(var)
                 success = True
                 if existing_dataset is None:
@@ -1215,14 +1238,14 @@ def write_dataset_band_by_band_with_validation(
                     break
 
         if not success:
-            log.info("  Failed to write data variable {var}")
+            log.info("  Failed to write data variable", var=var)
 
     # Consolidate metadata
     group_path = fs_utils.normalize_path(f"{output_path}/{group_name.lstrip('/')}")
     zarr_group = fs_utils.open_zarr_group(group_path, mode="r+")
     consolidate_metadata(zarr_group.store)
 
-    log.info("  ✅ Metadata consolidated for {len(successful_vars)} variables")
+    log.info("  ✅ Metadata consolidated for variables", count=len(successful_vars))
 
     # Report results
     if failed_vars:
@@ -1244,7 +1267,7 @@ def write_dataset_band_by_band_with_validation(
             print(
                 f"   - Wrote {len(successful_vars) - len(skipped_vars)} new variables"
             )
-            log.info("   - Skipped {len(skipped_vars)} existing valid variables")
+            log.info("   - Skipped existing valid variables", count=len(skipped_vars))
         return True, ds
 
 
@@ -1587,8 +1610,8 @@ def _load_existing_dataset(path: str) -> xr.Dataset | None:
                 chunks="auto",
                 decode_coords="all",
             )
-    except Exception:
-        log.warning("Could not open existing dataset at {path}: {e}")
+    except Exception as e:
+        log.warning("Could not open existing dataset at path", path=path, error=str(e))
     return None
 
 
@@ -1694,7 +1717,10 @@ def _add_grid_mapping_variable(
             attrs=grid_mapping_attrs,
         )
     else:
-        log.info("  Creating new grid_mapping variable '{grid_mapping_var_name}'")
+        log.info(
+            "  Creating new grid_mapping variable",
+            grid_mapping_var_name=grid_mapping_var_name,
+        )
 
         grid_mapping_attrs = base_attrs.copy()
 
@@ -1716,7 +1742,7 @@ def _add_grid_mapping_variable(
         if not utils.is_grid_mapping_variable(overview_ds, var_name):
             if "grid_mapping" not in overview_ds[var_name].attrs:
                 overview_ds[var_name].attrs["grid_mapping"] = grid_mapping_var_name
-                log.info("  Added grid_mapping attribute to {var_name}")
+                log.info("  Added grid_mapping attribute to", var_name=var_name)
 
 
 def _calculate_shard_dimension(data_dim: int, chunk_dim: int) -> int:
