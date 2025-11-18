@@ -192,10 +192,9 @@ class TestS2MultiscalePyramidIntegration:
 
         return dt
 
-    @patch("builtins.print")
     @patch.object(S2MultiscalePyramid, "_stream_write_dataset")
     def test_create_multiscale_from_datatree(
-        self, mock_write, mock_print, simple_datatree, tmp_path
+        self, mock_write, simple_datatree, tmp_path
     ):
         """Test multiscale creation from DataTree."""
         pyramid = S2MultiscalePyramid(enable_sharding=True, spatial_chunk=256)
@@ -211,6 +210,7 @@ class TestS2MultiscalePyramidIntegration:
 
         # Should process groups
         assert isinstance(result, dict)
+
         # At minimum, should write the original group
         assert mock_write.call_count >= 1
 

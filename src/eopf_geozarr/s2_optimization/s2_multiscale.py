@@ -70,7 +70,6 @@ class S2MultiscalePyramid:
             Dictionary of processed groups
         """
         processed_groups = {}
-
         # Step 1: Copy all original groups as-is
         for group_path in dt_input.groups:
             if group_path == ".":
