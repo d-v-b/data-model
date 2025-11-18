@@ -72,12 +72,12 @@ def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Any | None:
         return client
 
     except ImportError:
-        print(
-            "❌ Error: dask.distributed not available. Install with: pip install 'dask[distributed]'"
+        log.error(
+            "dask.distributed not available. Install with: pip install 'dask[distributed]'"
         )
         sys.exit(1)
     except Exception as e:
-        log.info("❌ Error starting dask cluster", error=str(e))
+        log.error("Error starting dask cluster", error=str(e))
         sys.exit(1)
 
 
@@ -116,26 +116,21 @@ def convert_command(args: argparse.Namespace) -> None:
             log.info("🔍 Validating S3 access...")
             success, error_msg = validate_s3_access(output_path_str)
             if not success:
-                log.info("❌ Error: Cannot access S3 path", path=output_path_str)
-                log.info("   Reason", error=error_msg)
-                log.info("\n💡 S3 Configuration Help:")
-                log.info("   Make sure you have S3 credentials configured:")
-                print(
+                msg = (
+                    f"❌ Error: Cannot access S3 path {output_path_str}"
+                    f"Reason: {error_msg}"
+                    "💡 S3 Configuration Help:"
+                    "   Make sure you have S3 credentials configured:"
                     "   - Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables"
-                )
-                log.info("   - Set AWS_DEFAULT_REGION (default: us-east-1)")
-                print(
+                    "   - Set AWS_DEFAULT_REGION (default: us-east-1)"
                     "   - For custom S3 providers (e.g., OVH Cloud), set AWS_ENDPOINT_URL"
+                    "   - Or configure AWS CLI with 'aws configure'"
+                    "   - Or use IAM roles if running on EC2"
                 )
-                log.info("   - Or configure AWS CLI with 'aws configure'")
-                log.info("   - Or use IAM roles if running on EC2")
-
+                log.error(msg)
                 if args.verbose:
                     creds_info = get_s3_credentials_info()
-                    log.info("\n🔧 Current AWS configuration:")
-                    for key, value in creds_info.items():
-                        log.info("   ", key=key, value=value or "Not set")
-
+                    log.info(f"🔧 Current AWS configuration: {creds_info.items()}")
                 sys.exit(1)
 
             log.info("✅ S3 access validated successfully")
@@ -147,13 +142,13 @@ def convert_command(args: argparse.Namespace) -> None:
             output_path = str(output_path)
 
         if args.verbose:
-            log.info("Loading EOPF dataset from", input_path=input_path)
-            log.info("Groups to convert", groups=args.groups)
-            log.info("CRS groups", crs_groups=args.crs_groups)
-            log.info("Output path", output_path=output_path)
-            log.info("Spatial chunk size", spatial_chunk=args.spatial_chunk)
-            log.info("Min dimension", min_dimension=args.min_dimension)
-            log.info("Tile width", tile_width=args.tile_width)
+            log.info(f"Loading EOPF dataset from {input_path}")
+            log.info(f"Groups to convert: {args.groups}")
+            log.info(f"CRS groups: {args.crs_groups}")
+            log.info(f"Output path: {output_path}")
+            log.info(f"Spatial chunk size: {args.spatial_chunk}")
+            log.info(f"Min dimension: {args.min_dimension}")
+            log.info(f"Tile width: {args.tile_width}")
 
         # Load the EOPF DataTree with appropriate storage options
         log.info("Loading EOPF dataset...")
@@ -166,10 +161,8 @@ def convert_command(args: argparse.Namespace) -> None:
         )
 
         if args.verbose:
-            log.info("Loaded DataTree with groups", group_count=len(dt.children))
-            log.info("Available groups:")
-            for group_name in dt.children:
-                log.info("  -", group_name=group_name)
+            log.info(f"Loaded DataTree with {len(dt.children)} groups")
+            log.info(f"Available groups: {tuple(dt.children.keys())}")
 
         # Convert to GeoZarr compliant format
         log.info("Converting to GeoZarr compliant format...")
@@ -192,13 +185,7 @@ def convert_command(args: argparse.Namespace) -> None:
         if args.verbose:
             # Check if dt_geozarr is a DataTree or Dataset
             if hasattr(dt_geozarr, "children"):
-                log.info(
-                    "Converted DataTree has groups",
-                    group_count=len(dt_geozarr.children),
-                )
-                log.info("Converted groups:")
-                for group_name in dt_geozarr.children:
-                    log.info("  -", group_name=group_name)
+                log.info(f"Converted groups: {tuple(dt_geozarr.children.keys())}")
             else:
                 log.info("Converted dataset (single group)")
 
@@ -262,7 +249,7 @@ def info_command(args: argparse.Namespace) -> None:
             log.info("Total groups", group_count=len(dt.children))
 
             log.info("\nGroup structure:")
-            print(dt)
+            log.info(str(dt))
 
     except Exception as e:
         log.info("❌ Error reading dataset", error=str(e))
