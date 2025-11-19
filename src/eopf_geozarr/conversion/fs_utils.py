@@ -340,10 +340,10 @@ def get_s3_credentials_info() -> S3Credentials:
     Returns
     -------
     dict
-        Dictionary with credential information
+        Dictionary with credential information (secrets are masked for security)
     """
     return {
-        "aws_access_key_id": os.environ.get("AWS_ACCESS_KEY_ID"),
+        "aws_access_key_id": "***" if os.environ.get("AWS_ACCESS_KEY_ID") else None,
         "aws_secret_access_key": "***"
         if os.environ.get("AWS_SECRET_ACCESS_KEY")
         else None,

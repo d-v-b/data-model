@@ -114,7 +114,7 @@ class TestCLIEndToEnd:
 
         # Verify info output contains expected information
         info_output = result_info.stdout
-        assert "Total groups:" in info_output, "Info should show total groups count"
+        assert "Total groups" in info_output, "Info should show total groups count"
         assert "Group structure:" in info_output, "Info should show group structure"
         assert "/measurements" in info_output, "Should find measurements group"
 
