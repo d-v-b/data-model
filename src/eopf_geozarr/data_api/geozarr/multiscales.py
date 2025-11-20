@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import Literal, NotRequired, Self
 
 from pydantic import BaseModel, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
@@ -25,10 +25,29 @@ MultiscaleConventions = TypedDict(  # type: ignore[misc]
     closed=False,
 )
 
+MULTISCALE_CONVENTION: MultiscaleConventions = {
+    "d35379db-88df-4056-af3a-620245f8e347": {
+        "version": "0.1.0",
+        "schema": "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v0.1.0/schema.json",
+        "name": "multiscales",
+        "description": "Multiscale layout of zarr datasets",
+        "spec": "https://github.com/zarr-conventions/multiscales/blob/v0.1.0/README.md",
+    }
+}
+
 
 class ConventionAttributes(BaseModel):
     zarr_conventions_version: Literal["0.1.0"]
     zarr_conventions: MultiscaleConventions
+
+
+class ScaleLevelJSON(TypedDict):
+    group: str
+    from_group: NotRequired[str]
+    translation: NotRequired[tuple[float, ...]]
+    factors: NotRequired[tuple[float, ...]]
+    scale: NotRequired[tuple[float, ...]]
+    resampling_method: NotRequired[str]
 
 
 class ScaleLevel(BaseModel):
@@ -50,11 +69,22 @@ class ScaleLevel(BaseModel):
         return self
 
 
+class MultiscalesJSON(TypedDict):
+    layout: tuple[ScaleLevelJSON, ...]
+    resampling_method: NotRequired[str]
+
+
 class Multiscales(BaseModel):
     layout: tuple[ScaleLevel, ...]
     resampling_method: str | MISSING = MISSING
     model_config = {"extra": "allow"}
 
 
-class MultiscalesAttributes(ConventionAttributes):
+class MultiscalesAttrs(ConventionAttributes):
     multiscales: Multiscales
+
+
+class MultiscalesAttrsJSON(TypedDict):
+    zarr_conventions_version: Literal["0.1.0"]
+    zarr_conventions: MultiscaleConventions
+    multiscales: MultiscalesJSON

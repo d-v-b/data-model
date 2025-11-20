@@ -3,7 +3,8 @@ Streaming multiscale pyramid creation for optimized S2 structure.
 Uses lazy evaluation to minimize memory usage during dataset preparation.
 """
 
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Literal
 
 import numpy as np
 import structlog
@@ -15,6 +16,13 @@ from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
     create_native_crs_tile_matrix_set,
 )
+from eopf_geozarr.data_api.geozarr.multiscales import (
+    MULTISCALE_CONVENTION,
+    MultiscalesAttrsJSON,
+    ScaleLevelJSON,
+)
+from eopf_geozarr.data_api.geozarr.types import TMSMultiscalesAttrsJSON
+from eopf_geozarr.types import OverviewLevelJSON
 
 from .s2_resampling import S2ResamplingEngine, determine_variable_type
 
@@ -630,7 +638,14 @@ class S2MultiscalePyramid:
         return coords
 
     def _add_multiscales_metadata_to_parent(
-        self, output_path: str, base_path: str, res_groups: dict, verbose: bool = False
+        self,
+        output_path: str,
+        base_path: str,
+        res_groups: Mapping[str, xr.Dataset],
+        verbose: bool = False,
+        multiscales_flavor: Literal[
+            "ogc_tms", "experimental_multiscales_convention"
+        ] = "experimental_multiscales_convention",
     ) -> xr.DataTree:
         """Add GeoZarr-compliant multiscales metadata to parent group."""
 
@@ -680,7 +695,7 @@ class S2MultiscalePyramid:
             return
 
         # Create overview_levels structure with string-based level names
-        overview_levels = []
+        overview_levels: list[OverviewLevelJSON] = []
         for res_name in all_resolutions:
             res_meters = res_order[res_name]
 
@@ -703,13 +718,18 @@ class S2MultiscalePyramid:
             finest_res_meters = res_order[all_resolutions[0]]
             scale_factor = res_meters // finest_res_meters
 
+            # calculate translation relative to finest resolution
+            trans_meters = (res_meters - finest_res_meters) / 2
+
             overview_levels.append(
                 {
                     "level": res_name,  # Use string-based level name
                     "zoom": zoom,
                     "width": width,
                     "height": height,
-                    "scale_factor": scale_factor,
+                    "translation_relative": trans_meters,
+                    "scale_absolute": res_meters,
+                    "scale_relative": scale_factor,
                     "chunks": dataset.data_vars[first_var.name].chunks,
                 }
             )
@@ -721,32 +741,57 @@ class S2MultiscalePyramid:
                 )
             return
 
-        # Create tile matrix set using geozarr function
-        tile_matrix_set = create_native_crs_tile_matrix_set(
-            native_crs,
-            native_bounds,
-            overview_levels,  # type: ignore[arg-type]
-            group_prefix=None,
-        )
+        multiscales: TMSMultiscalesAttrsJSON | MultiscalesAttrsJSON
 
-        # Create tile matrix limits
-        tile_matrix_limits = _create_tile_matrix_limits(
-            overview_levels,  # type: ignore[arg-type]
-            tile_width=256,
-        )
+        if multiscales_flavor == "ogc_tms":
+            # Create tile matrix set using geozarr function
+            tile_matrix_set = create_native_crs_tile_matrix_set(
+                native_crs,
+                native_bounds,
+                overview_levels,  # type: ignore[arg-type]
+                group_prefix=None,
+            )
 
-        multiscales = {
-            "tile_matrix_set": tile_matrix_set,
-            "resampling_method": "average",
-            "tile_matrix_limits": tile_matrix_limits,
-        }
+            # Create tile matrix limits
+            tile_matrix_limits = _create_tile_matrix_limits(
+                overview_levels,  # type: ignore[arg-type]
+                tile_width=256,
+            )
+            multiscales = {
+                "multiscales": {
+                    "tile_matrix_set": tile_matrix_set,
+                    "resampling_method": "average",
+                    "tile_matrix_limits": tile_matrix_limits,
+                }
+            }
+        else:
+            scale_levels: list[ScaleLevelJSON] = []
+            for overview_level in overview_levels:
+                scale_levels.append(
+                    {
+                        "group": str(overview_level["level"]),
+                        "scale": (overview_level["scale_relative"],),
+                        "translation": (
+                            overview_level["translation_relative"],
+                            overview_level["translation_relative"],
+                        ),
+                    }
+                )
+            multiscales = {
+                "zarr_conventions_version": "0.1.0",
+                "zarr_conventions": MULTISCALE_CONVENTION,
+                "multiscales": {
+                    "layout": tuple(scale_levels),
+                    "resampling_method": "average",
+                },
+            }
 
         # Create parent group path
         parent_group_path = f"{output_path}{base_path}"
         dt_multiscale = xr.DataTree()
         for res in all_resolutions:
             dt_multiscale[res] = xr.DataTree()
-        dt_multiscale.attrs["multiscales"] = multiscales
+        dt_multiscale.attrs.update(multiscales)
         dt_multiscale.to_zarr(
             parent_group_path,
             mode="a",

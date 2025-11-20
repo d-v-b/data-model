@@ -1,5 +1,8 @@
 """Types and constants for the GeoZarr data API."""
 
+from __future__ import annotations
+
+from collections.abc import Mapping
 from typing import Any, Final, Literal, NotRequired, TypedDict
 
 
@@ -56,6 +59,21 @@ class TileMatrixSetJSON(TypedDict):
     supportedCRS: str | None
     orderedAxes: tuple[str, str] | None | list[str]
     tileMatrices: tuple[TileMatrixJSON, ...] | list[TileMatrixJSON]
+
+
+class TMSMultiscalesJSON(TypedDict):
+    """
+    Typeddict model of the `multiscales` attribute of Zarr groups that implement the
+    OGC TileMatrixSet multiscales structure
+    """
+
+    tile_matrix_set: TileMatrixSetJSON
+    resampling_method: ResamplingMethod
+    tile_matrix_limits: Mapping[str, TileMatrixLimitJSON]
+
+
+class TMSMultiscalesAttrsJSON(TypedDict):
+    multiscales: TMSMultiscalesJSON
 
 
 ResamplingMethod = Literal[

@@ -245,9 +245,9 @@ class TileMatrixSet(BaseModel):
     tileMatrices: tuple[TileMatrix, ...]
 
 
-class Multiscales(BaseModel, extra="allow"):
+class TMSMultiscales(BaseModel, extra="allow"):
     """
-    Multiscale metadata for a GeoZarr dataset.
+    Multiscale metadata for a GeoZarr dataset based on the OGC TileMatrixSet standard
 
     Attributes
     ----------
@@ -307,4 +307,4 @@ class MultiscaleGroupAttrs(BaseModel, extra="allow"):
     multiscales: MultiscaleAttrs
     """
 
-    multiscales: Multiscales
+    multiscales: TMSMultiscales
