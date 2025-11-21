@@ -10,8 +10,13 @@ from typing import Any, TypedDict
 
 import structlog
 import xarray as xr
+import zarr
+from pydantic import TypeAdapter
 
 from eopf_geozarr.conversion.fs_utils import get_storage_options
+from eopf_geozarr.conversion.geozarr import get_zarr_group
+from eopf_geozarr.data_api.s1 import Sentinel1Root
+from eopf_geozarr.data_api.s2 import Sentinel2Root
 
 from .s2_multiscale import create_multiscale_from_datatree
 
@@ -50,7 +55,7 @@ def convert_s2(
     )
 
     # Validate input is S2
-    if not is_sentinel2_dataset(dt_input):
+    if not is_sentinel2_dataset(get_zarr_group(dt_input)):
         raise ValueError("Input dataset is not a Sentinel-2 product")
 
     # Step 1: Process data while preserving original structure
@@ -129,7 +134,7 @@ def convert_s2_optimized(
     )
 
     # Validate input is S2
-    if not is_sentinel2_dataset(dt_input):
+    if not is_sentinel2_dataset(get_zarr_group(dt_input)):
         raise ValueError("Input dataset is not a Sentinel-2 product")
 
     # Step 1: Process data while preserving original structure
@@ -269,24 +274,17 @@ def create_result_datatree(output_path: str) -> xr.DataTree:
         return xr.DataTree()
 
 
-def is_sentinel2_dataset(dt: xr.DataTree) -> bool:
-    """Check if dataset is Sentinel-2."""
-    # Check STAC properties
-    stac_props = dt.attrs.get("stac_discovery", {}).get("properties", {})
-    mission = stac_props.get("mission", "")
+def is_sentinel2_dataset(group: zarr.Group) -> bool:
+    from eopf_geozarr.pyz.v2 import GroupSpec
 
-    if mission.lower().startswith("sentinel-2"):
-        return True
+    adapter = TypeAdapter(Sentinel1Root | Sentinel2Root)
+    try:
+        model = adapter.validate_python(GroupSpec.from_zarr(group).model_dump())
+    except ValueError as e:
+        log.warning("Could not validate Sentinel-2 dataset", error=str(e))
+        return False
 
-    # Check for characteristic S2 groups
-    s2_indicators = [
-        "/measurements/reflectance",
-        "/conditions/geometry",
-        "/quality/atmosphere",
-    ]
-
-    found_indicators = sum(1 for indicator in s2_indicators if indicator in dt.groups)
-    return found_indicators >= 2
+    return isinstance(model, Sentinel2Root)
 
 
 def validate_optimized_dataset(dataset_path: str) -> dict[str, Any]:

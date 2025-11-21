@@ -1802,3 +1802,7 @@ def _is_sentinel1(dt: xr.DataTree) -> bool:
         return True
     else:
         return False
+
+
+def get_zarr_group(data: xr.DataTree) -> zarr.Group:
+    return data._close.__self__.zarr_group  # type: ignore[union-attr, no-any-return]
