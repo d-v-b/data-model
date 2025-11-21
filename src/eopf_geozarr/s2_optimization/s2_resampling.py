@@ -2,6 +2,7 @@
 Downsampling operations for Sentinel-2 data (no upsampling).
 """
 
+from typing import Literal
 import numpy as np
 import xarray as xr
 
@@ -70,7 +71,7 @@ def downsample_variable(
         raise ValueError(f"Unknown variable type: {var_type}")
 
     method = resampling_methods[var_type]
-    return method(data, target_height, target_width)
+    return method(data, target_height, target_width).astype(data.dtype)
 
 
 def downsample_classification(
@@ -177,7 +178,7 @@ def downsample_probability(
     return result
 
 
-def determine_variable_type(var_name: str, var_data: xr.DataArray) -> str:
+def determine_variable_type(var_name: str, var_data: xr.DataArray) -> Literal["reflectance", "classification", "probability", "quality_mask"]:
     """
     Determine the type of a variable for appropriate resampling.
 

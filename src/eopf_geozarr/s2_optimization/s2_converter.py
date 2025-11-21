@@ -22,9 +22,6 @@ from .s2_multiscale import create_multiscale_from_datatree
 
 log = structlog.get_logger()
 
-DISTRIBUTED_AVAILABLE = importlib.util.find_spec("distributed") is not None
-
-
 def convert_s2(
     dt_input: xr.DataTree,
     output_path: str,
@@ -132,7 +129,6 @@ def convert_s2_optimized(
         num_groups=len(dt_input.groups),
         output_path=output_path,
     )
-
     # Validate input is S2
     if not is_sentinel2_dataset(get_zarr_group(dt_input)):
         raise ValueError("Input dataset is not a Sentinel-2 product")
@@ -142,6 +138,7 @@ def convert_s2_optimized(
 
     # Step 2: Create multiscale pyramids for each group in the original structure
     log.info("Step 2: Creating multiscale pyramids (preserving original hierarchy)")
+
     datasets = create_multiscale_from_datatree(
         dt_input,
         output_path,

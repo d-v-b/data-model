@@ -14,10 +14,31 @@ class TileMatrixLimitJSON(TypedDict):
     maxTileRow: int
 
 
-class XarrayEncodingJSON(TypedDict):
-    chunks: NotRequired[tuple[int, ...]]
-    compressors: Any
+XARRAY_ENCODING_KEYS: Final[set[str]] = {
+    "chunks",
+    "preferred_chunks",
+    "compressors",
+    "filters",
+    "shards",
+    "_FillValue",
+    "scale_factor",
+    "add_offset",
+    "dtype",
+}
 
+class XarrayDataArrayEncoding(TypedDict):
+    """
+    The dict form of the encoding for xarray.DataArray
+    """
+    chunks: NotRequired[tuple[int, ...]]
+    preferred_chunks: NotRequired[tuple[int, ...]]
+    compressors: NotRequired[tuple[object, ...]]
+    filters: NotRequired[tuple[object, ...]]
+    shards: NotRequired[tuple[int, ...] | None]
+    _FillValue: NotRequired[object]
+    scale_factor: NotRequired[float]
+    add_offset: NotRequired[float]
+    dtype: NotRequired[object]
 
 class StandardXCoordAttrsJSON(TypedDict):
     units: Literal["m"]

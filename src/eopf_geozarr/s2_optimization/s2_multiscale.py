@@ -23,7 +23,8 @@ from eopf_geozarr.data_api.geozarr.multiscales import (
     MultiscalesAttrsJSON,
     ScaleLevelJSON,
 )
-from eopf_geozarr.data_api.geozarr.types import TMSMultiscalesAttrsJSON
+from eopf_geozarr.data_api.geozarr.types import XARRAY_ENCODING_KEYS, TMSMultiscalesAttrsJSON, XarrayDataArrayEncoding
+from eopf_geozarr.s2_optimization.common import DISTRIBUTED_AVAILABLE
 from eopf_geozarr.types import OverviewLevelJSON
 
 from .s2_resampling import determine_variable_type, downsample_variable
@@ -111,7 +112,6 @@ def create_multiscale_from_datatree(
         else:
             # Non-measurement groups: preserve original chunking
             encoding = create_original_encoding(dataset)
-
         ds_out = stream_write_dataset(
             dataset, output_group_path, encoding, enable_sharding=enable_sharding
         )
@@ -161,7 +161,6 @@ def create_multiscale_from_datatree(
         r120m_dataset = create_downsampled_resolution_group(
             source_dataset, factor=factor
         )
-
         if r120m_dataset and len(r120m_dataset.data_vars) > 0:
             output_path_120 = f"{output_path}{r120m_path}"
             log.info("Writing r120m to {}", output_path_120=output_path_120)
@@ -265,13 +264,16 @@ def create_multiscale_from_datatree(
 
 def create_measurements_encoding(
     dataset: xr.Dataset, *, spatial_chunk: int, enable_sharding: bool = True
-) -> dict:
+) -> XarrayDataArrayEncoding:
     """
     Create optimized encoding for a pyramid level with advanced chunking and sharding.
     """
     encoding = {}
 
     for var_name, var_data in dataset.data_vars.items():
+        # start with the original encoding
+        var_encoding: XarrayDataArrayEncoding = {}
+
         chunks: tuple[int, ...] = ()
         if var_data.ndim >= 2:
             height, width = var_data.shape[-2:]
@@ -295,13 +297,24 @@ def create_measurements_encoding(
         from zarr.codecs import BloscCodec
 
         compressor = BloscCodec(cname="zstd", clevel=3, shuffle="shuffle", blocksize=0)
-        var_encoding = {"chunks": chunks, "compressors": [compressor]}
+
+        var_encoding["chunks"] = chunks
+        var_encoding["compressors"] = (compressor,)
 
         # Add advanced sharding if enabled - shards match x/y dimensions exactly
         if enable_sharding and var_data.ndim >= 2:
             shard_dims = calculate_simple_shard_dimensions(var_data.shape, chunks)
             var_encoding["shards"] = shard_dims
-
+        else:
+            var_encoding['shards'] = None
+        
+        for key in XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}:
+            if key in var_data.encoding:
+                var_encoding[key] = var_data.encoding[key]
+        if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
+            log.warning(
+                f"Unknown encoding keys in {var_name}: {set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS}"
+            )
         encoding[var_name] = var_encoding
 
     # Add coordinate encoding
@@ -524,7 +537,7 @@ def add_multiscales_metadata_to_parent(
     return dt_multiscale
 
 
-def create_original_encoding(dataset: xr.Dataset) -> dict:
+def create_original_encoding(dataset: xr.Dataset) -> XarrayDataArrayEncoding:
     """Write a group preserving its original chunking and encoding."""
     from zarr.codecs import BloscCodec
 
@@ -533,20 +546,18 @@ def create_original_encoding(dataset: xr.Dataset) -> dict:
     encoding = {}
 
     for var_name in dataset.data_vars:
+        # start with the original encoding
         var_data = dataset.data_vars[var_name]
-
-        # Get original chunks if they exist
-        if hasattr(var_data, "encoding") and "chunks" in var_data.encoding:
-            original_chunks = var_data.encoding["chunks"]
-
-            # Set encoding with original chunks
-            encoding[var_name] = {
-                "chunks": original_chunks,
-                "compressors": [compressor],
-            }
-        else:
-            # No specific chunking - use as is
-            encoding[var_name] = {"compressors": [compressor]}
+        var_encoding: XarrayDataArrayEncoding = {}
+        var_encoding["compressors"] = (compressor,)
+        for key in XARRAY_ENCODING_KEYS - {"compressors"}:
+            if key in var_data.encoding:
+                var_encoding[key] = var_data.encoding[key]
+        if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
+            log.warning(
+                f"Unknown encoding keys in {var_name}: {set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS}"
+            )
+        encoding[var_name] = var_encoding
 
     for coord_name in dataset.coords:
         encoding[coord_name] = {"compressors": None}
@@ -573,31 +584,41 @@ def create_downsampled_resolution_group(
     if target_height < 1 or target_width < 1:
         return xr.Dataset()
 
-    # Create downsampled coordinates
-    downsampled_coords = create_downsampled_coordinates(
-        source_dataset, target_height, target_width, factor
-    )
-
     # Downsample all variables using existing lazy operations
     lazy_vars = {}
     for var_name, var_data in source_dataset.data_vars.items():
         if var_data.ndim < 2:
             continue
+        var_typ = determine_variable_type(var_name, var_data)
+        if var_typ == "quality_mask":
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary='trim').max()
+        elif var_typ == "reflectance":
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary='trim').mean()
+        elif var_typ == "classification":
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary='trim').reduce(subsample_2)
+        elif var_typ == "probability":
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary='trim').mean()
+        else:
+            raise ValueError(f"Unknown variable type {var_typ}")
 
-        lazy_downsampled = create_lazy_downsample_operation_from_existing(
-            var_data, target_height, target_width
-        )
+        # preserve encoding
+        lazy_downsampled.encoding = var_data.encoding
         lazy_vars[var_name] = lazy_downsampled
 
     if not lazy_vars:
         return xr.Dataset()
 
     # Create dataset with lazy variables and coordinates
-    dataset = xr.Dataset(lazy_vars, coords=downsampled_coords)
-    dataset.attrs.update(source_dataset.attrs)
+    dataset = xr.Dataset(lazy_vars, attrs=source_dataset.attrs)
 
     return dataset
 
+def subsample_2(a: xr.DataArray, axis: tuple[int, ...] | None = None) -> xr.DataArray:
+    if axis is None:
+        return a[((slice(None, None, 2),) * a.ndim)]
+    else:
+        indexer = [slice(None, None, 2) if i in axis else slice(None) for i in range(a.ndim)]
+        return a[tuple(indexer)]
 
 def create_downsampled_coordinates(
     level_2_dataset: xr.Dataset,
@@ -642,7 +663,6 @@ def create_lazy_downsample_operation_from_existing(
     source_data: xr.DataArray, target_height: int, target_width: int
 ) -> xr.DataArray:
     """Create lazy downsampling operation from existing data."""
-
     @delayed  # type: ignore[misc]
     def downsample_operation() -> Any:
         var_type = determine_variable_type(source_data.name, source_data)
@@ -689,11 +709,10 @@ def stream_write_dataset(
     This is where the magic happens: all the lazy downsampling operations
     are executed as the data is streamed to storage with optimal performance.
     """
-
     # Check if level already exists
     if fs_utils.path_exists(dataset_path):
         log.info(
-            "    Level path {} already exists. Skipping write.",
+            "Level path {} already exists. Skipping write.",
             dataset_path=dataset_path,
         )
         existing_ds = xr.open_dataset(
@@ -711,23 +730,30 @@ def stream_write_dataset(
     if enable_sharding:
         dataset = rechunk_dataset_for_encoding(dataset, encoding)
 
-        # Add the geo metadata before writing
-        write_geo_metadata(dataset)
+    # Add the geo metadata before writing
+    write_geo_metadata(dataset)
 
-        # Write with streaming computation and progress tracking
-        # The to_zarr operation will trigger all lazy computations
-        write_job = dataset.to_zarr(
-            dataset_path,
-            mode="w",
-            consolidated=True,
-            zarr_format=3,
-            encoding=encoding,
-            compute=False,  # Create job first for progress tracking
-        )
-        write_job = write_job.persist()
+    # Write with streaming computation and progress tracking
+    # The to_zarr operation will trigger all lazy computations
+    write_job = dataset.to_zarr(
+        dataset_path,
+        mode="w",
+        consolidated=True,
+        zarr_format=3,
+        encoding=encoding,
+        compute=False,  # Create job first for progress tracking
+    )
+    write_job = write_job.persist()
 
+    if DISTRIBUTED_AVAILABLE:
+        try:
+            import distributed
+            distributed.progress(write_job, notebook=False)
+        except Exception as e:
+            log.warning("Could not display progress bar: {}", e=e)
+            write_job.compute()
     else:
-        log.info("Writing zarr data...")
+        log.info("Writing zarr file...")
         write_job.compute()
 
     log.info("✅ Streaming write complete for dataset {}", dataset_path=dataset_path)
@@ -805,3 +831,13 @@ def rechunk_dataset_for_encoding(dataset: xr.Dataset, encoding: dict) -> xr.Data
     )
 
     return rechunked_dataset
+
+def extract_scale_offset_encoding(attrs: Mapping[str, Mapping[str, object]]) -> dict[str, object]:
+    """
+    extract the scale / offset encoding from _eopf_attrs
+    """
+    encoding = {}
+    encoding["add_offset"] = attrs["_eopf_attrs"]["add_offset"]
+    encoding["scale_factor"] = attrs["_eopf_attrs"]["scale_factor"]
+    encoding["dtype"] = attrs["_eopf_attrs"]["dtype"]
+    return encoding
