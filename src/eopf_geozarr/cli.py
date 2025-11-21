@@ -1232,7 +1232,6 @@ def convert_s2_optimized_command(args: Any) -> int:
             create_geometry_group=not args.skip_geometry,
             create_meteorology_group=not args.skip_meteorology,
             validate_output=not args.skip_validation,
-            verbose=args.verbose,
         )
 
         log.info("✅ S2 optimization completed", output_path=args.output_path)

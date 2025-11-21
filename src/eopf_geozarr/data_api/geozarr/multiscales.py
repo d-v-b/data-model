@@ -42,8 +42,8 @@ class ConventionAttributes(BaseModel):
 
 
 class ScaleLevelJSON(TypedDict):
-    group: str
-    from_group: NotRequired[str]
+    asset: str
+    derived_from: NotRequired[str]
     translation: NotRequired[tuple[float, ...]]
     factors: NotRequired[tuple[float, ...]]
     scale: NotRequired[tuple[float, ...]]
@@ -51,8 +51,8 @@ class ScaleLevelJSON(TypedDict):
 
 
 class ScaleLevel(BaseModel):
-    group: str
-    from_group: str | MISSING = MISSING
+    asset: str
+    derived_from: str | MISSING = MISSING
     translation: tuple[float, ...] | MISSING = MISSING
     factors: tuple[float, ...] | MISSING = MISSING
     scale: tuple[float, ...] | MISSING = MISSING
@@ -62,9 +62,9 @@ class ScaleLevel(BaseModel):
 
     @model_validator(mode="after")
     def check_model(self: Self) -> Self:
-        if self.from_group is not MISSING and self.scale is MISSING:
+        if self.derived_from is not MISSING and self.scale is MISSING:
             raise ValueError(
-                f"from_group was set to {self.from_group}, but scale was unset. This is an error."
+                f"from_group was set to {self.derived_from}, but scale was unset. This is an error."
             )
         return self
 
