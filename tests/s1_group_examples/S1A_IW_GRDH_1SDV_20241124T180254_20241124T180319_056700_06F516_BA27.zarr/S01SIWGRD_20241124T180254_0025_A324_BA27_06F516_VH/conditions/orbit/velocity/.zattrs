@@ -1,0 +1,22 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "axis"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time",
+      "axis"
+    ],
+    "dimensions": [
+      "azimuth_time",
+      "axis"
+    ],
+    "dtype": "<f8",
+    "long_name": "velocity vector",
+    "units": "m/s"
+  },
+  "dtype": "<f8",
+  "long_name": "velocity vector",
+  "units": "m/s"
+}

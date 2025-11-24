@@ -1,0 +1,19 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "angle",
+    "y",
+    "x"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "angle",
+      "y",
+      "x"
+    ],
+    "dimensions": [
+      "angle",
+      "y",
+      "x"
+    ]
+  }
+}

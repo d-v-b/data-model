@@ -1,0 +1,19 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time",
+      "line"
+    ],
+    "dimensions": [
+      "azimuth_time"
+    ],
+    "dtype": "<u4",
+    "long_name": "reference image measurement data set sample to which this geolocation grid point applies"
+  },
+  "coordinates": "line",
+  "dtype": "<u4",
+  "long_name": "reference image measurement data set sample to which this geolocation grid point applies"
+}

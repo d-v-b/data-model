@@ -1,0 +1,17 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "band",
+    "angle"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "angle",
+      "band"
+    ],
+    "dimensions": [
+      "band",
+      "angle"
+    ]
+  },
+  "unit": "deg"
+}

@@ -1,0 +1,57 @@
+{
+  "GRIB_NV": 0,
+  "GRIB_Nx": 9,
+  "GRIB_Ny": 9,
+  "GRIB_cfName": "air_pressure_at_mean_sea_level",
+  "GRIB_cfVarName": "msl",
+  "GRIB_dataType": "fc",
+  "GRIB_gridDefinitionDescription": "Latitude/Longitude Grid",
+  "GRIB_gridType": "regular_ll",
+  "GRIB_iDirectionIncrementInDegrees": 0.159,
+  "GRIB_iScansNegatively": 0,
+  "GRIB_jDirectionIncrementInDegrees": 0.128,
+  "GRIB_jPointsAreConsecutive": 0,
+  "GRIB_jScansPositively": 0,
+  "GRIB_latitudeOfFirstGridPointInDegrees": 42.427,
+  "GRIB_latitudeOfLastGridPointInDegrees": 41.404,
+  "GRIB_longitudeOfFirstGridPointInDegrees": 11.431,
+  "GRIB_longitudeOfLastGridPointInDegrees": 12.706,
+  "GRIB_missingValue": 3.4028234663852886e+38,
+  "GRIB_name": "Mean sea level pressure",
+  "GRIB_numberOfPoints": 81,
+  "GRIB_paramId": 151,
+  "GRIB_shortName": "msl",
+  "GRIB_stepType": "instant",
+  "GRIB_stepUnits": 0,
+  "GRIB_totalNumber": 0,
+  "GRIB_typeOfLevel": "surface",
+  "GRIB_units": "Pa",
+  "_ARRAY_DIMENSIONS": [
+    "latitude",
+    "longitude"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "latitude",
+      "longitude",
+      "number",
+      "time",
+      "step",
+      "surface",
+      "valid_time"
+    ],
+    "dimensions": [
+      "latitude",
+      "longitude"
+    ],
+    "eopf_is_masked": true,
+    "fill_value": NaN,
+    "long_name": "Mean sea level pressure",
+    "standard_name": "air_pressure_at_mean_sea_level",
+    "units": "Pa"
+  },
+  "coordinates": "isobaricInhPa number step surface time valid_time",
+  "long_name": "Mean sea level pressure",
+  "standard_name": "air_pressure_at_mean_sea_level",
+  "units": "Pa"
+}

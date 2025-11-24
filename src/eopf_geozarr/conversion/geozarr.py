@@ -128,6 +128,8 @@ def create_geozarr_dataset(
         dt, groups, gcp_group
     )
 
+    log.info("GeoZarr groups prepared", groups_prepared=list(geozarr_groups.keys()))
+
     # Create the GeoZarr compliant store through iterative processing
     dt_geozarr = iterative_copy(
         dt,
@@ -180,7 +182,13 @@ def setup_datatree_metadata_geozarr_spec_compliant(
         epsg_CPM_260 = epsg_CPM_260.split(":")[-1]
 
     for key in groups:
+        # Check if key exists in DataTree
+        if key not in dt:
+            log.info(f"Skipping group {key} - not found in DataTree")
+            continue
+
         if not dt[key].data_vars:
+            log.info(f"Skipping group {key} - no data variables")
             continue
 
         log.info(f"Processing group {key} for GeoZarr compliance")
@@ -233,7 +241,11 @@ def setup_datatree_metadata_geozarr_spec_compliant(
         _setup_grid_mapping(ds, grid_mapping_var_name)
 
         geozarr_groups[key] = ds
+        log.info(f"Added {key} to geozarr_groups")
 
+    log.info(
+        f"Returning geozarr_groups with {len(geozarr_groups)} groups: {list(geozarr_groups.keys())}"
+    )
     return geozarr_groups
 
 

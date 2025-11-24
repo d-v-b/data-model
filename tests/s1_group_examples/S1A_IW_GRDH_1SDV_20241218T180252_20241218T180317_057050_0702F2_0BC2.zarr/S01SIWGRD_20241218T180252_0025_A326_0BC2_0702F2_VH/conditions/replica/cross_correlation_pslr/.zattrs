@@ -1,0 +1,19 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time"
+    ],
+    "dimensions": [
+      "azimuth_time"
+    ],
+    "dtype": "<f4",
+    "long_name": "peak side lobe ratio of replica cross-correlation function between the reconstructed replica and the nominal replica",
+    "units": "dB"
+  },
+  "dtype": "<f4",
+  "long_name": "peak side lobe ratio of replica cross-correlation function between the reconstructed replica and the nominal replica",
+  "units": "dB"
+}

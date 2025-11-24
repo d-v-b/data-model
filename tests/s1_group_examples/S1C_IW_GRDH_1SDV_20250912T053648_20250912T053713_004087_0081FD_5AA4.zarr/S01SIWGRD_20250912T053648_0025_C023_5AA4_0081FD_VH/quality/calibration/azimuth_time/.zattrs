@@ -1,0 +1,12 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time"
+  ],
+  "calendar": "proleptic_gregorian",
+  "dimensions": [
+    "azimuth_time"
+  ],
+  "dtype": "<M8[us]",
+  "long_name": "zero doppler azimuth time at which calibration vector applies",
+  "units": "seconds since 2025-09-12 05:36:48.967107"
+}

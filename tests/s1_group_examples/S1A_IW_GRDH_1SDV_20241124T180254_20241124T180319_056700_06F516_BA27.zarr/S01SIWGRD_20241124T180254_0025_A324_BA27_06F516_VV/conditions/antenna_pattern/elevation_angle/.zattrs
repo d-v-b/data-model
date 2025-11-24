@@ -1,0 +1,22 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "count"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time",
+      "count"
+    ],
+    "dimensions": [
+      "azimuth_time",
+      "count"
+    ],
+    "dtype": "<f4",
+    "long_name": "elevation angle to grid point",
+    "units": "degrees"
+  },
+  "dtype": "<f4",
+  "long_name": "elevation angle to grid point",
+  "units": "degrees"
+}

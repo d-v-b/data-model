@@ -1,0 +1,25 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "swath",
+    "azimuth_time"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "line",
+      "swath",
+      "first_azimuth_time",
+      "last_azimuth_time",
+      "first_range_sample",
+      "last_range_sample"
+    ],
+    "dimensions": [
+      "swath",
+      "azimuth_time"
+    ],
+    "dtype": "<f4",
+    "long_name": "azimuth thermal noise correction vector power values (this array contains the count attribute number of floating point values)"
+  },
+  "coordinates": "first_azimuth_time first_range_sample last_azimuth_time last_range_sample line",
+  "dtype": "<f4",
+  "long_name": "azimuth thermal noise correction vector power values (this array contains the count attribute number of floating point values)"
+}

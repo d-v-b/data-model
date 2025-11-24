@@ -1,0 +1,25 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "band",
+    "detector",
+    "angle",
+    "y",
+    "x"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "angle",
+      "y",
+      "x",
+      "detector",
+      "band"
+    ],
+    "dimensions": [
+      "band",
+      "detector",
+      "angle",
+      "y",
+      "x"
+    ]
+  }
+}

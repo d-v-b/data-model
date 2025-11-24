@@ -5,6 +5,20 @@ import pathlib
 import xarray as xr
 
 
+def get_s1_group_examples() -> tuple[pathlib.Path, ...]:
+    return tuple(pathlib.Path("tests/s1_group_examples").glob("*.zarr"))
+
+
+S1_GROUP_EXAMPLES: tuple[pathlib.Path, ...] = get_s1_group_examples()
+
+
+def get_s2_group_examples() -> tuple[pathlib.Path, ...]:
+    return tuple(pathlib.Path("tests/s2_group_examples").glob("*.zarr"))
+
+
+S2_GROUP_EXAMPLES: tuple[pathlib.Path, ...] = get_s2_group_examples()
+
+
 def _verify_basic_structure(output_path: pathlib.Path, groups: list[str]) -> None:
     """Verify the basic Zarr store structure."""
     print("Verifying basic structure...")

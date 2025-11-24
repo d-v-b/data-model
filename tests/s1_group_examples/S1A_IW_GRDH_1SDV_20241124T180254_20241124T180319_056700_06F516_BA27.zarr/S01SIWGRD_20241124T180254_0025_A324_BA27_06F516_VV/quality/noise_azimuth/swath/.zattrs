@@ -1,0 +1,10 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "swath"
+  ],
+  "dimensions": [
+    "swath"
+  ],
+  "dtype": "U3",
+  "long_name": "Swath"
+}

@@ -1,0 +1,19 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time"
+    ],
+    "dimensions": [
+      "azimuth_time"
+    ],
+    "dtype": "<f8",
+    "long_name": "y component of angular velocity vector as extracted from ancillary attitude data",
+    "units": "degrees/s"
+  },
+  "dtype": "<f8",
+  "long_name": "y component of angular velocity vector as extracted from ancillary attitude data",
+  "units": "degrees/s"
+}

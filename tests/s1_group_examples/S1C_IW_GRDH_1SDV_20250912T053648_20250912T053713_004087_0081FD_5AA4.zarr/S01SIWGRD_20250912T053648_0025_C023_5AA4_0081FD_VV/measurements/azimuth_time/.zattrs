@@ -1,0 +1,10 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time"
+  ],
+  "dimensions": [
+    "azimuth_time"
+  ],
+  "dtype": "<u2",
+  "long_name": "azimuth time for GRD IW"
+}

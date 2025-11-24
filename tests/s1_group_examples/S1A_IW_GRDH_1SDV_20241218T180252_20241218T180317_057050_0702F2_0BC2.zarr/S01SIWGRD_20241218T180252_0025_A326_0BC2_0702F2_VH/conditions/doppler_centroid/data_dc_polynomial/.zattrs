@@ -1,0 +1,20 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "degree"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time",
+      "degree"
+    ],
+    "dimensions": [
+      "azimuth_time",
+      "degree"
+    ],
+    "dtype": "<f4",
+    "long_name": "doppler centroid estimated from data, expressed as polynomial with 5 coefficients: doppler centroid = d0 + d1(tsr-t0) + d2(tsr-t0)^2 + d3(tsr-t0)^3 + d4(tsr-t0)^4, where tsr = 2-way slant range time"
+  },
+  "dtype": "<f4",
+  "long_name": "doppler centroid estimated from data, expressed as polynomial with 5 coefficients: doppler centroid = d0 + d1(tsr-t0) + d2(tsr-t0)^2 + d3(tsr-t0)^3 + d4(tsr-t0)^4, where tsr = 2-way slant range time"
+}

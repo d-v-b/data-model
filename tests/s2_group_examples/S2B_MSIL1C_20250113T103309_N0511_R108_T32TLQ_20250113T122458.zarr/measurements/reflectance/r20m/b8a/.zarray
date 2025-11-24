@@ -1,0 +1,23 @@
+{
+  "shape": [
+    5490,
+    5490
+  ],
+  "chunks": [
+    915,
+    915
+  ],
+  "dtype": "<u2",
+  "fill_value": 0,
+  "order": "C",
+  "filters": null,
+  "dimension_separator": ".",
+  "compressor": {
+    "id": "blosc",
+    "cname": "zstd",
+    "clevel": 3,
+    "shuffle": 2,
+    "blocksize": 0
+  },
+  "zarr_format": 2
+}

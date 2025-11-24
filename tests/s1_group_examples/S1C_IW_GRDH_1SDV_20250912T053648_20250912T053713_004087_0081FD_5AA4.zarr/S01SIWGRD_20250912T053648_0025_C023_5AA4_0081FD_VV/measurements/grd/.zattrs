@@ -1,0 +1,19 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "ground_range"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time"
+    ],
+    "dimensions": [
+      "azimuth_time",
+      "ground_range"
+    ],
+    "dtype": "<u2",
+    "long_name": "measurement data set for GRD IW"
+  },
+  "dtype": "<u2",
+  "long_name": "measurement data set for GRD IW"
+}

@@ -1,0 +1,19 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "ground_range"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time",
+      "ground_range",
+      "line",
+      "pixel"
+    ],
+    "dimensions": [
+      "azimuth_time",
+      "ground_range"
+    ]
+  },
+  "coordinates": "line pixel"
+}

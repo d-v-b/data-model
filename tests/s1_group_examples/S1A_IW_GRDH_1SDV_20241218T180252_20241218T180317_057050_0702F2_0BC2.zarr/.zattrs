@@ -1,0 +1,189 @@
+{
+  "other_metadata": {
+    "eopf_category": "eocontainer",
+    "history": [
+      {
+        "output": "Downlinked Stream",
+        "processingTime": "2024-12-18T18:07:51.444091",
+        "processor": null,
+        "type": "Raw Data"
+      },
+      {
+        "inputs": {
+          "Applicable Document1": "S-1 Core PDGS S-1 Level-0 Product Format Specifications S1PD.SP.00110.ASTR",
+          "Applicable Document2": "Sentinel-1 SAR Space Packet Protocol Data Unit S1-IF-ASD-PL-0007",
+          "Raw Data": "Downlinked Stream"
+        },
+        "output": "Unknown",
+        "processingTime": "2024-12-18T18:21:20.306298",
+        "processor": null,
+        "type": "Raw Data"
+      },
+      {
+        "output": "Downlinked Stream",
+        "processingTime": "2024-12-18T18:07:56.136093",
+        "processor": null,
+        "type": "Raw Data"
+      },
+      {
+        "inputs": {
+          "Applicable Document1": "S-1 Core PDGS S-1 Level-0 Product Format Specifications S1PD.SP.00110.ASTR",
+          "Applicable Document2": "Sentinel-1 SAR Space Packet Protocol Data Unit S1-IF-ASD-PL-0007",
+          "Raw Data": "Downlinked Stream"
+        },
+        "output": "Unknown",
+        "processingTime": "2024-12-18T18:23:19.181794",
+        "processor": null,
+        "type": "Raw Data"
+      },
+      {
+        "inputs": {
+          "Applicable Document1": "S-1 Core PDGS S-1 Level-0 Product Format Specifications S1PD.SP.00110.ASTR",
+          "Applicable Document2": "Sentinel-1 SAR Space Packet Protocol Data Unit S1-IF-ASD-PL-0007",
+          "Raw Data1": "Unknown",
+          "Raw Data2": "Unknown"
+        },
+        "output": "/data/CDP/production//2213686/S1A_IW_RAW__0SDV_20241218T180248_20241218T180321_057050_0702F2_DD1A.SAFE",
+        "processingCentre": "S1A-PS, ESA",
+        "processingTime": "2024-12-18T18:25:03.308138",
+        "processor": "",
+        "type": "Level-0 Product"
+      },
+      {
+        "inputs": {
+          "AUX_CAL": "/data/CDP/production//2213686/S1A_AUX_CAL_V20190228T092500_G20240327T102320.SAFE",
+          "AUX_INS": "/data/CDP/production//2213686/S1A_AUX_INS_V20190228T092500_G20211103T111906.SAFE",
+          "AUX_PP1": "/data/CDP/production//2213686/S1A_AUX_PP1_V20190228T092500_G20241125T134138.SAFE",
+          "AUX_PRE": "/data/CDP/production//2213686/S1A_OPER_AUX_PREORB_OPOD_20241218T182302_V20241218T175234_20241219T002734.EOF",
+          "Level-0 Annotation Product": "/data/CDP/production//2213686/S1A_IW_RAW__0ADV_20241218T180158_20241218T181005_057050_0702F2_5DD9.SAFE",
+          "Level-0 Calibration Product": "/data/CDP/production//2213686/S1A_IW_RAW__0CDV_20241218T180158_20241218T181005_057050_0702F2_A9BE.SAFE",
+          "Level-0 Noise Product": "/data/CDP/production//2213686/S1A_IW_RAW__0NDV_20241218T180158_20241218T181005_057050_0702F2_FEA2.SAFE",
+          "Level-0 Product": "/data/CDP/production//2213686/S1A_IW_RAW__0SDV_20241218T180248_20241218T180321_057050_0702F2_DD1A.SAFE",
+          "product definition": "Sentinel-1 Product Definition (S1-RS-MDA-52-7440) release 2/7",
+          "product specification": "Sentinel-1 Product Specification (S1-RS-MDA-52-7441) release 3/14"
+        },
+        "output": "S1A_IW_SL1__1_DV_20241218T180249_20241218T180321_057050_0702F2_B182.SAFE",
+        "processingCentre": "Copernicus Ground Segment, ESA",
+        "processingTime": "2024-12-18T18:41:36.000000",
+        "processor": "Sentinel-1 IPF",
+        "type": "Level-1 Intermediate SLC Product",
+        "version": "003.90"
+      },
+      {
+        "inputs": {
+          "Level-1 Intermediate SLC Product": "S1A_IW_SL1__1_DV_20241218T180249_20241218T180321_057050_0702F2_B182.SAFE"
+        },
+        "output": "",
+        "processingCentre": "Copernicus Ground Segment, ESA",
+        "processingTime": "2024-12-18T18:42:48.000000",
+        "processor": "Sentinel-1 IPF",
+        "type": "L1",
+        "version": "003.90"
+      }
+    ],
+    "title": "S01SIWGRH"
+  },
+  "stac_discovery": {
+    "assets": {
+      "S01SIWGRD_20241218T180252_0025_A326_0BC2_0702F2_VH": {
+        "href": "S01SIWGRD_20241218T180252_0025_A326_0BC2_0702F2_VH"
+      },
+      "S01SIWGRD_20241218T180252_0025_A326_0BC2_0702F2_VV": {
+        "href": "S01SIWGRD_20241218T180252_0025_A326_0BC2_0702F2_VV"
+      }
+    },
+    "bbox": [
+      0.387656,
+      38.065109,
+      -2.922826,
+      39.970909
+    ],
+    "geometry": {
+      "coordinates": [
+        [
+          [
+            -2.922826,
+            39.567101
+          ],
+          [
+            0.07394,
+            39.970909
+          ],
+          [
+            0.387656,
+            38.470242
+          ],
+          [
+            -2.545932,
+            38.065109
+          ]
+        ]
+      ],
+      "type": "Polygon"
+    },
+    "id": "SAR Standard L1 Product",
+    "links": [
+      {
+        "href": "./.zattrs.json",
+        "rel": "self",
+        "type": "application/json"
+      }
+    ],
+    "properties": {
+      "constellation": "sentinel-1",
+      "created": "2024-12-18T18:42:48.000000Z",
+      "datetime": "2024-12-18T18:03:04.956043Z",
+      "end_datetime": "2024-12-18T18:03:17.455474Z",
+      "eopf:datatake_id": "459506",
+      "eopf:instrument_mode": "IW",
+      "instruments": "sar",
+      "platform": "sentinel-1a",
+      "processing:software": {
+        "name": "Sentinel-1 EOPF",
+        "version": "2.5.8"
+      },
+      "product:timeliness": "PT3H",
+      "product:timeliness_category": "NRT-3h",
+      "product:type": "S01SIWGRH",
+      "provider": [
+        {
+          "name": "Copernicus Ground Segment",
+          "roles": [
+            "processor"
+          ]
+        },
+        {
+          "name": "ESA",
+          "roles": [
+            "producer"
+          ]
+        }
+      ],
+      "sar:frequency_band": "C",
+      "sar:instrument_mode": "IW",
+      "sar:polarizations": [
+        "VV",
+        "VH"
+      ],
+      "sar:product_type": "GRD",
+      "sat:absolute_orbit": 57050,
+      "sat:anx_datetime": "2024-12-18T17:52:33.551554",
+      "sat:orbit_state": "ascending",
+      "sat:platform_international_designator": "2014-016A",
+      "sat:relative_orbit": 103,
+      "start_datetime": "2024-12-18T18:02:52.456611Z"
+    },
+    "stac_extensions": [
+      "https://stac-extensions.github.io/eopf/v1.2.0/schema.json",
+      "https://stac-extensions.github.io/product/v0.1.0/schema.json",
+      "https://stac-extensions.github.io/eo/v1.1.0/schema.json",
+      "https://stac-extensions.github.io/sat/v1.1.0/schema.json",
+      "https://stac-extensions.github.io/view/v1.0.0/schema.json",
+      "https://stac-extensions.github.io/scientific/v1.0.0/schema.json",
+      "https://stac-extensions.github.io/processing/v1.2.0/schema.json",
+      "https://stac-extensions.github.io/sar/v1.2.0/schema.json"
+    ],
+    "stac_version": "1.1.0",
+    "type": "Feature"
+  }
+}

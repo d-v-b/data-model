@@ -1,0 +1,19 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "degree"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time"
+    ],
+    "dimensions": [
+      "azimuth_time",
+      "degree"
+    ],
+    "dtype": "<f4",
+    "long_name": "reference replica amplitude coefficients in single precision floating point values"
+  },
+  "dtype": "<f4",
+  "long_name": "reference replica amplitude coefficients in single precision floating point values"
+}

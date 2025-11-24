@@ -1,0 +1,7 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "swath"
+  ],
+  "dtype": "<i4",
+  "long_name": "last range sample azimuth thermal noise correction"
+}

@@ -1,0 +1,13 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "slant_range_time"
+  ],
+  "dimensions": [
+    "azimuth_time",
+    "slant_range_time"
+  ],
+  "dtype": "<f8",
+  "long_name": "two-way slant range time to sample",
+  "units": "s"
+}

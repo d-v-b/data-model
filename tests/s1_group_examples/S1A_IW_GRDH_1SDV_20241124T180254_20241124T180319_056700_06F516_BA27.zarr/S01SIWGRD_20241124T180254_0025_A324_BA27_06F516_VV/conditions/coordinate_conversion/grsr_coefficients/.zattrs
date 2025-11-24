@@ -1,0 +1,19 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "degree"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time"
+    ],
+    "dimensions": [
+      "azimuth_time",
+      "degree"
+    ],
+    "dtype": "<f8",
+    "long_name": "coefficients to convert from ground range to slant range, slant range = s0 + s1(gr-gr0) + s2(gr-gr0)^2 + s3(gr-gr0)^3 + s4(gr-gr0)^4...+ sN(gr-gr0)^N where gr is the ground range distance to the desired pixel and N is the number of coefficients in the array minus one"
+  },
+  "dtype": "<f8",
+  "long_name": "coefficients to convert from ground range to slant range, slant range = s0 + s1(gr-gr0) + s2(gr-gr0)^2 + s3(gr-gr0)^3 + s4(gr-gr0)^4...+ sN(gr-gr0)^N where gr is the ground range distance to the desired pixel and N is the number of coefficients in the array minus one"
+}

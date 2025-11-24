@@ -1,0 +1,23 @@
+{
+  "_ARRAY_DIMENSIONS": [
+    "azimuth_time",
+    "ground_range"
+  ],
+  "_eopf_attrs": {
+    "coordinates": [
+      "azimuth_time",
+      "line",
+      "pixel",
+      "ground_range"
+    ],
+    "dimensions": [
+      "azimuth_time",
+      "ground_range"
+    ],
+    "dtype": "<f4",
+    "long_name": "digital number calibration vector (this array contains the count attribute number of floating point values; the values in this vector are aligned with the pixel vector)"
+  },
+  "coordinates": "line pixel",
+  "dtype": "<f4",
+  "long_name": "digital number calibration vector (this array contains the count attribute number of floating point values; the values in this vector are aligned with the pixel vector)"
+}
