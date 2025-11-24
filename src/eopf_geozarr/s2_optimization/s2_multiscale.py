@@ -23,7 +23,11 @@ from eopf_geozarr.data_api.geozarr.multiscales import (
     MultiscalesAttrsJSON,
     ScaleLevelJSON,
 )
-from eopf_geozarr.data_api.geozarr.types import XARRAY_ENCODING_KEYS, TMSMultiscalesAttrsJSON, XarrayDataArrayEncoding
+from eopf_geozarr.data_api.geozarr.types import (
+    XARRAY_ENCODING_KEYS,
+    TMSMultiscalesAttrsJSON,
+    XarrayDataArrayEncoding,
+)
 from eopf_geozarr.s2_optimization.common import DISTRIBUTED_AVAILABLE
 from eopf_geozarr.types import OverviewLevelJSON
 
@@ -306,8 +310,8 @@ def create_measurements_encoding(
             shard_dims = calculate_simple_shard_dimensions(var_data.shape, chunks)
             var_encoding["shards"] = shard_dims
         else:
-            var_encoding['shards'] = None
-        
+            var_encoding["shards"] = None
+
         for key in XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}:
             if key in var_data.encoding:
                 var_encoding[key] = var_data.encoding[key]
@@ -591,19 +595,30 @@ def create_downsampled_resolution_group(
             continue
         var_typ = determine_variable_type(var_name, var_data)
         if var_typ == "quality_mask":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary='trim').max()
+            lazy_downsampled = (
+                var_data.coarsen({"x": factor, "y": factor}, boundary="trim")
+                .max()
+                .sdyupr
+            )
         elif var_typ == "reflectance":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary='trim').mean()
+            lazy_downsampled = var_data.coarsen(
+                {"x": factor, "y": factor}, boundary="trim"
+            ).mean()
         elif var_typ == "classification":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary='trim').reduce(subsample_2)
+            lazy_downsampled = var_data.coarsen(
+                {"x": factor, "y": factor}, boundary="trim"
+            ).reduce(subsample_2)
         elif var_typ == "probability":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary='trim').mean()
+            lazy_downsampled = var_data.coarsen(
+                {"x": factor, "y": factor}, boundary="trim"
+            ).mean()
         else:
             raise ValueError(f"Unknown variable type {var_typ}")
 
         # preserve encoding
         lazy_downsampled.encoding = var_data.encoding
-        lazy_vars[var_name] = lazy_downsampled
+        # Ensure that dtype is preserved
+        lazy_vars[var_name] = lazy_downsampled.astype(var_data.dtype)
 
     if not lazy_vars:
         return xr.Dataset()
@@ -613,12 +628,16 @@ def create_downsampled_resolution_group(
 
     return dataset
 
+
 def subsample_2(a: xr.DataArray, axis: tuple[int, ...] | None = None) -> xr.DataArray:
     if axis is None:
         return a[((slice(None, None, 2),) * a.ndim)]
     else:
-        indexer = [slice(None, None, 2) if i in axis else slice(None) for i in range(a.ndim)]
+        indexer = [
+            slice(None, None, 2) if i in axis else slice(None) for i in range(a.ndim)
+        ]
         return a[tuple(indexer)]
+
 
 def create_downsampled_coordinates(
     level_2_dataset: xr.Dataset,
@@ -663,6 +682,7 @@ def create_lazy_downsample_operation_from_existing(
     source_data: xr.DataArray, target_height: int, target_width: int
 ) -> xr.DataArray:
     """Create lazy downsampling operation from existing data."""
+
     @delayed  # type: ignore[misc]
     def downsample_operation() -> Any:
         var_type = determine_variable_type(source_data.name, source_data)
@@ -748,6 +768,7 @@ def stream_write_dataset(
     if DISTRIBUTED_AVAILABLE:
         try:
             import distributed
+
             distributed.progress(write_job, notebook=False)
         except Exception as e:
             log.warning("Could not display progress bar: {}", e=e)
@@ -832,7 +853,10 @@ def rechunk_dataset_for_encoding(dataset: xr.Dataset, encoding: dict) -> xr.Data
 
     return rechunked_dataset
 
-def extract_scale_offset_encoding(attrs: Mapping[str, Mapping[str, object]]) -> dict[str, object]:
+
+def extract_scale_offset_encoding(
+    attrs: Mapping[str, Mapping[str, object]],
+) -> dict[str, object]:
     """
     extract the scale / offset encoding from _eopf_attrs
     """
