@@ -17,6 +17,10 @@ s2_example_json_paths = tuple(
 
 @pytest.fixture(params=s1_example_json_paths, ids=lambda p: p.stem)
 def s1_group_example(request, tmp_path) -> tuple[pathlib.Path, ...]:
+    """
+    A pytest fixture that returns the path to a Zarr group with the same layout as a sentinel 1
+    product
+    """
     path: pathlib.Path = request.param
     out_dir = tmp_path / path.stem
     g = GroupSpec(**json.loads(path.read_text()))
@@ -26,6 +30,10 @@ def s1_group_example(request, tmp_path) -> tuple[pathlib.Path, ...]:
 
 @pytest.fixture(params=s2_example_json_paths, ids=lambda p: p.stem)
 def s2_group_example(request, tmp_path) -> tuple[pathlib.Path, ...]:
+    """
+    A pytest fixture that returns the path to a Zarr group with the same layout as a sentinel 2
+    product
+    """
     path: pathlib.Path = request.param
     out_dir = tmp_path / path.stem
     g = GroupSpec(**json.loads(path.read_text()))
