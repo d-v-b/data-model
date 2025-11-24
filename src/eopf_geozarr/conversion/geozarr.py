@@ -638,7 +638,7 @@ def create_geozarr_compliant_multiscales(
             level=ol["level"],
             width=ol["width"],
             height=ol["height"],
-            scale_factor=ol["scale_factor"],
+            scale_factor=ol["scale_relative"],
         )
 
     # Create native CRS tile matrix set
@@ -679,7 +679,7 @@ def create_geozarr_compliant_multiscales(
 
         width = overview["width"]
         height = overview["height"]
-        scale_factor = overview["scale_factor"]
+        scale_factor = overview["scale_relative"]
 
         log.info(
             f"Creating overview level (scale) {level} with scale factor {scale_factor}"
@@ -877,8 +877,8 @@ def create_native_crs_tile_matrix_set(
         scale_denominator = cell_size * 3779.5275
 
         # Calculate matrix dimensions
-        tile_width = overview["chunks"][1][0] if "chunks" in overview else 256
-        tile_height = overview["chunks"][0][0] if "chunks" in overview else 256
+        tile_width = overview["chunks"][1][0] if "chunks" in overview else 256  # type: ignore[index]
+        tile_height = overview["chunks"][0][0] if "chunks" in overview else 256  # type: ignore[index]
         matrix_width = int(np.ceil(width / tile_width))
         matrix_height = int(np.ceil(height / tile_height))
 
@@ -1805,4 +1805,4 @@ def _is_sentinel1(dt: xr.DataTree) -> bool:
 
 
 def get_zarr_group(data: xr.DataTree) -> zarr.Group:
-    return data._close.__self__.zarr_group  # type: ignore[union-attr, no-any-return]
+    return data._close.__self__.zarr_group

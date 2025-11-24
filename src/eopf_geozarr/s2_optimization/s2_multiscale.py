@@ -268,11 +268,11 @@ def create_multiscale_from_datatree(
 
 def create_measurements_encoding(
     dataset: xr.Dataset, *, spatial_chunk: int, enable_sharding: bool = True
-) -> XarrayDataArrayEncoding:
+) -> dict[str, XarrayDataArrayEncoding]:
     """
     Create optimized encoding for a pyramid level with advanced chunking and sharding.
     """
-    encoding = {}
+    encoding: dict[str, XarrayDataArrayEncoding] = {}
 
     for var_name, var_data in dataset.data_vars.items():
         # start with the original encoding
@@ -312,9 +312,10 @@ def create_measurements_encoding(
         else:
             var_encoding["shards"] = None
 
+        # Forward-propagate the existing encoding
         for key in XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}:
             if key in var_data.encoding:
-                var_encoding[key] = var_data.encoding[key]
+                var_encoding[key] = var_data.encoding[key]  # type: ignore[literal-required]
         if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
             log.warning(
                 f"Unknown encoding keys in {var_name}: {set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS}"
@@ -323,7 +324,7 @@ def create_measurements_encoding(
 
     # Add coordinate encoding
     for coord_name in dataset.coords:
-        encoding[coord_name] = {"compressors": []}
+        encoding[coord_name] = {"compressors": []}  # type: ignore[typeddict-item]
 
     return encoding
 
@@ -483,13 +484,13 @@ def add_multiscales_metadata_to_parent(
         tile_matrix_set = create_native_crs_tile_matrix_set(
             native_crs,
             native_bounds,
-            overview_levels,  # type: ignore[arg-type]
+            overview_levels,
             group_prefix=None,
         )
 
         # Create tile matrix limits
         tile_matrix_limits = _create_tile_matrix_limits(
-            overview_levels,  # type: ignore[arg-type]
+            overview_levels,
             tile_width=256,
         )
         multiscales = {
@@ -541,7 +542,7 @@ def add_multiscales_metadata_to_parent(
     return dt_multiscale
 
 
-def create_original_encoding(dataset: xr.Dataset) -> XarrayDataArrayEncoding:
+def create_original_encoding(dataset: xr.Dataset) -> dict[str, XarrayDataArrayEncoding]:
     """Write a group preserving its original chunking and encoding."""
     from zarr.codecs import BloscCodec
 
@@ -556,7 +557,7 @@ def create_original_encoding(dataset: xr.Dataset) -> XarrayDataArrayEncoding:
         var_encoding["compressors"] = (compressor,)
         for key in XARRAY_ENCODING_KEYS - {"compressors"}:
             if key in var_data.encoding:
-                var_encoding[key] = var_data.encoding[key]
+                var_encoding[key] = var_data.encoding[key]  # type: ignore[literal-required]
         if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
             log.warning(
                 f"Unknown encoding keys in {var_name}: {set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS}"
@@ -719,7 +720,7 @@ def create_lazy_downsample_operation_from_existing(
 def stream_write_dataset(
     dataset: xr.Dataset,
     dataset_path: str,
-    encoding: dict[str, Any],
+    encoding: dict[str, XarrayDataArrayEncoding],
     *,
     enable_sharding: bool,
 ) -> xr.Dataset:
@@ -808,7 +809,9 @@ def write_geo_metadata(
             var.attrs["grid_mapping"] = grid_mapping_var_name
 
 
-def rechunk_dataset_for_encoding(dataset: xr.Dataset, encoding: dict) -> xr.Dataset:
+def rechunk_dataset_for_encoding(
+    dataset: xr.Dataset, encoding: dict[str, XarrayDataArrayEncoding]
+) -> xr.Dataset:
     """
     Rechunk dataset variables to align with sharding dimensions when sharding is enabled.
 

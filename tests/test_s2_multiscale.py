@@ -11,92 +11,66 @@ import pytest
 import xarray as xr
 from structlog.testing import capture_logs
 
-from eopf_geozarr.s2_optimization.s2_multiscale import S2MultiscalePyramid
+from eopf_geozarr.s2_optimization.s2_multiscale import (
+    calculate_aligned_chunk_size,
+    calculate_simple_shard_dimensions,
+    create_measurements_encoding,
+    create_multiscale_from_datatree,
+)
 
 
-class TestS2MultiscalePyramid:
-    """Test suite for S2MultiscalePyramid class."""
+@pytest.fixture
+def sample_dataset():
+    """Create a sample xarray dataset for testing."""
+    x = np.linspace(0, 1000, 100)
+    y = np.linspace(0, 1000, 100)
+    time = np.array(["2023-01-01", "2023-01-02"], dtype="datetime64[ns]")
 
-    @pytest.fixture
-    def pyramid(self):
-        """Create a basic S2MultiscalePyramid instance."""
-        return S2MultiscalePyramid(enable_sharding=True, spatial_chunk=1024)
+    # Create sample variables with different dimensions
+    b02 = xr.DataArray(
+        np.random.randint(0, 4000, (2, 100, 100)),
+        dims=["time", "y", "x"],
+        coords={"time": time, "y": y, "x": x},
+        name="b02",
+    )
 
-    @pytest.fixture
-    def sample_dataset(self):
-        """Create a sample xarray dataset for testing."""
-        x = np.linspace(0, 1000, 100)
-        y = np.linspace(0, 1000, 100)
-        time = np.array(["2023-01-01", "2023-01-02"], dtype="datetime64[ns]")
+    b05 = xr.DataArray(
+        np.random.randint(0, 4000, (2, 100, 100)),
+        dims=["time", "y", "x"],
+        coords={"time": time, "y": y, "x": x},
+        name="b05",
+    )
 
-        # Create sample variables with different dimensions
-        b02 = xr.DataArray(
-            np.random.randint(0, 4000, (2, 100, 100)),
-            dims=["time", "y", "x"],
-            coords={"time": time, "y": y, "x": x},
-            name="b02",
-        )
+    scl = xr.DataArray(
+        np.random.randint(0, 11, (2, 100, 100)),
+        dims=["time", "y", "x"],
+        coords={"time": time, "y": y, "x": x},
+        name="scl",
+    )
 
-        b05 = xr.DataArray(
-            np.random.randint(0, 4000, (2, 100, 100)),
-            dims=["time", "y", "x"],
-            coords={"time": time, "y": y, "x": x},
-            name="b05",
-        )
+    dataset = xr.Dataset({"b02": b02, "b05": b05, "scl": scl})
 
-        scl = xr.DataArray(
-            np.random.randint(0, 11, (2, 100, 100)),
-            dims=["time", "y", "x"],
-            coords={"time": time, "y": y, "x": x},
-            name="scl",
-        )
+    return dataset
 
-        dataset = xr.Dataset({"b02": b02, "b05": b05, "scl": scl})
 
-        return dataset
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for testing."""
+    temp_dir = tempfile.mkdtemp()
+    yield temp_dir
+    shutil.rmtree(temp_dir)
 
-    @pytest.fixture
-    def temp_dir(self):
-        """Create a temporary directory for testing."""
-        temp_dir = tempfile.mkdtemp()
-        yield temp_dir
-        shutil.rmtree(temp_dir)
 
-    def test_init(self):
-        """Test S2MultiscalePyramid initialization."""
-        pyramid = S2MultiscalePyramid(enable_sharding=True, spatial_chunk=512)
+class TestS2MultiscaleFunctions:
+    """Test suite for S2 multiscale functions."""
 
-        assert pyramid.enable_sharding is True
-        assert pyramid.spatial_chunk == 512
-        assert hasattr(pyramid, "resampler")
-        assert len(pyramid.pyramid_levels) == 6
-        assert pyramid.pyramid_levels[0] == 10
-        assert pyramid.pyramid_levels[1] == 20
-        assert pyramid.pyramid_levels[2] == 60
-        assert pyramid.pyramid_levels[3] == 120
-        assert pyramid.pyramid_levels[4] == 360
-        assert pyramid.pyramid_levels[5] == 720
-
-    def test_pyramid_levels_structure(self, pyramid):
-        """Test the pyramid levels structure."""
-        expected_levels = {
-            0: 10,  # Level 0: 10m
-            1: 20,  # Level 1: 20m
-            2: 60,  # Level 2: 60m
-            3: 120,  # Level 3: 120m
-            4: 360,  # Level 4: 360m
-            5: 720,  # Level 5: 720m
-        }
-
-        assert pyramid.pyramid_levels == expected_levels
-
-    def test_calculate_simple_shard_dimensions(self, pyramid):
+    def test_calculate_simple_shard_dimensions(self):
         """Test simplified shard dimensions calculation."""
         # Test 3D data (time, y, x) - shards are multiples of chunks
         data_shape = (5, 1024, 1024)
         chunks = (1, 256, 256)
 
-        shard_dims = pyramid._calculate_simple_shard_dimensions(data_shape, chunks)
+        shard_dims = calculate_simple_shard_dimensions(data_shape, chunks)
 
         assert len(shard_dims) == 3
         assert shard_dims[0] == 1  # Time dimension should be 1
@@ -107,7 +81,7 @@ class TestS2MultiscalePyramid:
         data_shape = (1000, 1000)
         chunks = (256, 256)
 
-        shard_dims = pyramid._calculate_simple_shard_dimensions(data_shape, chunks)
+        shard_dims = calculate_simple_shard_dimensions(data_shape, chunks)
 
         assert len(shard_dims) == 2
         # Should use largest multiple of chunk_size that fits
@@ -116,9 +90,11 @@ class TestS2MultiscalePyramid:
         )  # 3 * 256 = 768 (largest multiple that fits in 1000)
         assert shard_dims[1] == 768  # 3 * 256 = 768
 
-    def test_create_measurements_encoding(self, pyramid, sample_dataset):
+    def test_create_measurements_encoding(self, sample_dataset):
         """Test measurements encoding creation with xy-aligned sharding."""
-        encoding = pyramid._create_measurements_encoding(sample_dataset)
+        encoding = create_measurements_encoding(
+            sample_dataset, enable_sharding=True, spatial_chunk=1024
+        )
 
         # Check that encoding is created for all variables
         for var_name in sample_dataset.data_vars:
@@ -131,8 +107,7 @@ class TestS2MultiscalePyramid:
             assert "compressors" in var_encoding or "compressor" in var_encoding
 
             # Check sharding is included when enabled
-            if pyramid.enable_sharding:
-                assert "shards" in var_encoding
+            assert "shards" in var_encoding
 
         # Check coordinate encoding
         for coord_name in sample_dataset.coords:
@@ -143,29 +118,31 @@ class TestS2MultiscalePyramid:
                     or encoding[coord_name].get("compressors") is None
                 )
 
-    def test_create_measurements_encoding_time_chunking(self, pyramid, sample_dataset):
+    def test_create_measurements_encoding_time_chunking(self, sample_dataset):
         """Test that time dimension is chunked to 1 for single file per time."""
-        encoding = pyramid._create_measurements_encoding(sample_dataset)
+        encoding = create_measurements_encoding(
+            sample_dataset, enable_sharding=True, spatial_chunk=1024
+        )
 
         for var_name in sample_dataset.data_vars:
             if sample_dataset[var_name].ndim == 3:  # 3D variable with time
                 chunks = encoding[var_name]["chunks"]
                 assert chunks[0] == 1  # Time dimension should be chunked to 1
 
-    def test_calculate_aligned_chunk_size(self, pyramid):
+    def test_calculate_aligned_chunk_size(self):
         """Test aligned chunk size calculation."""
         # Test with spatial_chunk that divides evenly
-        chunk_size = pyramid._calculate_aligned_chunk_size(1024, 256)
+        chunk_size = calculate_aligned_chunk_size(1024, 256)
         assert chunk_size == 256
 
         # Test with spatial_chunk that doesn't divide evenly
-        chunk_size = pyramid._calculate_aligned_chunk_size(1000, 256)
+        chunk_size = calculate_aligned_chunk_size(1000, 256)
         # Should return a value that divides evenly into 1000
         assert 1000 % chunk_size == 0
 
 
-class TestS2MultiscalePyramidIntegration:
-    """Integration tests for S2MultiscalePyramid."""
+class TestS2MultiscaleIntegration:
+    """Integration tests for S2 multiscale functions."""
 
     @pytest.fixture
     def simple_datatree(self):
@@ -193,13 +170,11 @@ class TestS2MultiscalePyramidIntegration:
 
         return dt
 
-    @patch.object(S2MultiscalePyramid, "_stream_write_dataset")
+    @patch("eopf_geozarr.s2_optimization.s2_multiscale.stream_write_dataset")
     def test_create_multiscale_from_datatree(
         self, mock_write, simple_datatree, tmp_path
     ):
         """Test multiscale creation from DataTree."""
-        pyramid = S2MultiscalePyramid(enable_sharding=True, spatial_chunk=256)
-
         output_path = str(tmp_path / "output.zarr")
 
         # Mock the write to avoid actual file I/O
@@ -207,8 +182,11 @@ class TestS2MultiscalePyramidIntegration:
 
         # Capture log output using structlog's testing context manager
         with capture_logs() as cap_logs:
-            result = pyramid.create_multiscale_from_datatree(
-                simple_datatree, output_path, verbose=False
+            result = create_multiscale_from_datatree(
+                simple_datatree,
+                output_path,
+                enable_sharding=True,
+                spatial_chunk=256,
             )
 
         # Should process groups

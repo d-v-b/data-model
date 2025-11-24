@@ -54,7 +54,7 @@ class OverviewLevelJSON(TypedDict):
     height: int
     translation_relative: float
     scale_absolute: float
-    scale_relative: int
+    scale_relative: int | float
     chunks: tuple[tuple[int, ...], ...] | list[tuple[int, ...]] | None
 
 

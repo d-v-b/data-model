@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Literal, NotRequired, Self
+from typing import Literal, NotRequired
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import TypedDict
 
@@ -25,7 +25,7 @@ MultiscaleConventions = TypedDict(  # type: ignore[misc]
     closed=False,
 )
 
-MULTISCALE_CONVENTION: MultiscaleConventions = {
+MULTISCALE_CONVENTION: MultiscaleConventions = {  # type: ignore[typeddict-unknown-key]
     "d35379db-88df-4056-af3a-620245f8e347": {
         "version": "0.1.0",
         "schema": "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v0.1.0/schema.json",
@@ -41,6 +41,16 @@ class ConventionAttributes(BaseModel):
     zarr_conventions: MultiscaleConventions
 
 
+class TransformJSON(TypedDict):
+    scale: NotRequired[tuple[float, ...]]
+    translation: NotRequired[tuple[float, ...]]
+
+
+class Transform(BaseModel):
+    scale: tuple[float, ...] | MISSING = MISSING
+    translation: tuple[float, ...] | MISSING = MISSING
+
+
 class ScaleLevelJSON(TypedDict):
     asset: str
     derived_from: NotRequired[str]
@@ -53,20 +63,10 @@ class ScaleLevelJSON(TypedDict):
 class ScaleLevel(BaseModel):
     asset: str
     derived_from: str | MISSING = MISSING
-    translation: tuple[float, ...] | MISSING = MISSING
-    factors: tuple[float, ...] | MISSING = MISSING
-    scale: tuple[float, ...] | MISSING = MISSING
+    transform: Transform | MISSING = MISSING
     resampling_method: str | MISSING = MISSING
 
     model_config = {"extra": "allow"}
-
-    @model_validator(mode="after")
-    def check_model(self: Self) -> Self:
-        if self.derived_from is not MISSING and self.scale is MISSING:
-            raise ValueError(
-                f"from_group was set to {self.derived_from}, but scale was unset. This is an error."
-            )
-        return self
 
 
 class MultiscalesJSON(TypedDict):

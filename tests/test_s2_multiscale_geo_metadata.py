@@ -4,23 +4,22 @@ Unit tests for _write_geo_metadata method in S2MultiscalePyramid.
 Tests the geographic metadata writing functionality added to level creation.
 """
 
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 import xarray as xr
 
-from eopf_geozarr.s2_optimization.s2_multiscale import S2MultiscalePyramid
+from eopf_geozarr.s2_optimization.s2_multiscale import (
+    create_measurements_encoding,
+    stream_write_dataset,
+    write_geo_metadata,
+)
 
 
 @pytest.fixture
-def pyramid_creator():
-    """Create a S2MultiscalePyramid instance for testing."""
-    return S2MultiscalePyramid(enable_sharding=True, spatial_chunk=1024)
-
-
-@pytest.fixture
-def sample_dataset_with_crs():
+def sample_dataset_with_crs() -> xr.Dataset:
     """Create a sample dataset with CRS information."""
     coords = {
         "x": (["x"], np.linspace(0, 1000, 100)),
@@ -44,7 +43,7 @@ def sample_dataset_with_crs():
 
 
 @pytest.fixture
-def sample_dataset_with_epsg_attrs():
+def sample_dataset_with_epsg_attrs() -> xr.Dataset:
     """Create a sample dataset with EPSG in attributes."""
     coords = {
         "x": (["x"], np.linspace(0, 1000, 50)),
@@ -66,7 +65,7 @@ def sample_dataset_with_epsg_attrs():
 
 
 @pytest.fixture
-def sample_dataset_no_crs():
+def sample_dataset_no_crs() -> xr.Dataset:
     """Create a sample dataset without CRS information."""
     coords = {
         "x": (["x"], np.linspace(0, 1000, 25)),
@@ -85,12 +84,12 @@ class TestWriteGeoMetadata:
     """Test the _write_geo_metadata method."""
 
     def test_write_geo_metadata_with_rio_crs(
-        self, pyramid_creator, sample_dataset_with_crs
-    ):
+        self, sample_dataset_with_crs: xr.Dataset
+    ) -> None:
         """Test _write_geo_metadata with dataset that has rioxarray CRS."""
 
         # Call the method
-        pyramid_creator._write_geo_metadata(sample_dataset_with_crs)
+        write_geo_metadata(sample_dataset_with_crs)
 
         # Verify CRS was written
         assert hasattr(sample_dataset_with_crs, "rio")
@@ -98,8 +97,8 @@ class TestWriteGeoMetadata:
         assert sample_dataset_with_crs.rio.crs.to_epsg() == 32632
 
     def test_write_geo_metadata_with_epsg_attrs(
-        self, pyramid_creator, sample_dataset_with_epsg_attrs
-    ):
+        self, sample_dataset_with_epsg_attrs: xr.Dataset
+    ) -> None:
         """Test _write_geo_metadata with dataset that has EPSG in variable attributes."""
 
         # Verify initial state - no CRS
@@ -109,14 +108,14 @@ class TestWriteGeoMetadata:
         )
 
         # Call the method
-        pyramid_creator._write_geo_metadata(sample_dataset_with_epsg_attrs)
+        write_geo_metadata(sample_dataset_with_epsg_attrs)
 
         # Verify CRS was written from attributes
         assert hasattr(sample_dataset_with_epsg_attrs, "rio")
         assert sample_dataset_with_epsg_attrs.rio.crs is not None
         assert sample_dataset_with_epsg_attrs.rio.crs.to_epsg() == 32632
 
-    def test_write_geo_metadata_no_crs(self, pyramid_creator, sample_dataset_no_crs):
+    def test_write_geo_metadata_no_crs(self, sample_dataset_no_crs: xr.Dataset) -> None:
         """Test _write_geo_metadata with dataset that has no CRS information."""
 
         # Verify initial state - no CRS
@@ -126,28 +125,28 @@ class TestWriteGeoMetadata:
         )
 
         # Call the method - should not fail but also not add CRS
-        pyramid_creator._write_geo_metadata(sample_dataset_no_crs)
+        write_geo_metadata(sample_dataset_no_crs)
 
         # Verify no CRS was added (method handles gracefully)
         # The method should not fail even when no CRS is available
         # This tests the robustness of the method
 
     def test_write_geo_metadata_custom_grid_mapping_name(
-        self, pyramid_creator, sample_dataset_with_crs
-    ):
+        self, sample_dataset_with_crs: xr.Dataset
+    ) -> None:
         """Test _write_geo_metadata with custom grid_mapping variable name."""
 
         # Call the method with custom grid mapping name
         custom_name = "custom_spatial_ref"
-        pyramid_creator._write_geo_metadata(sample_dataset_with_crs, custom_name)
+        write_geo_metadata(sample_dataset_with_crs, custom_name)
 
         # Verify CRS was written
         assert hasattr(sample_dataset_with_crs, "rio")
         assert sample_dataset_with_crs.rio.crs is not None
 
     def test_write_geo_metadata_preserves_existing_data(
-        self, pyramid_creator, sample_dataset_with_crs
-    ):
+        self, sample_dataset_with_crs: xr.Dataset
+    ) -> None:
         """Test that _write_geo_metadata preserves existing data variables and coordinates."""
 
         # Store original data
@@ -156,40 +155,40 @@ class TestWriteGeoMetadata:
         original_b02_data = sample_dataset_with_crs["b02"].values.copy()
 
         # Call the method
-        pyramid_creator._write_geo_metadata(sample_dataset_with_crs)
+        write_geo_metadata(sample_dataset_with_crs)
 
         # Verify all original data is preserved
         assert list(sample_dataset_with_crs.data_vars.keys()) == original_vars
         assert all(coord in sample_dataset_with_crs.coords for coord in original_coords)
         assert np.array_equal(sample_dataset_with_crs["b02"].values, original_b02_data)
 
-    def test_write_geo_metadata_empty_dataset(self, pyramid_creator):
+    def test_write_geo_metadata_empty_dataset(self) -> None:
         """Test _write_geo_metadata with empty dataset."""
 
         empty_ds = xr.Dataset({}, coords={})
 
         # Call the method - should handle gracefully
-        pyramid_creator._write_geo_metadata(empty_ds)
+        write_geo_metadata(empty_ds)
 
         # Verify method doesn't fail with empty dataset
         # This tests robustness
 
     def test_write_geo_metadata_rio_write_crs_called(
-        self, pyramid_creator, sample_dataset_with_crs
-    ):
+        self, sample_dataset_with_crs: xr.Dataset
+    ) -> None:
         """Test that rio.write_crs is called correctly."""
 
         # Mock the rio.write_crs method
         with patch.object(sample_dataset_with_crs.rio, "write_crs") as mock_write_crs:
             # Call the method
-            pyramid_creator._write_geo_metadata(sample_dataset_with_crs)
+            write_geo_metadata(sample_dataset_with_crs)
 
             # Verify rio.write_crs was called with correct arguments
             mock_write_crs.assert_called_once()
             call_args = mock_write_crs.call_args
             assert call_args[1]["inplace"] is True  # inplace=True should be passed
 
-    def test_write_geo_metadata_crs_from_multiple_sources(self, pyramid_creator):
+    def test_write_geo_metadata_crs_from_multiple_sources(self) -> None:
         """Test CRS detection from multiple sources in priority order."""
 
         # Create dataset with both rio CRS and EPSG attributes
@@ -207,14 +206,14 @@ class TestWriteGeoMetadata:
         ds["b08"].attrs["proj:epsg"] = 32632  # EPSG attribute
 
         # Call the method
-        pyramid_creator._write_geo_metadata(ds)
+        write_geo_metadata(ds)
 
         # Verify rio CRS was used (priority over attributes)
         assert ds.rio.crs.to_epsg() == 4326  # Should still be 4326, not 32632
 
     def test_write_geo_metadata_integration_with_stream_write(
-        self, pyramid_creator, tmp_path
-    ):
+        self, tmp_path: Path
+    ) -> None:
         """Test that _write_geo_metadata is properly integrated in _stream_write_dataset."""
 
         # Create a simple dataset with CRS
@@ -231,13 +230,15 @@ class TestWriteGeoMetadata:
         ds = ds.rio.write_crs("EPSG:32632")
 
         # Create encoding for the dataset
-        encoding = pyramid_creator._create_measurements_encoding(ds)
+        encoding = create_measurements_encoding(
+            ds, spatial_chunk=1024, enable_sharding=True
+        )
 
         # Create a temporary output path
         output_path = str(tmp_path / "test_dataset.zarr")
 
         # Call _stream_write_dataset (which should call _write_geo_metadata internally)
-        pyramid_creator._stream_write_dataset(ds, output_path, encoding)
+        stream_write_dataset(ds, output_path, encoding, enable_sharding=True)
 
         # Re-open the written dataset to verify CRS was persisted
         written_ds = xr.open_dataset(
@@ -253,7 +254,9 @@ class TestWriteGeoMetadata:
 class TestWriteGeoMetadataEdgeCases:
     """Test edge cases for _write_geo_metadata method."""
 
-    def test_write_geo_metadata_invalid_crs(self, pyramid_creator):
+    def test_write_geo_metadata_invalid_crs(
+        self,
+    ) -> None:
         """Test _write_geo_metadata with invalid CRS data."""
 
         coords = {
@@ -272,9 +275,11 @@ class TestWriteGeoMetadataEdgeCases:
         from pyproj.exceptions import CRSError
 
         with pytest.raises(CRSError):
-            pyramid_creator._write_geo_metadata(ds)
+            write_geo_metadata(ds)
 
-    def test_write_geo_metadata_mixed_crs_variables(self, pyramid_creator):
+    def test_write_geo_metadata_mixed_crs_variables(
+        self,
+    ) -> None:
         """Test _write_geo_metadata with variables having different CRS information."""
 
         coords = {
@@ -294,14 +299,14 @@ class TestWriteGeoMetadataEdgeCases:
         ds["var2"].attrs["proj:epsg"] = 4326
 
         # Call the method (should use the first CRS found)
-        pyramid_creator._write_geo_metadata(ds)
+        write_geo_metadata(ds)
 
         # Verify a CRS was applied (should be the first one found)
         assert hasattr(ds, "rio")
 
     def test_write_geo_metadata_maintains_dataset_attrs(
-        self, pyramid_creator, sample_dataset_with_crs
-    ):
+        self, sample_dataset_with_crs: xr.Dataset
+    ) -> None:
         """Test that _write_geo_metadata maintains dataset-level attributes."""
 
         # Add some dataset attributes
@@ -312,12 +317,8 @@ class TestWriteGeoMetadataEdgeCases:
         original_attrs = sample_dataset_with_crs.attrs.copy()
 
         # Call the method
-        pyramid_creator._write_geo_metadata(sample_dataset_with_crs)
+        write_geo_metadata(sample_dataset_with_crs)
 
         # Verify dataset attributes are preserved
         for key, value in original_attrs.items():
             assert sample_dataset_with_crs.attrs[key] == value
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])

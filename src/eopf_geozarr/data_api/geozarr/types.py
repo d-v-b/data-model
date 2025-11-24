@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Final, Literal, NotRequired, TypedDict
+from typing import Final, Literal, NotRequired, TypedDict
 
 
 class TileMatrixLimitJSON(TypedDict):
@@ -26,19 +26,22 @@ XARRAY_ENCODING_KEYS: Final[set[str]] = {
     "dtype",
 }
 
+
 class XarrayDataArrayEncoding(TypedDict):
     """
     The dict form of the encoding for xarray.DataArray
     """
+
     chunks: NotRequired[tuple[int, ...]]
     preferred_chunks: NotRequired[tuple[int, ...]]
-    compressors: NotRequired[tuple[object, ...]]
+    compressors: NotRequired[tuple[object, ...] | None]
     filters: NotRequired[tuple[object, ...]]
     shards: NotRequired[tuple[int, ...] | None]
     _FillValue: NotRequired[object]
     scale_factor: NotRequired[float]
     add_offset: NotRequired[float]
     dtype: NotRequired[object]
+
 
 class StandardXCoordAttrsJSON(TypedDict):
     units: Literal["m"]

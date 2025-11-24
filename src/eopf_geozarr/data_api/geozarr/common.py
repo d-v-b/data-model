@@ -4,7 +4,7 @@ import io
 import urllib
 import urllib.request
 from dataclasses import dataclass
-from typing import Annotated, Any, Mapping, Self, TypeVar
+from typing import Annotated, Any, Mapping, Self, TypeGuard, TypeVar
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel, Field, model_validator
@@ -308,3 +308,7 @@ class MultiscaleGroupAttrs(BaseModel, extra="allow"):
     """
 
     multiscales: TMSMultiscales
+
+
+def is_none(data: object) -> TypeGuard[None]:
+    return data is None

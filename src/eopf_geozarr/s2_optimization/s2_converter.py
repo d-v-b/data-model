@@ -4,7 +4,6 @@ Main S2 optimization converter.
 
 from __future__ import annotations
 
-import importlib.util
 import time
 from typing import Any, TypedDict
 
@@ -22,13 +21,14 @@ from .s2_multiscale import create_multiscale_from_datatree
 
 log = structlog.get_logger()
 
+
 def convert_s2(
     dt_input: xr.DataTree,
     output_path: str,
     validate_output: bool,
     enable_sharding: bool,
     spatial_chunk: int,
-) -> None:
+) -> xr.DataTree:
     """
     Convert S2 dataset to optimized structure.
 
@@ -274,7 +274,7 @@ def create_result_datatree(output_path: str) -> xr.DataTree:
 def is_sentinel2_dataset(group: zarr.Group) -> bool:
     from eopf_geozarr.pyz.v2 import GroupSpec
 
-    adapter = TypeAdapter(Sentinel1Root | Sentinel2Root)
+    adapter = TypeAdapter(Sentinel1Root | Sentinel2Root)  # type: ignore[var-annotated]
     try:
         model = adapter.validate_python(GroupSpec.from_zarr(group).model_dump())
     except ValueError as e:
