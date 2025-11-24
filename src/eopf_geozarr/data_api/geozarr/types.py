@@ -57,14 +57,6 @@ class StandardYCoordAttrsJSON(TypedDict):
     _ARRAY_DIMENSIONS: list[Literal["y"]]
 
 
-class OverviewLevelJSON(TypedDict):
-    level: int
-    zoom: int
-    width: int
-    height: int
-    scale_factor: int
-
-
 class TileMatrixJSON(TypedDict):
     id: str
     scaleDenominator: float
