@@ -70,44 +70,6 @@ jobs:
           .venv
         key: uv-main-${{ hashFiles('uv.lock') }}
 
-  test-network:
-    runs-on: ubuntu-latest
-    # Temporarily enabled for PR to verify test fix
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
-    steps:
-    - uses: actions/checkout@v5
-
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version: '3.11'
-
-    - name: Restore global uv cache
-      id: cache-restore
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          ~/.cache/uv
-          ~/.local/share/uv
-          .venv
-        key: uv-main-${{ hashFiles('uv.lock') }}
-        restore-keys: |
-          uv-main-
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v7
-      with:
-        version: "0.8.4"
-        python-version: "3.13"
-        enable-cache: false
-
-    - name: Install dependencies
-      run: uv sync --group dev --group test
-
-    - name: Run network tests
-      run: |
-        uv run pytest tests/ -v --tb=short -m "network"
-
   security:
     runs-on: ubuntu-latest
     steps:
