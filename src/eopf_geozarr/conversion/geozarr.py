@@ -182,17 +182,19 @@ def setup_datatree_metadata_geozarr_spec_compliant(
         epsg_CPM_260 = epsg_CPM_260.split(":")[-1]
 
     for key in groups:
-        # Check if key exists in DataTree
-        if key not in dt:
+        # Check if key exists in DataTree by attempting to access it
+        try:
+            node = dt[key]
+        except KeyError:
             log.info(f"Skipping group {key} - not found in DataTree")
             continue
 
-        if not dt[key].data_vars:
+        if not node.data_vars:
             log.info(f"Skipping group {key} - no data variables")
             continue
 
         log.info(f"Processing group {key} for GeoZarr compliance")
-        ds = dt[key].to_dataset().copy()
+        ds = node.to_dataset().copy()
 
         if gcp_group is not None:
             ds_gcp = dt[gcp_group].to_dataset()
@@ -836,7 +838,9 @@ def calculate_overview_levels(
             "zoom": zoom,
             "width": current_width,
             "height": current_height,
-            "scale_factor": 2**level,
+            "translation_relative": 0.0,
+            "scale_absolute": 1.0,
+            "scale_relative": 2**level,
         }
         overview_levels.append(overview_level)  # type: ignore[arg-type]
 

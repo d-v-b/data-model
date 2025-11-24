@@ -23,13 +23,27 @@ def test_cli_convert_real_sentinel2_data(s2_data_path: Path, tmp_path: Path) -> 
 
     output_path = tmp_path / "s2b_geozarr_cli_test.zarr"
 
+    # Detect product level (L1C vs L2A) by checking which quicklook group exists
+    dt_source = xr.open_datatree(s2_data_path, engine="zarr")
+    has_l2a_quicklook = "/quality/l2a_quicklook" in dt_source.groups
+    has_l1c_quicklook = "/quality/l1c_quicklook" in dt_source.groups
+
+    # Choose appropriate quicklook group based on product level
+    if has_l2a_quicklook:
+        quicklook_group = "/quality/l2a_quicklook/r10m"
+    elif has_l1c_quicklook:
+        quicklook_group = "/quality/l1c_quicklook/r10m"
+    else:
+        quicklook_group = None
+
     # Groups to convert (from the notebook)
     groups = [
         "/measurements/reflectance/r10m",
         "/measurements/reflectance/r20m",
         "/measurements/reflectance/r60m",
-        "/quality/l1c_quicklook/r10m",
     ]
+    if quicklook_group:
+        groups.append(quicklook_group)
 
     # Build CLI command with notebook parameters
     cmd = (
