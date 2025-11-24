@@ -12,11 +12,10 @@ from pathlib import Path
 import pytest
 import xarray as xr
 
-from tests.conftest import S2_GROUP_EXAMPLES
 
-
-@pytest.mark.parametrize("s2_data_path", S2_GROUP_EXAMPLES)
-def test_cli_convert_real_sentinel2_data(s2_data_path: Path, tmp_path: Path) -> None:
+def test_cli_convert_real_sentinel2_data(
+    s2_group_example: Path, tmp_path: Path
+) -> None:
     """
     Test CLI conversion using a Sentinel-2 hierarchy saved locally.
     """
@@ -24,7 +23,7 @@ def test_cli_convert_real_sentinel2_data(s2_data_path: Path, tmp_path: Path) -> 
     output_path = tmp_path / "s2b_geozarr_cli_test.zarr"
 
     # Detect product level (L1C vs L2A) by checking which quicklook group exists
-    dt_source = xr.open_datatree(s2_data_path, engine="zarr")
+    dt_source = xr.open_datatree(s2_group_example, engine="zarr")
     has_l2a_quicklook = "/quality/l2a_quicklook" in dt_source.groups
     has_l1c_quicklook = "/quality/l1c_quicklook" in dt_source.groups
 
@@ -52,7 +51,7 @@ def test_cli_convert_real_sentinel2_data(s2_data_path: Path, tmp_path: Path) -> 
             "-m",
             "eopf_geozarr",
             "convert",
-            s2_data_path,
+            str(s2_group_example),
             str(output_path),
             "--groups",
         ]
@@ -230,8 +229,7 @@ def test_cli_crs_groups_option() -> None:
     )
 
 
-@pytest.mark.parametrize("s2_data_path", S2_GROUP_EXAMPLES)
-def test_cli_convert_with_crs_groups(s2_data_path, tmp_path: Path) -> None:
+def test_cli_convert_with_crs_groups(s2_group_example, tmp_path: Path) -> None:
     """
     Test CLI conversion with --crs-groups option using real Sentinel-2 data.
 
@@ -256,7 +254,7 @@ def test_cli_convert_with_crs_groups(s2_data_path, tmp_path: Path) -> None:
             "-m",
             "eopf_geozarr",
             "convert",
-            s2_data_path,
+            str(s2_group_example),
             str(output_path),
             "--groups",
         ]

@@ -1,22 +1,36 @@
 """Tests for the eopf-geozarr package."""
 
+import json
 import pathlib
 
+import pytest
 import xarray as xr
+from pydantic_zarr.v2 import GroupSpec
+
+s1_example_json_paths = tuple(
+    pathlib.Path("tests/test_data_api/s1_examples").glob("*.json")
+)
+s2_example_json_paths = tuple(
+    pathlib.Path("tests/test_data_api/s2_examples").glob("*.json")
+)
 
 
-def get_s1_group_examples() -> tuple[pathlib.Path, ...]:
-    return tuple(pathlib.Path("tests/s1_group_examples").glob("*.zarr"))
+@pytest.fixture(params=s1_example_json_paths, ids=lambda p: p.stem)
+def s1_group_example(request, tmp_path) -> tuple[pathlib.Path, ...]:
+    path: pathlib.Path = request.param
+    out_dir = tmp_path / path.stem
+    g = GroupSpec(**json.loads(path.read_text()))
+    g.to_zarr(tmp_path / path.stem, path="")
+    return out_dir
 
 
-S1_GROUP_EXAMPLES: tuple[pathlib.Path, ...] = get_s1_group_examples()
-
-
-def get_s2_group_examples() -> tuple[pathlib.Path, ...]:
-    return tuple(pathlib.Path("tests/s2_group_examples").glob("*.zarr"))
-
-
-S2_GROUP_EXAMPLES: tuple[pathlib.Path, ...] = get_s2_group_examples()
+@pytest.fixture(params=s2_example_json_paths, ids=lambda p: p.stem)
+def s2_group_example(request, tmp_path) -> tuple[pathlib.Path, ...]:
+    path: pathlib.Path = request.param
+    out_dir = tmp_path / path.stem
+    g = GroupSpec(**json.loads(path.read_text()))
+    g.to_zarr(tmp_path / path.stem, path="")
+    return out_dir
 
 
 def _verify_basic_structure(output_path: pathlib.Path, groups: list[str]) -> None:
