@@ -120,7 +120,11 @@ def create_multiscale_from_datatree(
             # Non-measurement groups: preserve original chunking
             encoding = create_original_encoding(dataset)
         ds_out = stream_write_dataset(
-            dataset, output_group_path, encoding, enable_sharding=enable_sharding, crs=crs
+            dataset,
+            output_group_path,
+            encoding,
+            enable_sharding=enable_sharding,
+            crs=crs,
         )
         processed_groups[group_path] = ds_out
 
@@ -803,7 +807,9 @@ def stream_write_dataset(
 
 
 def write_geo_metadata(
-    dataset: xr.Dataset, grid_mapping_var_name: str = "spatial_ref", crs: CRS | None = None
+    dataset: xr.Dataset,
+    grid_mapping_var_name: str = "spatial_ref",
+    crs: CRS | None = None,
 ) -> None:
     """
     Write geographic metadata to the dataset.

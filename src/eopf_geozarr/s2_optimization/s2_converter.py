@@ -34,7 +34,9 @@ def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS | None:
         CRS object if found, None otherwise
     """
     # For CPM >= 2.6.0, the EPSG code is stored in root attributes
-    epsg_cpm_260 = dt_input.attrs.get("other_metadata", {}).get("horizontal_CRS_code", None)
+    epsg_cpm_260 = dt_input.attrs.get("other_metadata", {}).get(
+        "horizontal_CRS_code", None
+    )
     if epsg_cpm_260 is not None:
         try:
             # Handle both integer (32632) and string ("EPSG:32632" or "32632") formats
@@ -48,7 +50,11 @@ def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS | None:
             log.info("Initialized CRS from CPM 2.6.0+ metadata", epsg=epsg_code)
             return crs
         except Exception as e:
-            log.warning("Failed to initialize CRS from CPM 2.6.0+ metadata", epsg=epsg_cpm_260, error=str(e))
+            log.warning(
+                "Failed to initialize CRS from CPM 2.6.0+ metadata",
+                epsg=epsg_cpm_260,
+                error=str(e),
+            )
 
     for group_path in dt_input.groups:
         if group_path == ".":
