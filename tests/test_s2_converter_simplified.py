@@ -14,6 +14,7 @@ import xarray as xr
 
 from eopf_geozarr.s2_optimization.s2_converter import (
     convert_s2_optimized,
+    initialize_crs_from_dataset,
     simple_root_consolidation,
 )
 
@@ -68,6 +69,144 @@ class TestS2FunctionalAPI:
         """
         # This test is kept as a placeholder to maintain test structure
         assert True
+
+
+class TestCRSInitialization:
+    """Test CRS initialization functionality."""
+
+    def test_initialize_crs_from_cpm_260_metadata(self):
+        """Test CRS initialization from CPM >= 2.6.0 metadata with integer EPSG."""
+        # Create a DataTree with CPM 2.6.0+ style metadata (integer format)
+        dt = xr.DataTree()
+        dt.attrs = {
+            "other_metadata": {
+                "horizontal_CRS_code": 32632  # EPSG:32632 (WGS 84 / UTM zone 32N)
+            }
+        }
+
+        crs = initialize_crs_from_dataset(dt)
+
+        assert crs is not None
+        assert crs.to_epsg() == 32632
+
+    def test_initialize_crs_from_cpm_260_metadata_string(self):
+        """Test CRS initialization from CPM >= 2.6.0 metadata with string EPSG."""
+        # Create a DataTree with CPM 2.6.0+ style metadata (string format)
+        dt = xr.DataTree()
+        dt.attrs = {
+            "other_metadata": {
+                "horizontal_CRS_code": "EPSG:32632"  # String format
+            }
+        }
+
+        crs = initialize_crs_from_dataset(dt)
+
+        assert crs is not None
+        assert crs.to_epsg() == 32632
+
+    def test_initialize_crs_from_cpm_260_metadata_invalid_epsg(self):
+        """Test CRS initialization with invalid EPSG code in CPM 2.6.0 metadata."""
+        # Create a DataTree with invalid EPSG code
+        dt = xr.DataTree()
+        dt.attrs = {
+            "other_metadata": {
+                "horizontal_CRS_code": 999999  # Invalid EPSG code
+            }
+        }
+
+        # Should fall through to other methods or return None
+        crs = initialize_crs_from_dataset(dt)
+
+        # CRS should be None since there's no other CRS information
+        assert crs is None
+
+    def test_initialize_crs_from_rio_accessor(self):
+        """Test CRS initialization from rioxarray accessor."""
+        # Create a dataset with rioxarray CRS
+        coords = {
+            "x": (["x"], np.linspace(0, 1000, 10)),
+            "y": (["y"], np.linspace(0, 1000, 10)),
+        }
+        data_vars = {
+            "b02": (["y", "x"], np.random.rand(10, 10)),
+        }
+        ds = xr.Dataset(data_vars, coords=coords)
+        ds = ds.rio.write_crs("EPSG:32633")
+
+        # Create DataTree without CPM 2.6.0 metadata
+        dt = xr.DataTree(ds)
+
+        crs = initialize_crs_from_dataset(dt)
+
+        assert crs is not None
+        assert crs.to_epsg() == 32633
+
+    def test_initialize_crs_from_proj_epsg_attribute(self):
+        """Test CRS initialization from proj:epsg attribute."""
+        # Create a dataset with proj:epsg attribute
+        coords = {
+            "x": (["x"], np.linspace(0, 1000, 10)),
+            "y": (["y"], np.linspace(0, 1000, 10)),
+        }
+        data_vars = {
+            "b02": (["y", "x"], np.random.rand(10, 10)),
+        }
+        ds = xr.Dataset(data_vars, coords=coords)
+        ds["b02"].attrs["proj:epsg"] = 32634
+
+        # Create DataTree
+        dt = xr.DataTree(ds)
+
+        crs = initialize_crs_from_dataset(dt)
+
+        assert crs is not None
+        assert crs.to_epsg() == 32634
+
+    def test_initialize_crs_no_crs_information(self):
+        """Test CRS initialization when no CRS information is available."""
+        # Create a dataset without any CRS information
+        coords = {
+            "x": (["x"], np.linspace(0, 1000, 10)),
+            "y": (["y"], np.linspace(0, 1000, 10)),
+        }
+        data_vars = {
+            "b02": (["y", "x"], np.random.rand(10, 10)),
+        }
+        ds = xr.Dataset(data_vars, coords=coords)
+
+        # Create DataTree without any CRS metadata
+        dt = xr.DataTree(ds)
+
+        crs = initialize_crs_from_dataset(dt)
+
+        assert crs is None
+
+    def test_initialize_crs_priority_cpm_260_over_rio(self):
+        """Test that CPM 2.6.0 metadata takes priority over rio accessor."""
+        # Create a dataset with both CPM 2.6.0 metadata and rio CRS
+        coords = {
+            "x": (["x"], np.linspace(0, 1000, 10)),
+            "y": (["y"], np.linspace(0, 1000, 10)),
+        }
+        data_vars = {
+            "b02": (["y", "x"], np.random.rand(10, 10)),
+        }
+        ds = xr.Dataset(data_vars, coords=coords)
+        ds = ds.rio.write_crs("EPSG:32633")  # Different EPSG
+
+        # Create DataTree with CPM 2.6.0 metadata
+        dt = xr.DataTree(ds)
+        dt.attrs = {
+            "other_metadata": {
+                "horizontal_CRS_code": 32632  # This should take priority
+            }
+        }
+
+        crs = initialize_crs_from_dataset(dt)
+
+        assert crs is not None
+        # CPM 2.6.0 metadata should take priority
+        assert crs.to_epsg() == 32632
 
 
 class TestMetadataConsolidation:
@@ -129,8 +268,6 @@ class TestConvenienceFunction:
             spatial_chunk=512,
             compression_level=2,
             max_retries=5,
-            create_meteorology_group=False,
-            create_geometry_group=False,
             validate_output=False,
         )
 

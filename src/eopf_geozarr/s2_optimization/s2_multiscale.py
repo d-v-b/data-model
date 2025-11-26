@@ -63,6 +63,7 @@ def create_multiscale_from_datatree(
     output_path: str,
     enable_sharding: bool,
     spatial_chunk: int,
+    crs: CRS | None = None,
 ) -> dict[str, dict]:
     """
     Create multiscale versions preserving original structure.
@@ -71,7 +72,9 @@ def create_multiscale_from_datatree(
     Args:
         dt_input: Input DataTree with original structure
         output_path: Base output path
-        verbose: Enable verbose logging
+        enable_sharding: Enable Zarr v3 sharding
+        spatial_chunk: Spatial chunk size
+        crs: Coordinate Reference System for datasets
 
     Returns:
         Dictionary of processed groups
@@ -117,7 +120,7 @@ def create_multiscale_from_datatree(
             # Non-measurement groups: preserve original chunking
             encoding = create_original_encoding(dataset)
         ds_out = stream_write_dataset(
-            dataset, output_group_path, encoding, enable_sharding=enable_sharding
+            dataset, output_group_path, encoding, enable_sharding=enable_sharding, crs=crs
         )
         processed_groups[group_path] = ds_out
 
@@ -176,6 +179,7 @@ def create_multiscale_from_datatree(
                 output_path_120,
                 encoding_120,
                 enable_sharding=enable_sharding,
+                crs=crs,
             )
             processed_groups[r120m_path] = ds_120
             resolution_groups["r120m"] = ds_120
@@ -200,6 +204,7 @@ def create_multiscale_from_datatree(
                         output_path_360,
                         encoding_360,
                         enable_sharding=enable_sharding,
+                        crs=crs,
                     )
                     processed_groups[r360m_path] = ds_360
                     resolution_groups["r360m"] = ds_360
@@ -230,6 +235,7 @@ def create_multiscale_from_datatree(
                                 output_path_720,
                                 encoding_720,
                                 enable_sharding=enable_sharding,
+                                crs=crs,
                             )
                             processed_groups[r720m_path] = ds_720
                             resolution_groups["r720m"] = ds_720
@@ -259,7 +265,7 @@ def create_multiscale_from_datatree(
     log.info("Adding multiscales metadata to parent groups")
 
     dt_multiscale = add_multiscales_metadata_to_parent(
-        output_path, base_path, resolution_groups
+        output_path, base_path, resolution_groups, multiscales_flavor="ogc_tms"
     )
     processed_groups[base_path] = dt_multiscale
 
@@ -723,12 +729,23 @@ def stream_write_dataset(
     encoding: dict[str, XarrayDataArrayEncoding],
     *,
     enable_sharding: bool,
+    crs: CRS | None = None,
 ) -> xr.Dataset:
     """
     Stream write a lazy dataset with advanced chunking and sharding.
 
     This is where the magic happens: all the lazy downsampling operations
     are executed as the data is streamed to storage with optimal performance.
+
+    Args:
+        dataset: Dataset to write
+        dataset_path: Output path for dataset
+        encoding: Encoding dictionary for variables
+        enable_sharding: Enable Zarr v3 sharding
+        crs: Coordinate Reference System for geographic metadata
+
+    Returns:
+        Written dataset
     """
     # Check if level already exists
     if fs_utils.path_exists(dataset_path):
@@ -751,8 +768,11 @@ def stream_write_dataset(
     if enable_sharding:
         dataset = rechunk_dataset_for_encoding(dataset, encoding)
 
-    # Add the geo metadata before writing
-    write_geo_metadata(dataset)
+    # Add the geo metadata before writing for
+    # - /measurements/ groups
+    # - /quality/ groups
+    if "/measurements/" in dataset_path or "/quality/" in dataset_path:
+        write_geo_metadata(dataset, crs=crs)
 
     # Write with streaming computation and progress tracking
     # The to_zarr operation will trigger all lazy computations
@@ -783,19 +803,26 @@ def stream_write_dataset(
 
 
 def write_geo_metadata(
-    dataset: xr.Dataset, grid_mapping_var_name: str = "spatial_ref"
+    dataset: xr.Dataset, grid_mapping_var_name: str = "spatial_ref", crs: CRS | None = None
 ) -> None:
-    """Write geographic metadata to the dataset."""
-    # Implementation same as original
-    crs = None
-    for var in dataset.data_vars.values():
-        if hasattr(var, "rio") and var.rio.crs:
-            crs = var.rio.crs
-            break
-        elif "proj:epsg" in var.attrs:
-            epsg = var.attrs["proj:epsg"]
-            crs = CRS.from_epsg(epsg)
-            break
+    """
+    Write geographic metadata to the dataset.
+
+    Args:
+        dataset: Dataset to write metadata to
+        grid_mapping_var_name: Name for grid mapping variable
+        crs: Coordinate Reference System to use (if None, attempts to detect from dataset)
+    """
+    # Use provided CRS or try to detect from dataset
+    if crs is None:
+        for var in dataset.data_vars.values():
+            if hasattr(var, "rio") and var.rio.crs:
+                crs = var.rio.crs
+                break
+            elif "proj:epsg" in var.attrs:
+                epsg = var.attrs["proj:epsg"]
+                crs = CRS.from_epsg(epsg)
+                break
 
     if crs is not None:
         dataset.rio.write_crs(
