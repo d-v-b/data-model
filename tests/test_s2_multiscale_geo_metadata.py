@@ -234,8 +234,8 @@ class TestWriteGeoMetadata:
             ds, spatial_chunk=1024, enable_sharding=True
         )
 
-        # Create a temporary output path
-        output_path = str(tmp_path / "test_dataset.zarr")
+        # Create a temporary output path that matches the pattern for geo metadata
+        output_path = str(tmp_path / "measurements" / "test_dataset.zarr")
 
         # Call _stream_write_dataset (which should call _write_geo_metadata internally)
         stream_write_dataset(ds, output_path, encoding, enable_sharding=True)

@@ -243,18 +243,25 @@ class TestMetadataConsolidation:
 class TestConvenienceFunction:
     """Test the convenience function."""
 
+    @patch("eopf_geozarr.s2_optimization.s2_converter.initialize_crs_from_dataset")
     @patch("eopf_geozarr.s2_optimization.s2_converter.get_zarr_group")
     @patch("eopf_geozarr.s2_optimization.s2_converter.is_sentinel2_dataset")
     @patch("eopf_geozarr.s2_optimization.s2_converter.create_multiscale_from_datatree")
     @patch("eopf_geozarr.s2_optimization.s2_converter.simple_root_consolidation")
     def test_convert_s2_optimized_convenience_function(
-        self, mock_consolidation, mock_multiscale, mock_is_s2, mock_get_zarr_group
+        self,
+        mock_consolidation,
+        mock_multiscale,
+        mock_is_s2,
+        mock_get_zarr_group,
+        mock_init_crs,
     ):
         """Test the convenience function parameter passing."""
         # Setup mocks
         mock_multiscale.return_value = {}
         mock_is_s2.return_value = True
         mock_get_zarr_group.return_value = Mock()
+        mock_init_crs.return_value = None  # Return None for CRS
 
         # Test parameter passing - Mock DataTree with groups attribute
         dt_input = Mock()
