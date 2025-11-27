@@ -15,30 +15,38 @@ s2_example_json_paths = tuple(
 )
 
 
+def create_group_from_json(
+    source_path: pathlib.Path, out_path: pathlib.Path
+) -> pathlib.Path:
+    """
+    Create a Zarr V2 group from a JSON model
+    """
+    out_dir = out_path / (source_path.stem + ".zarr")
+    g = GroupSpec(**json.loads(source_path.read_text()))
+    g.to_zarr(out_dir, path="")
+    return out_dir
+
+
 @pytest.fixture(params=s1_example_json_paths, ids=lambda p: p.stem)
-def s1_group_example(request, tmp_path) -> tuple[pathlib.Path, ...]:
+def s1_group_example(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path
+) -> tuple[pathlib.Path, ...]:
     """
     A pytest fixture that returns the path to a Zarr group with the same layout as a sentinel 1
     product
     """
-    path: pathlib.Path = request.param
-    out_dir = tmp_path / path.stem
-    g = GroupSpec(**json.loads(path.read_text()))
-    g.to_zarr(tmp_path / path.stem, path="")
-    return out_dir
+    return create_group_from_json(request.param, tmp_path)
 
 
 @pytest.fixture(params=s2_example_json_paths, ids=lambda p: p.stem)
-def s2_group_example(request, tmp_path) -> tuple[pathlib.Path, ...]:
+def s2_group_example(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path
+) -> tuple[pathlib.Path, ...]:
     """
     A pytest fixture that returns the path to a Zarr group with the same layout as a sentinel 2
     product
     """
-    path: pathlib.Path = request.param
-    out_dir = tmp_path / path.stem
-    g = GroupSpec(**json.loads(path.read_text()))
-    g.to_zarr(tmp_path / path.stem, path="")
-    return out_dir
+    return create_group_from_json(request.param, tmp_path)
 
 
 def _verify_basic_structure(output_path: pathlib.Path, groups: list[str]) -> None:

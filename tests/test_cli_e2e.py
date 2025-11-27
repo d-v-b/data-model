@@ -6,11 +6,17 @@ from the analysis notebook:
 docs/analysis/eopf-geozarr/EOPF_Sentinel2_ZarrV3_geozarr_compliant.ipynb
 """
 
+import json
 import subprocess
 from pathlib import Path
 
 import pytest
 import xarray as xr
+import zarr
+from pydantic_zarr.core import tuplify_json
+from pydantic_zarr.v3 import GroupSpec
+
+from tests.test_data_api.conftest import view_json_diff
 
 
 def test_cli_convert_real_sentinel2_data(
@@ -81,10 +87,6 @@ def test_cli_convert_real_sentinel2_data(
     if result.returncode != 0:
         pytest.fail(f"CLI convert command failed: {result.stderr}")
 
-    # Verify output exists
-    assert output_path.exists(), f"Output path {output_path} was not created"
-    assert (output_path / "zarr.json").exists(), "Main zarr.json not found"
-
     cmd_info = ["python", "-m", "eopf_geozarr", "info", str(output_path)]
 
     result_info = subprocess.run(cmd_info, capture_output=True, text=True, timeout=60)
@@ -117,53 +119,22 @@ def test_cli_convert_real_sentinel2_data(
     assert "Validation Results:" in validate_output, "Should show validation header"
     assert "✅" in validate_output, "Should show successful validations"
 
-    _verify_converted_data_structure(output_path, groups)
-
-
-def _verify_converted_data_structure(output_path: Path, groups: list[str]) -> None:
-    """Verify the structure and compliance of converted data."""
-    # Check each group was converted
-    for group in groups:
-        group_path = output_path / group.lstrip("/")
-        assert group_path.exists(), f"Group {group} not found"
-
-        # Check level 0 exists
-        level_0_path = group_path / "0"
-        assert level_0_path.exists(), f"Level 0 not found for {group}"
-
-        # Open and verify the dataset
-        ds = xr.open_dataset(str(level_0_path), engine="zarr", zarr_format=3)
-
-        # Verify GeoZarr compliance basics
-        data_vars = [var for var in ds.data_vars if var != "spatial_ref"]
-
-        if data_vars:  # Only check if there are data variables
-            # Check first data variable for compliance
-            first_var = data_vars[0]
-
-            # Check _ARRAY_DIMENSIONS
-            assert "_ARRAY_DIMENSIONS" in ds[first_var].attrs, (
-                f"Missing _ARRAY_DIMENSIONS in {first_var} for {group}"
-            )
-
-            # Check standard_name
-            assert "standard_name" in ds[first_var].attrs, (
-                f"Missing standard_name in {first_var} for {group}"
-            )
-
-            # Check grid_mapping
-            assert "grid_mapping" in ds[first_var].attrs, (
-                f"Missing grid_mapping in {first_var} for {group}"
-            )
-
-        # Check spatial_ref exists
-        if "spatial_ref" in ds:
-            assert "_ARRAY_DIMENSIONS" in ds["spatial_ref"].attrs, (
-                f"Missing _ARRAY_DIMENSIONS in spatial_ref for {group}"
-            )
-            print("    ✅ spatial_ref variable verified")
-
-        ds.close()
+    # verify exact output group structure
+    # this is a sensitive, brittle check
+    expected_structure_json = tuplify_json(
+        json.loads(
+            (
+                Path("tests/test_data_api/geozarr_examples/")
+                / (s2_group_example.stem + ".json")
+            ).read_text()
+        )
+    )
+    observed_structure_json = tuplify_json(
+        GroupSpec.from_zarr(zarr.open_group(output_path)).model_dump()
+    )
+    assert expected_structure_json == observed_structure_json, view_json_diff(
+        expected_structure_json, observed_structure_json
+    )
 
 
 def test_cli_help_commands() -> None:
