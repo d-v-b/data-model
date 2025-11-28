@@ -770,9 +770,8 @@ def stream_write_dataset(
     log.info("Streaming computation and write to {}", dataset_path=dataset_path)
     log.info("Variables", variables=list(dataset.data_vars.keys()))
 
-    # Rechunk dataset to align with encoding when sharding is enabled
-    if enable_sharding:
-        dataset = rechunk_dataset_for_encoding(dataset, encoding)
+    # Rechunk dataset to align with encoding
+    dataset = rechunk_dataset_for_encoding(dataset, encoding)
 
     # Add the geo metadata before writing for
     # - /measurements/ groups

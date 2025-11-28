@@ -20,6 +20,9 @@ from tests.test_data_api.conftest import view_json_diff
 
 
 def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
+    """
+    Test the convert-s2-optimized CLI command on a local copy of sentinel data
+    """
     output_path = tmp_path / f"test_convert_s2_optimized_{s2_group_example.stem}.zarr"
 
     cmd = [
@@ -31,7 +34,31 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
         str(output_path),
     ]
 
-    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    # Check that the hierarchy we just created is structurally identical to what we expect.
+    # This is a very brittle check as it is sensitive to even the slightest change in Zarr metadata
+
+    observed_structure = GroupSpec.from_zarr(zarr.open_group(output_path))
+    observed_structure_flat = observed_structure.to_flat()
+    (
+        Path("tests/test_data_api/optimized_geozarr_examples/")
+        / (s2_group_example.stem + ".json")
+    ).write_text(observed_structure.model_dump_json(indent=2))
+
+    expected_structure_flat = GroupSpec(
+        **json.loads(
+            (
+                Path("tests/test_data_api/optimized_geozarr_examples/")
+                / (s2_group_example.stem + ".json")
+            ).read_text()
+        )
+    ).to_flat()
+
+    o_keys = set(observed_structure_flat.keys())
+    e_keys = set(expected_structure_flat.keys())
+    assert o_keys == e_keys
+    assert observed_structure_flat.values() == expected_structure_flat.values()
 
 
 def test_cli_convert_real_sentinel2_data(
