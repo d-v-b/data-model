@@ -1225,15 +1225,6 @@ def convert_s2_optimized_command(args: Any) -> int:
         )
 
         log.info("✅ S2 optimization completed", output_path=args.output_path)
-        return 0
-
-    except Exception as e:
-        log.info("❌ Error during S2 optimization", error=str(e))
-        if args.verbose:
-            import traceback
-
-            traceback.print_exc()
-        return 1
     finally:
         # Clean up dask client if it was created
         if dask_client is not None:
