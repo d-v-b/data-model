@@ -20,12 +20,10 @@ from eopf_geozarr.conversion.geozarr import (
 )
 from eopf_geozarr.data_api.geozarr.multiscales import (
     MULTISCALE_CONVENTION,
-    MultiscalesAttrsJSON,
     ScaleLevelJSON,
 )
 from eopf_geozarr.data_api.geozarr.types import (
     XARRAY_ENCODING_KEYS,
-    TMSMultiscalesAttrsJSON,
     XarrayDataArrayEncoding,
 )
 from eopf_geozarr.s2_optimization.common import DISTRIBUTED_AVAILABLE
@@ -35,6 +33,7 @@ from .s2_resampling import determine_variable_type, downsample_variable
 
 log = structlog.get_logger()
 
+MultiscalesFlavor = Literal["ogc_tms", "experimental_multiscales_convention"]
 
 pyramid_levels = {
     0: 10,  # Level 0: 10m (native for b02,b03,b04,b08)
@@ -396,9 +395,10 @@ def add_multiscales_metadata_to_parent(
     output_path: str,
     base_path: str,
     res_groups: Mapping[str, xr.Dataset],
-    multiscales_flavor: Literal[
-        "ogc_tms", "experimental_multiscales_convention"
-    ] = "experimental_multiscales_convention",
+    multiscales_flavor: set[MultiscalesFlavor] = {
+        "ogc_tms",
+        "experimental_multiscales_convention",
+    },
 ) -> xr.DataTree:
     """Add GeoZarr-compliant multiscales metadata to parent group."""
     # Sort by resolution (finest to coarsest)
@@ -487,9 +487,9 @@ def add_multiscales_metadata_to_parent(
         log.info("    Could not create overview levels for {}", base_path=base_path)
         return
 
-    multiscales: TMSMultiscalesAttrsJSON | MultiscalesAttrsJSON
+    multiscales = {"multiscales": {}}
 
-    if multiscales_flavor == "ogc_tms":
+    if "ogc_tms" in multiscales_flavor:
         # Create tile matrix set using geozarr function
         tile_matrix_set = create_native_crs_tile_matrix_set(
             native_crs,
@@ -503,14 +503,16 @@ def add_multiscales_metadata_to_parent(
             overview_levels,
             tile_width=256,
         )
-        multiscales = {
-            "multiscales": {
-                "tile_matrix_set": tile_matrix_set,
-                "resampling_method": "average",
-                "tile_matrix_limits": tile_matrix_limits,
+        multiscales["multiscales"].update(
+            {
+                "multiscales": {
+                    "tile_matrix_set": tile_matrix_set,
+                    "resampling_method": "average",
+                    "tile_matrix_limits": tile_matrix_limits,
+                }
             }
-        }
-    else:
+        )
+    if "experimental_multiscales_convention" in multiscales_flavor:
         scale_levels: list[ScaleLevelJSON] = []
         for overview_level in overview_levels:
             scale_levels.append(
@@ -523,14 +525,14 @@ def add_multiscales_metadata_to_parent(
                     ),
                 }
             )
-        multiscales = {
-            "zarr_conventions_version": "0.1.0",
-            "zarr_conventions": MULTISCALE_CONVENTION,
-            "multiscales": {
+        multiscales["zarr_conventions_version"] = "0.1.0"
+        multiscales["zarr_conventions"] = MULTISCALE_CONVENTION
+        multiscales["multiscales"].update(
+            {
                 "layout": tuple(scale_levels),
                 "resampling_method": "average",
-            },
-        }
+            }
+        )
 
     # Create parent group path
     parent_group_path = f"{output_path}{base_path}"
