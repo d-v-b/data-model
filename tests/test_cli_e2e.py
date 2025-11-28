@@ -19,6 +19,21 @@ from pydantic_zarr.v3 import GroupSpec
 from tests.test_data_api.conftest import view_json_diff
 
 
+def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
+    output_path = tmp_path / f"test_convert_s2_optimized_{s2_group_example.stem}.zarr"
+
+    cmd = [
+        "python",
+        "-m",
+        "eopf_geozarr",
+        "convert-s2-optimized",
+        str(s2_group_example),
+        str(output_path),
+    ]
+
+    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+
 def test_cli_convert_real_sentinel2_data(
     s2_group_example: Path, tmp_path: Path
 ) -> None:
@@ -84,14 +99,13 @@ def test_cli_convert_real_sentinel2_data(
     )
 
     # Check command succeeded
-    if result.returncode != 0:
-        pytest.fail(f"CLI convert command failed: {result.stderr}")
+    assert result.returncode != 0, result.stderr
 
     cmd_info = ["python", "-m", "eopf_geozarr", "info", str(output_path)]
 
     result_info = subprocess.run(cmd_info, capture_output=True, text=True, timeout=60)
 
-    assert result_info.returncode == 0, f"CLI info command failed: {result_info.stderr}"
+    assert result_info.returncode == 0, result_info.stderr
 
     # Verify info output contains expected information
     info_output = result_info.stdout
