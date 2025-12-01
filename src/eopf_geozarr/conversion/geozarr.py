@@ -301,7 +301,7 @@ def iterative_copy(
     dt_result.to_zarr(
         output_path,
         mode="a",
-        consolidated=True,
+        consolidated=False,
         compute=True,
         storage_options=storage_options,
     )
@@ -747,7 +747,7 @@ def create_geozarr_compliant_multiscales(
             output_path,
             group=overview_group,
             mode="w",
-            consolidated=True,
+            consolidated=False,
             zarr_format=3,
             encoding=encoding,
             align_chunks=align_chunks_flag,
@@ -905,7 +905,7 @@ def create_native_crs_tile_matrix_set(
                 "id": matrix_id,
                 "scaleDenominator": scale_denominator,
                 "cellSize": cell_size,
-                "pointOfOrigin": [left, top],
+                "pointOfOrigin": (left, top),
                 "tileWidth": tile_width,
                 "tileHeight": tile_height,
                 "matrixWidth": matrix_width,
@@ -926,8 +926,8 @@ def create_native_crs_tile_matrix_set(
         "title": f"Native CRS Tile Matrix Set ({native_crs})",
         "crs": crs_uri,
         "supportedCRS": crs_uri,
-        "orderedAxes": ["X", "Y"],
-        "tileMatrices": tile_matrices,
+        "orderedAxes": ("X", "Y"),
+        "tileMatrices": tuple(tile_matrices),
     }
 
 
