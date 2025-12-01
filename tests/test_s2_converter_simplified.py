@@ -4,8 +4,8 @@ Unit tests for simplified S2 converter implementation.
 Tests the new simplified approach that uses only xarray and proper metadata consolidation.
 """
 
-import shutil
-import tempfile
+import json
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -46,14 +46,6 @@ def mock_s2_dataset():
     dt.attrs = {"stac_discovery": {"properties": {"mission": "sentinel-2"}}}
 
     return dt
-
-
-@pytest.fixture
-def temp_output_dir():
-    """Create temporary directory for test outputs."""
-    temp_dir = tempfile.mkdtemp()
-    yield temp_dir
-    shutil.rmtree(temp_dir)
 
 
 class TestS2FunctionalAPI:
@@ -209,35 +201,43 @@ class TestCRSInitialization:
         assert crs.to_epsg() == 32632
 
 
-class TestMetadataConsolidation:
-    """Test metadata consolidation functionality."""
+def test_simple_root_consolidation_success(tmp_path: Path):
+    """
+    Test that simple_root_consolidation produces consolidated metadata at the root, and for the
+    measurements/reflectance group, but not for other groups.
+    """
 
-    @patch("xarray.DataTree.to_zarr")
-    def test_simple_root_consolidation_success(self, mock_to_zarr, temp_output_dir):
-        """Test successful root consolidation with DataTree."""
-        # Call the function with empty datasets
-        simple_root_consolidation(temp_output_dir, {})
+    datasets = {
+        "/measurements/reflectance/r10m": xr.Dataset(),
+        "/quality/atmosphere": xr.Dataset(),
+    }
 
-        # Verify to_zarr was called multiple times to create root group
-        assert mock_to_zarr.call_count >= 2
+    [
+        v.to_zarr(
+            str(tmp_path / f"test.zarr{k}/"),
+            mode="a",
+            zarr_format=3,
+            consolidated=False,
+        )
+        for k, v in datasets.items()
+    ]
 
-        # Verify the calls included consolidated=True
-        calls = mock_to_zarr.call_args_list
-        assert any(kwargs.get("consolidated", False) for args, kwargs in calls)
+    simple_root_consolidation(str(tmp_path / "test.zarr"), datasets=datasets)
 
-    @patch("xarray.DataTree.to_zarr")
-    def test_simple_root_consolidation_with_groups(self, mock_to_zarr, temp_output_dir):
-        """Test root consolidation with nested groups."""
-        # Create test datasets dict with nested groups
-        datasets = {
-            "/measurements/reflectance/r10m": {},
-            "/quality/atmosphere": {},
-        }
+    root_z_meta = json.loads((tmp_path / "test.zarr/zarr.json").read_text())
+    reflectance_zmeta = json.loads(
+        (tmp_path / "test.zarr/measurements/reflectance/zarr.json").read_text()
+    )
+    atmos_zmeta = json.loads((tmp_path / "test.zarr/quality/zarr.json").read_text())
 
-        simple_root_consolidation(temp_output_dir, datasets)
-
-        # Verify to_zarr was called (for root + intermediary groups)
-        assert mock_to_zarr.call_count >= 2
+    assert "consolidated_metadata" in root_z_meta and isinstance(
+        root_z_meta["consolidated_metadata"], dict
+    )
+    assert "consolidated_metadata" in reflectance_zmeta and isinstance(
+        reflectance_zmeta["consolidated_metadata"], dict
+    )
+    if "consolidated_metadata" in atmos_zmeta:
+        assert atmos_zmeta["consolidated_metadata"] is None
 
 
 class TestConvenienceFunction:
