@@ -253,55 +253,52 @@ def convert_s2_optimized(
 
 def simple_root_consolidation(output_path: str, datasets: dict[str, dict]) -> None:
     """Simple root-level metadata consolidation with proper zarr group creation."""
-    try:
-        log.info("Performing root consolidation")
+    # create missing intermediary groups (/conditions, /quality, etc.)
+    # using the keys of the datasets dict
+    missing_groups = set()
+    for group_path in datasets.keys():
+        # extract all the parent paths
+        parts = group_path.strip("/").split("/")
+        for i in range(1, len(parts)):
+            parent_path = "/" + "/".join(parts[:i])
+            if parent_path not in datasets:
+                missing_groups.add(parent_path)
 
-        # create missing intermediary groups (/conditions, /quality, etc.)
-        # using the keys of the datasets dict
-        missing_groups = set()
-        for group_path in datasets.keys():
-            # extract all the parent paths
-            parts = group_path.strip("/").split("/")
-            for i in range(1, len(parts)):
-                parent_path = "/" + "/".join(parts[:i])
-                if parent_path not in datasets:
-                    missing_groups.add(parent_path)
-
-        for group_path in missing_groups:
-            dt_parent = xr.DataTree()
-            dt_parent.to_zarr(
-                output_path + group_path,
-                mode="a",
-                zarr_format=3,
-            )
-
-        # Create root zarr group if it doesn't exist
-        log.info("Creating root zarr group")
-        dt_root = xr.DataTree()
-        dt_root.to_zarr(
-            output_path,
+    for group_path in missing_groups:
+        dt_parent = xr.DataTree()
+        dt_parent.to_zarr(
+            output_path + group_path,
             mode="a",
-            consolidated=True,
             zarr_format=3,
+            consolidated=False,
         )
-        dt_root = xr.DataTree()
-        for group_path, dataset in datasets.items():
-            dt_root[group_path] = xr.DataTree()
-        dt_root.to_zarr(
-            output_path,
-            mode="r+",
-            consolidated=True,
-            zarr_format=3,
-        )
-        log.info("Root zarr group created")
 
-        try:
-            log.info("Root consolidation completed")
-        except Exception as e:
-            log.warning("Metadata consolidation failed", error=str(e))
+    # Create root zarr group if it doesn't exist
+    log.info("Creating root zarr group")
+    dt_root = xr.DataTree()
+    dt_root.to_zarr(
+        output_path,
+        mode="a",
+        consolidated=False,
+        zarr_format=3,
+    )
+    dt_root = xr.DataTree()
+    for group_path, dataset in datasets.items():
+        dt_root[group_path] = xr.DataTree()
 
-    except Exception as e:
-        log.warning("Root consolidation failed", error=str(e))
+    dt_root.to_zarr(
+        output_path,
+        mode="r+",
+        consolidated=False,
+        zarr_format=3,
+    )
+    log.info("Root zarr group created")
+
+    # consolidate reflectance group metadata
+    zarr.consolidate_metadata(output_path + "/measurements/reflectance", zarr_format=3)
+
+    # consolidate root group metadata
+    zarr.consolidate_metadata(output_path, zarr_format=3)
 
 
 def optimization_summary(
