@@ -4295,142 +4295,140 @@
         "reflectance": {
           "attributes": {
             "multiscales": {
-              "multiscales": {
-                "resampling_method": "average",
-                "tile_matrix_limits": {
-                  "r10m": {
-                    "maxTileCol": 42,
-                    "maxTileRow": 42,
-                    "minTileCol": 0,
-                    "minTileRow": 0,
-                    "tileMatrix": "r10m"
-                  },
-                  "r120m": {
-                    "maxTileCol": 3,
-                    "maxTileRow": 3,
-                    "minTileCol": 0,
-                    "minTileRow": 0,
-                    "tileMatrix": "r120m"
-                  },
-                  "r20m": {
-                    "maxTileCol": 21,
-                    "maxTileRow": 21,
-                    "minTileCol": 0,
-                    "minTileRow": 0,
-                    "tileMatrix": "r20m"
-                  },
-                  "r360m": {
-                    "maxTileCol": 1,
-                    "maxTileRow": 1,
-                    "minTileCol": 0,
-                    "minTileRow": 0,
-                    "tileMatrix": "r360m"
-                  },
-                  "r60m": {
-                    "maxTileCol": 7,
-                    "maxTileRow": 7,
-                    "minTileCol": 0,
-                    "minTileRow": 0,
-                    "tileMatrix": "r60m"
-                  },
-                  "r720m": {
-                    "maxTileCol": 0,
-                    "maxTileRow": 0,
-                    "minTileCol": 0,
-                    "minTileRow": 0,
-                    "tileMatrix": "r720m"
-                  }
+              "resampling_method": "average",
+              "tile_matrix_limits": {
+                "r10m": {
+                  "maxTileCol": 42,
+                  "maxTileRow": 42,
+                  "minTileCol": 0,
+                  "minTileRow": 0,
+                  "tileMatrix": "r10m"
                 },
-                "tile_matrix_set": {
-                  "crs": "http://www.opengis.net/def/crs/EPSG/0/32632",
-                  "id": "Native_CRS_32632",
-                  "orderedAxes": [
-                    "X",
-                    "Y"
-                  ],
-                  "supportedCRS": "http://www.opengis.net/def/crs/EPSG/0/32632",
-                  "tileMatrices": [
-                    {
-                      "cellSize": 0.0,
-                      "id": "r10m",
-                      "matrixHeight": 45,
-                      "matrixWidth": 45,
-                      "pointOfOrigin": [
-                        0.0,
-                        0.0
-                      ],
-                      "scaleDenominator": 0.0,
-                      "tileHeight": 244,
-                      "tileWidth": 244
-                    },
-                    {
-                      "cellSize": 0.0,
-                      "id": "r20m",
-                      "matrixHeight": 30,
-                      "matrixWidth": 30,
-                      "pointOfOrigin": [
-                        0.0,
-                        0.0
-                      ],
-                      "scaleDenominator": 0.0,
-                      "tileHeight": 183,
-                      "tileWidth": 183
-                    },
-                    {
-                      "cellSize": 0.0,
-                      "id": "r60m",
-                      "matrixHeight": 10,
-                      "matrixWidth": 10,
-                      "pointOfOrigin": [
-                        0.0,
-                        0.0
-                      ],
-                      "scaleDenominator": 0.0,
-                      "tileHeight": 183,
-                      "tileWidth": 183
-                    },
-                    {
-                      "cellSize": 0.0,
-                      "id": "r120m",
-                      "matrixHeight": 1,
-                      "matrixWidth": 1,
-                      "pointOfOrigin": [
-                        0.0,
-                        0.0
-                      ],
-                      "scaleDenominator": 0.0,
-                      "tileHeight": 915,
-                      "tileWidth": 915
-                    },
-                    {
-                      "cellSize": 0.0,
-                      "id": "r360m",
-                      "matrixHeight": 2,
-                      "matrixWidth": 2,
-                      "pointOfOrigin": [
-                        0.0,
-                        0.0
-                      ],
-                      "scaleDenominator": 0.0,
-                      "tileHeight": 256,
-                      "tileWidth": 256
-                    },
-                    {
-                      "cellSize": 0.0,
-                      "id": "r720m",
-                      "matrixHeight": 1,
-                      "matrixWidth": 1,
-                      "pointOfOrigin": [
-                        0.0,
-                        0.0
-                      ],
-                      "scaleDenominator": 0.0,
-                      "tileHeight": 152,
-                      "tileWidth": 152
-                    }
-                  ],
-                  "title": "Native CRS Tile Matrix Set (EPSG:32632)"
+                "r120m": {
+                  "maxTileCol": 3,
+                  "maxTileRow": 3,
+                  "minTileCol": 0,
+                  "minTileRow": 0,
+                  "tileMatrix": "r120m"
+                },
+                "r20m": {
+                  "maxTileCol": 21,
+                  "maxTileRow": 21,
+                  "minTileCol": 0,
+                  "minTileRow": 0,
+                  "tileMatrix": "r20m"
+                },
+                "r360m": {
+                  "maxTileCol": 1,
+                  "maxTileRow": 1,
+                  "minTileCol": 0,
+                  "minTileRow": 0,
+                  "tileMatrix": "r360m"
+                },
+                "r60m": {
+                  "maxTileCol": 7,
+                  "maxTileRow": 7,
+                  "minTileCol": 0,
+                  "minTileRow": 0,
+                  "tileMatrix": "r60m"
+                },
+                "r720m": {
+                  "maxTileCol": 0,
+                  "maxTileRow": 0,
+                  "minTileCol": 0,
+                  "minTileRow": 0,
+                  "tileMatrix": "r720m"
                 }
+              },
+              "tile_matrix_set": {
+                "crs": "http://www.opengis.net/def/crs/EPSG/0/32632",
+                "id": "Native_CRS_32632",
+                "orderedAxes": [
+                  "X",
+                  "Y"
+                ],
+                "supportedCRS": "http://www.opengis.net/def/crs/EPSG/0/32632",
+                "tileMatrices": [
+                  {
+                    "cellSize": 0.0,
+                    "id": "r10m",
+                    "matrixHeight": 45,
+                    "matrixWidth": 45,
+                    "pointOfOrigin": [
+                      0.0,
+                      0.0
+                    ],
+                    "scaleDenominator": 0.0,
+                    "tileHeight": 244,
+                    "tileWidth": 244
+                  },
+                  {
+                    "cellSize": 0.0,
+                    "id": "r20m",
+                    "matrixHeight": 30,
+                    "matrixWidth": 30,
+                    "pointOfOrigin": [
+                      0.0,
+                      0.0
+                    ],
+                    "scaleDenominator": 0.0,
+                    "tileHeight": 183,
+                    "tileWidth": 183
+                  },
+                  {
+                    "cellSize": 0.0,
+                    "id": "r60m",
+                    "matrixHeight": 10,
+                    "matrixWidth": 10,
+                    "pointOfOrigin": [
+                      0.0,
+                      0.0
+                    ],
+                    "scaleDenominator": 0.0,
+                    "tileHeight": 183,
+                    "tileWidth": 183
+                  },
+                  {
+                    "cellSize": 0.0,
+                    "id": "r120m",
+                    "matrixHeight": 1,
+                    "matrixWidth": 1,
+                    "pointOfOrigin": [
+                      0.0,
+                      0.0
+                    ],
+                    "scaleDenominator": 0.0,
+                    "tileHeight": 915,
+                    "tileWidth": 915
+                  },
+                  {
+                    "cellSize": 0.0,
+                    "id": "r360m",
+                    "matrixHeight": 2,
+                    "matrixWidth": 2,
+                    "pointOfOrigin": [
+                      0.0,
+                      0.0
+                    ],
+                    "scaleDenominator": 0.0,
+                    "tileHeight": 256,
+                    "tileWidth": 256
+                  },
+                  {
+                    "cellSize": 0.0,
+                    "id": "r720m",
+                    "matrixHeight": 1,
+                    "matrixWidth": 1,
+                    "pointOfOrigin": [
+                      0.0,
+                      0.0
+                    ],
+                    "scaleDenominator": 0.0,
+                    "tileHeight": 152,
+                    "tileWidth": 152
+                  }
+                ],
+                "title": "Native CRS Tile Matrix Set (EPSG:32632)"
               }
             }
           },
