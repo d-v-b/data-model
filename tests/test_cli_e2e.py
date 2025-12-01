@@ -41,19 +41,20 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
 
     observed_structure = GroupSpec.from_zarr(zarr.open_group(output_path))
     observed_structure_flat = observed_structure.to_flat()
+    """
     (
         Path("tests/test_data_api/optimized_geozarr_examples/")
         / (s2_group_example.stem + ".json")
     ).write_text(observed_structure.model_dump_json(indent=2))
-
-    expected_structure_flat = GroupSpec(
-        **json.loads(
+    """
+    expected_structure_json = tuplify_json(json.loads(
             (
                 Path("tests/test_data_api/optimized_geozarr_examples/")
                 / (s2_group_example.stem + ".json")
             ).read_text()
         )
-    ).to_flat()
+        )
+    expected_structure_flat = GroupSpec(**expected_structure_json).to_flat()
 
     o_keys = set(observed_structure_flat.keys())
     e_keys = set(expected_structure_flat.keys())
