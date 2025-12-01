@@ -5,6 +5,7 @@ import urllib
 import urllib.request
 from dataclasses import dataclass
 from typing import Annotated, Any, Mapping, Self, TypeGuard, TypeVar
+from urllib.error import URLError
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel, Field, model_validator
@@ -13,7 +14,7 @@ from typing_extensions import Final, Literal, Protocol, runtime_checkable
 
 from eopf_geozarr.data_api.geozarr.projjson import ProjJSON
 from eopf_geozarr.data_api.geozarr.types import ResamplingMethod
-from urllib.error import URLError
+
 
 @dataclass(frozen=True)
 class UNSET_TYPE:

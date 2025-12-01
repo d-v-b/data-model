@@ -73,8 +73,8 @@ class TileMatrixSetJSON(TypedDict):
     title: str | None
     crs: str | None
     supportedCRS: str | None
-    orderedAxes: tuple[str, str] | None | list[str]
-    tileMatrices: tuple[TileMatrixJSON, ...] | list[TileMatrixJSON]
+    orderedAxes: tuple[str, str] | None
+    tileMatrices: tuple[TileMatrixJSON, ...]
 
 
 class TMSMultiscalesJSON(TypedDict):

@@ -268,7 +268,10 @@ def create_multiscale_from_datatree(
     log.info("Adding multiscales metadata to parent groups")
 
     dt_multiscale = add_multiscales_metadata_to_parent(
-        output_path, base_path, resolution_groups, multiscales_flavor="ogc_tms"
+        output_path,
+        base_path,
+        resolution_groups,
+        multiscales_flavor={"ogc_tms", "experimental_multiscales_convention"},
     )
     processed_groups[base_path] = dt_multiscale
 
@@ -487,7 +490,7 @@ def add_multiscales_metadata_to_parent(
         log.info("    Could not create overview levels for {}", base_path=base_path)
         return
 
-    multiscales = {"multiscales": {}}
+    multiscales: dict[str, Any] = {"multiscales": {}}
 
     if "ogc_tms" in multiscales_flavor:
         # Create tile matrix set using geozarr function
@@ -505,11 +508,9 @@ def add_multiscales_metadata_to_parent(
         )
         multiscales["multiscales"].update(
             {
-                "multiscales": {
-                    "tile_matrix_set": tile_matrix_set,
-                    "resampling_method": "average",
-                    "tile_matrix_limits": tile_matrix_limits,
-                }
+                "tile_matrix_set": tile_matrix_set,
+                "resampling_method": "average",
+                "tile_matrix_limits": tile_matrix_limits,
             }
         )
     if "experimental_multiscales_convention" in multiscales_flavor:
@@ -540,10 +541,11 @@ def add_multiscales_metadata_to_parent(
     for res in all_resolutions:
         dt_multiscale[res] = xr.DataTree()
     dt_multiscale.attrs.update(multiscales)
+
     dt_multiscale.to_zarr(
         parent_group_path,
         mode="a",
-        consolidated=True,
+        consolidated=False,
         zarr_format=3,
     )
 
@@ -784,7 +786,7 @@ def stream_write_dataset(
     write_job = dataset.to_zarr(
         dataset_path,
         mode="w",
-        consolidated=True,
+        consolidated=False,
         zarr_format=3,
         encoding=encoding,
         compute=False,  # Create job first for progress tracking

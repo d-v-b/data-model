@@ -1196,7 +1196,7 @@ def add_s2_optimization_commands(subparsers: Any) -> None:
     s2_parser.set_defaults(func=convert_s2_optimized_command)
 
 
-def convert_s2_optimized_command(args: Any) -> int:
+def convert_s2_optimized_command(args: Any) -> None:
     """Execute S2 optimized conversion command."""
     # Set up dask cluster if requested
     dask_client = setup_dask_cluster(
