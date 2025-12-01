@@ -42,7 +42,8 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     observed_structure_json = GroupSpec.from_zarr(
         zarr.open_group(output_path, use_consolidated=False)
     ).model_dump()
-    # The comparing JSON objects is sensitive to the difference between tuples and lists, but we
+
+    # Comparing JSON objects is sensitive to the difference between tuples and lists, but we
     # don't care about that here, so we convert all lists to tuples before creating the GroupSpec
     observed_structure = GroupSpec(**tuplify_json(observed_structure_json))
     observed_structure_flat = observed_structure.to_flat()
