@@ -55,14 +55,14 @@ class OverviewLevelJSON(TypedDict):
     translation_relative: float
     scale_absolute: float
     scale_relative: int | float
-    chunks: tuple[tuple[int, ...], ...] | list[tuple[int, ...]] | None
+    chunks: tuple[tuple[int, ...], ...] | None
 
 
 class TileMatrixJSON(TypedDict):
     id: str
     scaleDenominator: float
     cellSize: float
-    pointOfOrigin: tuple[float, float] | list[float]
+    pointOfOrigin: tuple[float, float]
     tileWidth: int
     tileHeight: int
     matrixWidth: int
@@ -74,8 +74,8 @@ class TileMatrixSetJSON(TypedDict):
     title: str | None
     crs: str | None
     supportedCRS: str | None
-    orderedAxes: tuple[str, str] | None | list[str]
-    tileMatrices: tuple[TileMatrixJSON, ...] | list[TileMatrixJSON]
+    orderedAxes: tuple[str, str] | None
+    tileMatrices: tuple[TileMatrixJSON, ...]
 
 
 ResamplingMethod = Literal[
