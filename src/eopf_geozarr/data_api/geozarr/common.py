@@ -5,6 +5,7 @@ import urllib
 import urllib.request
 from dataclasses import dataclass
 from typing import Annotated, Any, Mapping, Self, TypeVar
+from urllib.error import URLError
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel, Field, model_validator
@@ -98,12 +99,9 @@ def get_cf_standard_names(url: str) -> tuple[str, ...]:
 
     req = urllib.request.Request(url, headers=headers)
 
-    try:
-        with urllib.request.urlopen(req) as response:
-            content = response.read()  # Read the entire response body into memory
-            content_fobj = io.BytesIO(content)
-    except urllib.error.URLError as e:
-        raise e
+    with urllib.request.urlopen(req) as response:
+        content = response.read()  # Read the entire response body into memory
+        content_fobj = io.BytesIO(content)
 
     _info, table, _aliases = parse_cf_standard_name_table(source=content_fobj)
     return tuple(table.keys())
@@ -115,14 +113,22 @@ CF_STANDARD_NAME_URL = (
     "master/Data/cf-standard-names/current/src/cf-standard-name-table.xml"
 )
 
-# this does IO against github. consider locally storing this data instead if fetching every time
-# is problematic.
-CF_STANDARD_NAMES = get_cf_standard_names(url=CF_STANDARD_NAME_URL)
+try:
+    # this does IO against github. consider locally storing this data instead if fetching every time
+    # is problematic.
+    CF_STANDARD_NAMES = get_cf_standard_names(url=CF_STANDARD_NAME_URL)
+    DO_CF_NAME_VALIDATION = True
+except URLError:
+    # When we cannot connect to the CF standard names table, we do not validate names
+    CF_STANDARD_NAMES = ()
+    DO_CF_NAME_VALIDATION = False
 
 
 def check_standard_name(name: str) -> str:
     """
-    Check if the standard name is valid according to the CF conventions.
+    Check if the standard name is valid according to the CF conventions. If the global variable
+    DO_CF_NAME_VALIDATION is set to False, e.g. due to a connection error when fetching the
+    list of standard names, this function will return the input name.
 
     Parameters
     ----------
@@ -140,11 +146,13 @@ def check_standard_name(name: str) -> str:
         If the standard name is not valid.
     """
 
-    if name in CF_STANDARD_NAMES:
-        return name
-    raise ValueError(
-        f"Invalid standard name: {name}. This name was not found in the list of CF standard names."
-    )
+    if DO_CF_NAME_VALIDATION:
+        if name in CF_STANDARD_NAMES:
+            return name
+        raise ValueError(
+            f"Invalid standard name: {name}. This name was not found in the list of CF standard names."
+        )
+    return name
 
 
 CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
