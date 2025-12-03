@@ -81,7 +81,7 @@ def test_multiscales_round_trip(example_group) -> None:
     source_untyped = GroupSpec_V3.from_zarr(example_group)
     flat = source_untyped.to_flat()
     meta = flat["/measurements/reflectance/r60m"].attributes["multiscales"]
-    assert Multiscales(**meta).model_dump() == tuplify_json(meta)
+    assert TMSMultiscales(**meta).model_dump() == tuplify_json(meta)
 
 
 def test_projattrs_crs_required() -> None:

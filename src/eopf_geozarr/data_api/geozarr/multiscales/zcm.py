@@ -80,6 +80,7 @@ class Multiscales(BaseModel):
     layout: tuple[ScaleLevel, ...]
     resampling_method: str | MISSING = MISSING
 
+    model_config = {"extra": "allow"}
 
 class MultiscalesAttrsJSON(TypedDict):
     zarr_conventions_version: Literal["0.1.0"]
