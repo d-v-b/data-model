@@ -15,44 +15,56 @@ ConventionID = Literal["d35379db-88df-4056-af3a-620245f8e347"]
 CONVENTION_ID: Final[ConventionID] = "d35379db-88df-4056-af3a-620245f8e347"
 
 ConventionSchemaURL = Literal[
-    "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v0.1.0/schema.json"
+    "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v1/schema.json"
 ]
 CONVENTION_SCHEMA_URL: Final[ConventionSchemaURL] = (
-    "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v0.1.0/schema.json"
+    "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v1/schema.json"
 )
 
 ConventionSpecURL = Literal[
-    "https://github.com/zarr-conventions/multiscales/blob/v0.1.0/README.md"
+    "https://github.com/zarr-conventions/multiscales/blob/v1/README.md"
 ]
 CONVENTION_SPEC_URL: Final[ConventionSpecURL] = (
-    "https://github.com/zarr-conventions/multiscales/blob/v0.1.0/README.md"
+    "https://github.com/zarr-conventions/multiscales/blob/v1/README.md"
 )
+
+ConventionDescription = Literal["Multiscale layout of zarr datasets"]
+CONVENTION_DESCRIPTION: Final[ConventionDescription] = (
+    "Multiscale layout of zarr datasets"
+)
+
+ConventionName = Literal["multiscales"]
+CONVENTION_NAME: Final[ConventionName] = "multiscales"
 
 
 class MultiscaleConventionMetadata(ZarrConventionMetadata):
     uuid: ConventionID = CONVENTION_ID
     schema_url: ConventionSchemaURL = CONVENTION_SCHEMA_URL
-    name: Literal["multiscales"] = "multiscales"
-    description: Literal["Multiscale layout of zarr datasets"] = (
-        "Multiscale layout of zarr datasets"
-    )
+    name: ConventionName = CONVENTION_NAME
+    description: ConventionDescription = CONVENTION_DESCRIPTION
     spec_url: ConventionSpecURL = CONVENTION_SPEC_URL
 
 
 class MultiscaleConventionMetadataJSON(TypedDict):
-    uuid: NotRequired[Literal["d35379db-88df-4056-af3a-620245f8e347"]]
-    schema_url: NotRequired[
-        Literal[
-            "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/heads/main/schema.json"
-        ]
-    ]
-    name: NotRequired[Literal["multiscales"]]
-    description: NotRequired[Literal["Multiscale layout of zarr datasets"]]
-    spec_url: NotRequired[
-        Literal[
-            "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/heads/main/README.md"
-        ]
-    ]
+    """
+    A TypedDict representation of the Multiscales convention metadata
+    """
+
+    uuid: NotRequired[ConventionID]
+    schema_url: NotRequired[ConventionSchemaURL]
+    name: NotRequired[ConventionName]
+    description: NotRequired[ConventionDescription]
+    spec_url: NotRequired[ConventionSpecURL]
+
+
+# A final dict representation of the Multiscales convention metadata
+MULTISCALE_CONVENTION_METADATA: Final[MultiscaleConventionMetadataJSON] = {
+    "uuid": CONVENTION_ID,
+    "schema_url": CONVENTION_SCHEMA_URL,
+    "name": CONVENTION_NAME,
+    "description": CONVENTION_DESCRIPTION,
+    "spec_url": CONVENTION_SPEC_URL,
+}
 
 
 class ZarrConventionAttrs(BaseModel):

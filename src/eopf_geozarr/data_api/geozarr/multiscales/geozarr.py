@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, computed_field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import NotRequired, TypedDict
 
@@ -47,7 +47,9 @@ class MultiscaleGroupAttrs(BaseModel):
     """
     Attributes for Multiscale GeoZarr dataset.
 
-    A Multiscale dataset is a collection of Dataset
+    A Multiscale dataset is a Zarr group containing multiscale metadata
+    That metadata can be either in the Zarr Convention Metadata (ZCM) format, or
+    the Tile Matrix Set (TMS) format, or both.
 
     Attributes
     ----------
@@ -67,7 +69,10 @@ class MultiscaleGroupAttrs(BaseModel):
         is valid, and that at least one of the two is present.
         """
         if self.zarr_conventions is not MISSING:
-            self._zcm_multiscales = zcm.Multiscales(**self.multiscales.model_dump())
+            self._zcm_multiscales = zcm.Multiscales(
+                layout=self.multiscales.layout,
+                resampling_method=self.multiscales.resampling_method,
+            )
         if self.multiscales.tile_matrix_limits is not MISSING:
             self._tms_multiscales = tms.Multiscales(
                 tile_matrix_limits=self.multiscales.tile_matrix_limits,
@@ -80,6 +85,7 @@ class MultiscaleGroupAttrs(BaseModel):
             )
         return self
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def multiscale_meta(self) -> MultiscaleMetaDict:
         out: MultiscaleMetaDict = {}
