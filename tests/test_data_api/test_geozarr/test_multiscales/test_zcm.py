@@ -3,9 +3,13 @@ import pytest
 from pydantic import ValidationError
 from pydantic_zarr.core import tuplify_json
 
-from eopf_geozarr.data_api.geozarr.multiscales import Multiscales, ScaleLevel
+from eopf_geozarr.data_api.geozarr.multiscales.zcm import MultiscalesAttrs, ScaleLevel
 
 from .conftest import ZCM_MULTISCALES_EXAMPLES
+
+
+def test_json_examples_exist() -> None:
+    assert len(ZCM_MULTISCALES_EXAMPLES) > 0
 
 
 @pytest.mark.parametrize(
@@ -17,10 +21,10 @@ def test_multiscales_rt(json_example: tuple[str, dict[str, object]]) -> None:
     """
     _, value = json_example
     value_tup = tuplify_json(value)
-    multi_json = value_tup["attributes"]["multiscales"]
-    model = Multiscales(**multi_json)
+    attrs_json = value_tup["attributes"]
+    model = MultiscalesAttrs(**attrs_json)
     observed = model.model_dump()
-    expected = multi_json
+    expected = attrs_json
     assert jsondiff.diff(observed, expected) == {}
 
 

@@ -1,19 +1,20 @@
 """Common utilities for GeoZarr data API."""
 
+from __future__ import annotations
+
 import io
 import urllib
 import urllib.request
 from dataclasses import dataclass
-from typing import Annotated, Any, Mapping, Self, TypeGuard, TypeVar
+from typing import Annotated, Any, Mapping, NotRequired, Self, TypeGuard, TypeVar
 from urllib.error import URLError
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
-from typing_extensions import Final, Literal, Protocol, runtime_checkable
+from typing_extensions import Final, Literal, Protocol, TypedDict, runtime_checkable
 
 from eopf_geozarr.data_api.geozarr.projjson import ProjJSON
-from eopf_geozarr.data_api.geozarr.types import ResamplingMethod
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,35 @@ class UNSET_TYPE:
 
 
 GEO_PROJ_VERSION: Final = "0.1"
+
+
+class ZarrConventionMetadata(BaseModel):
+    uuid: str | MISSING = MISSING
+    schema_url: str | MISSING = MISSING
+    spec_url: str | MISSING = MISSING
+    name: str | MISSING = MISSING
+    description: str | MISSING = MISSING
+
+    @model_validator(mode="after")
+    def ensure_identifiable(self) -> Self:
+        if (
+            self.uuid is MISSING
+            and self.schema_url is MISSING
+            and self.spec_url is MISSING
+        ):
+            raise ValueError(
+                "At least one of uuid, schema_url, or spec_url must be provided."
+            )
+
+        return self
+
+
+class ZarrConventionMetadataJSON(TypedDict):
+    uuid: NotRequired[str]
+    schema_url: NotRequired[str]
+    name: NotRequired[str]
+    description: NotRequired[str]
+    spec_url: NotRequired[str]
 
 
 class ProjAttrs(BaseModel, extra="allow"):
@@ -220,57 +250,6 @@ class DataArrayLike(Protocol):
     attributes: BaseDataArrayAttrs
 
 
-class TileMatrixLimit(BaseModel):
-    """"""
-
-    tileMatrix: str
-    minTileCol: int
-    minTileRow: int
-    maxTileCol: int
-    maxTileRow: int
-
-
-class TileMatrix(BaseModel):
-    id: str
-    scaleDenominator: float
-    cellSize: float
-    pointOfOrigin: tuple[float, float]
-    tileWidth: int
-    tileHeight: int
-    matrixWidth: int
-    matrixHeight: int
-
-
-class TileMatrixSet(BaseModel):
-    id: str
-    title: str | None = None
-    crs: str | None = None
-    supportedCRS: str | None = None
-    orderedAxes: tuple[str, str] | None = None
-    tileMatrices: tuple[TileMatrix, ...]
-
-
-class TMSMultiscales(BaseModel, extra="allow"):
-    """
-    Multiscale metadata for a GeoZarr dataset based on the OGC TileMatrixSet standard
-
-    Attributes
-    ----------
-    tile_matrix_set : str
-        The tile matrix set identifier for the multiscale dataset.
-    resampling_method : ResamplingMethod
-        The name of the resampling method for the multiscale dataset.
-    tile_matrix_set_limits : dict[str, TileMatrixSetLimits] | None, optional
-        The tile matrix set limits for the multiscale dataset.
-    """
-
-    tile_matrix_set: TileMatrixSet
-    resampling_method: ResamplingMethod
-    # TODO: ensure that the keys match tile_matrix_set.tileMatrices[$index].id
-    # TODO: ensure that the keys match the tileMatrix attribute
-    tile_matrix_limits: dict[str, TileMatrixLimit] | None = None
-
-
 class DatasetAttrs(BaseModel, extra="allow"):
     """
     Attributes for a GeoZarr dataset.
@@ -295,24 +274,14 @@ def check_grid_mapping(model: TDataSetLike) -> TDataSetLike:
     """
     if model.members is not None:
         for name, member in model.members.items():
-            if member.attributes.grid_mapping not in model.members:
+            if (
+                hasattr(member.attributes, "grid_mapping")
+                and isinstance(member.attributes.grid_mapping, str)
+                and member.attributes.grid_mapping not in model.members
+            ):
                 msg = f"Grid mapping variable '{member.attributes.grid_mapping}' declared by {name} was not found in dataset members"
                 raise ValueError(msg)
     return model
-
-
-class MultiscaleGroupAttrs(BaseModel, extra="allow"):
-    """
-    Attributes for Multiscale GeoZarr dataset.
-
-    A Multiscale dataset is a collection of Dataet
-
-    Attributes
-    ----------
-    multiscales: MultiscaleAttrs
-    """
-
-    multiscales: TMSMultiscales
 
 
 def is_none(data: object) -> TypeGuard[None]:
