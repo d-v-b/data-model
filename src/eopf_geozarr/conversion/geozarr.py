@@ -128,6 +128,8 @@ def create_geozarr_dataset(
         dt, groups, gcp_group
     )
 
+    log.info("GeoZarr groups prepared", groups_prepared=list(geozarr_groups.keys()))
+
     # Create the GeoZarr compliant store through iterative processing
     dt_geozarr = iterative_copy(
         dt,
@@ -180,11 +182,19 @@ def setup_datatree_metadata_geozarr_spec_compliant(
         epsg_CPM_260 = epsg_CPM_260.split(":")[-1]
 
     for key in groups:
-        if not dt[key].data_vars:
+        # Check if key exists in DataTree by attempting to access it
+        try:
+            node = dt[key]
+        except KeyError:
+            log.info(f"Skipping group {key} - not found in DataTree")
+            continue
+
+        if not node.data_vars:
+            log.info(f"Skipping group {key} - no data variables")
             continue
 
         log.info(f"Processing group {key} for GeoZarr compliance")
-        ds = dt[key].to_dataset().copy()
+        ds = node.to_dataset().copy()
 
         if gcp_group is not None:
             ds_gcp = dt[gcp_group].to_dataset()
@@ -233,7 +243,11 @@ def setup_datatree_metadata_geozarr_spec_compliant(
         _setup_grid_mapping(ds, grid_mapping_var_name)
 
         geozarr_groups[key] = ds
+        log.info(f"Added {key} to geozarr_groups")
 
+    log.info(
+        f"Returning geozarr_groups with {len(geozarr_groups)} groups: {list(geozarr_groups.keys())}"
+    )
     return geozarr_groups
 
 
@@ -287,7 +301,7 @@ def iterative_copy(
     dt_result.to_zarr(
         output_path,
         mode="a",
-        consolidated=True,
+        consolidated=False,
         compute=True,
         storage_options=storage_options,
     )
@@ -638,7 +652,7 @@ def create_geozarr_compliant_multiscales(
             level=ol["level"],
             width=ol["width"],
             height=ol["height"],
-            scale_factor=ol["scale_factor"],
+            scale_factor=ol["scale_relative"],
         )
 
     # Create native CRS tile matrix set
@@ -679,7 +693,7 @@ def create_geozarr_compliant_multiscales(
 
         width = overview["width"]
         height = overview["height"]
-        scale_factor = overview["scale_factor"]
+        scale_factor = overview["scale_relative"]
 
         log.info(
             f"Creating overview level (scale) {level} with scale factor {scale_factor}"
@@ -733,7 +747,7 @@ def create_geozarr_compliant_multiscales(
             output_path,
             group=overview_group,
             mode="w",
-            consolidated=True,
+            consolidated=False,
             zarr_format=3,
             encoding=encoding,
             align_chunks=align_chunks_flag,
@@ -824,7 +838,9 @@ def calculate_overview_levels(
             "zoom": zoom,
             "width": current_width,
             "height": current_height,
-            "scale_factor": 2**level,
+            "translation_relative": 0.0,
+            "scale_absolute": 1.0,
+            "scale_relative": 2**level,
         }
         overview_levels.append(overview_level)  # type: ignore[arg-type]
 
@@ -877,8 +893,8 @@ def create_native_crs_tile_matrix_set(
         scale_denominator = cell_size * 3779.5275
 
         # Calculate matrix dimensions
-        tile_width = overview["chunks"][1][0] if "chunks" in overview else 256
-        tile_height = overview["chunks"][0][0] if "chunks" in overview else 256
+        tile_width = overview["chunks"][1][0] if "chunks" in overview else 256  # type: ignore[index]
+        tile_height = overview["chunks"][0][0] if "chunks" in overview else 256  # type: ignore[index]
         matrix_width = int(np.ceil(width / tile_width))
         matrix_height = int(np.ceil(height / tile_height))
 
@@ -889,7 +905,7 @@ def create_native_crs_tile_matrix_set(
                 "id": matrix_id,
                 "scaleDenominator": scale_denominator,
                 "cellSize": cell_size,
-                "pointOfOrigin": [left, top],
+                "pointOfOrigin": (left, top),
                 "tileWidth": tile_width,
                 "tileHeight": tile_height,
                 "matrixWidth": matrix_width,
@@ -910,8 +926,8 @@ def create_native_crs_tile_matrix_set(
         "title": f"Native CRS Tile Matrix Set ({native_crs})",
         "crs": crs_uri,
         "supportedCRS": crs_uri,
-        "orderedAxes": ["X", "Y"],
-        "tileMatrices": tile_matrices,
+        "orderedAxes": ("X", "Y"),
+        "tileMatrices": tuple(tile_matrices),
     }
 
 
@@ -1802,3 +1818,7 @@ def _is_sentinel1(dt: xr.DataTree) -> bool:
         return True
     else:
         return False
+
+
+def get_zarr_group(data: xr.DataTree) -> zarr.Group:
+    return data._close.__self__.zarr_group

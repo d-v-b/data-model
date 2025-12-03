@@ -134,17 +134,17 @@ class TestUtilityFunctions:
         assert levels[0]["level"] == 0
         assert levels[0]["width"] == 1024
         assert levels[0]["height"] == 1024
-        assert levels[0]["scale_factor"] == 1
+        assert levels[0]["scale_relative"] == 1
 
         assert levels[1]["level"] == 1
         assert levels[1]["width"] == 512
         assert levels[1]["height"] == 512
-        assert levels[1]["scale_factor"] == 2
+        assert levels[1]["scale_relative"] == 2
 
         assert levels[2]["level"] == 2
         assert levels[2]["width"] == 256
         assert levels[2]["height"] == 256
-        assert levels[2]["scale_factor"] == 4
+        assert levels[2]["scale_relative"] == 4
 
 
 class TestMetadataSetup:

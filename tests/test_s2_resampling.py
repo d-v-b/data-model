@@ -7,13 +7,13 @@ import pytest
 import xarray as xr
 
 from eopf_geozarr.s2_optimization.s2_resampling import (
-    S2ResamplingEngine,
     determine_variable_type,
+    downsample_variable,
 )
 
 
 @pytest.fixture
-def sample_reflectance_data_2d():
+def sample_reflectance_data_2d() -> xr.DataArray:
     """Create a 2D reflectance data array for testing."""
     # Create a 4x4 array with known values
     data = np.array(
@@ -40,7 +40,7 @@ def sample_reflectance_data_2d():
 
 
 @pytest.fixture
-def sample_reflectance_data_3d():
+def sample_reflectance_data_3d() -> xr.DataArray:
     """Create a 3D reflectance data array with time dimension for testing."""
     # Create a 2x4x4 array (time, y, x)
     data = np.array(
@@ -76,7 +76,7 @@ def sample_reflectance_data_3d():
 
 
 @pytest.fixture
-def sample_classification_data():
+def sample_classification_data() -> xr.DataArray:
     """Create classification data for testing."""
     # SCL values: 0=no_data, 1=saturated, 4=vegetation, 6=water, etc.
     data = np.array(
@@ -97,7 +97,7 @@ def sample_classification_data():
 
 
 @pytest.fixture
-def sample_quality_mask():
+def sample_quality_mask() -> xr.DataArray:
     """Create quality mask data for testing."""
     # Binary mask: 0=good, 1=bad
     data = np.array(
@@ -115,7 +115,7 @@ def sample_quality_mask():
 
 
 @pytest.fixture
-def sample_probability_data():
+def sample_probability_data() -> xr.DataArray:
     """Create probability data for testing."""
     # Cloud probabilities in percent (0-100)
     data = np.array(
@@ -144,26 +144,11 @@ def sample_probability_data():
 class TestS2ResamplingEngine:
     """Test cases for S2ResamplingEngine class."""
 
-    def test_initialization(self):
-        """Test engine initialization."""
-        engine = S2ResamplingEngine()
-
-        assert hasattr(engine, "resampling_methods")
-        assert len(engine.resampling_methods) == 5
-        assert "reflectance" in engine.resampling_methods
-        assert "classification" in engine.resampling_methods
-        assert "quality_mask" in engine.resampling_methods
-        assert "probability" in engine.resampling_methods
-        assert "detector_footprint" in engine.resampling_methods
-
-    def test_downsample_reflectance_2d(self, sample_reflectance_data_2d):
+    def test_downsample_reflectance_2d(self, sample_reflectance_data_2d) -> None:
         """Test reflectance downsampling for 2D data."""
-        engine = S2ResamplingEngine()
 
         # Downsample from 4x4 to 2x2
-        result = engine.downsample_variable(
-            sample_reflectance_data_2d, 2, 2, "reflectance"
-        )
+        result = downsample_variable(sample_reflectance_data_2d, 2, 2, "reflectance")
 
         # Check dimensions
         assert result.shape == (2, 2)
@@ -185,14 +170,10 @@ class TestS2ResamplingEngine:
         # Check attributes are preserved
         assert result.attrs == sample_reflectance_data_2d.attrs
 
-    def test_downsample_reflectance_3d(self, sample_reflectance_data_3d):
+    def test_downsample_reflectance_3d(self, sample_reflectance_data_3d) -> None:
         """Test reflectance downsampling for 3D data."""
-        engine = S2ResamplingEngine()
-
         # Downsample from 2x4x4 to 2x2x2
-        result = engine.downsample_variable(
-            sample_reflectance_data_3d, 2, 2, "reflectance"
-        )
+        result = downsample_variable(sample_reflectance_data_3d, 2, 2, "reflectance")
 
         # Check dimensions
         assert result.shape == (2, 2, 2)
@@ -213,12 +194,9 @@ class TestS2ResamplingEngine:
 
     def test_downsample_classification(self, sample_classification_data):
         """Test classification downsampling using mode."""
-        engine = S2ResamplingEngine()
 
         # Downsample from 4x4 to 2x2
-        result = engine.downsample_variable(
-            sample_classification_data, 2, 2, "classification"
-        )
+        result = downsample_variable(sample_classification_data, 2, 2, "classification")
 
         # Check dimensions
         assert result.shape == (2, 2)
@@ -234,10 +212,9 @@ class TestS2ResamplingEngine:
 
     def test_downsample_quality_mask(self, sample_quality_mask):
         """Test quality mask downsampling using logical OR."""
-        engine = S2ResamplingEngine()
 
         # Downsample from 4x4 to 2x2
-        result = engine.downsample_variable(sample_quality_mask, 2, 2, "quality_mask")
+        result = downsample_variable(sample_quality_mask, 2, 2, "quality_mask")
 
         # Check dimensions
         assert result.shape == (2, 2)
@@ -258,12 +235,9 @@ class TestS2ResamplingEngine:
 
     def test_downsample_probability(self, sample_probability_data):
         """Test probability downsampling with value clamping."""
-        engine = S2ResamplingEngine()
 
         # Downsample from 4x4 to 2x2
-        result = engine.downsample_variable(
-            sample_probability_data, 2, 2, "probability"
-        )
+        result = downsample_variable(sample_probability_data, 2, 2, "probability")
 
         # Check dimensions
         assert result.shape == (2, 2)
@@ -280,12 +254,9 @@ class TestS2ResamplingEngine:
 
     def test_detector_footprint_same_as_quality_mask(self, sample_quality_mask):
         """Test that detector footprint uses same method as quality mask."""
-        engine = S2ResamplingEngine()
 
-        result_quality = engine.downsample_variable(
-            sample_quality_mask, 2, 2, "quality_mask"
-        )
-        result_detector = engine.downsample_variable(
+        result_quality = downsample_variable(sample_quality_mask, 2, 2, "quality_mask")
+        result_detector = downsample_variable(
             sample_quality_mask, 2, 2, "detector_footprint"
         )
 
@@ -294,14 +265,12 @@ class TestS2ResamplingEngine:
 
     def test_invalid_variable_type(self, sample_reflectance_data_2d):
         """Test error handling for invalid variable type."""
-        engine = S2ResamplingEngine()
 
         with pytest.raises(ValueError, match="Unknown variable type"):
-            engine.downsample_variable(sample_reflectance_data_2d, 2, 2, "invalid_type")
+            downsample_variable(sample_reflectance_data_2d, 2, 2, "invalid_type")
 
-    def test_non_divisible_dimensions(self):
+    def test_non_divisible_dimensions(self) -> None:
         """Test handling of non-divisible dimensions."""
-        engine = S2ResamplingEngine()
 
         # Create 5x5 data (not evenly divisible by 2)
         data = np.random.rand(5, 5).astype(np.float32)
@@ -309,14 +278,13 @@ class TestS2ResamplingEngine:
         da = xr.DataArray(data, dims=["y", "x"], coords=coords)
 
         # Should crop to make it divisible
-        result = engine.downsample_variable(da, 2, 2, "reflectance")
+        result = downsample_variable(da, 2, 2, "reflectance")
 
         # Should result in 2x2 output (cropped from 4x4)
         assert result.shape == (2, 2)
 
-    def test_single_pixel_downsampling(self):
+    def test_single_pixel_downsampling(self) -> None:
         """Test downsampling to single pixel."""
-        engine = S2ResamplingEngine()
 
         # Create 4x4 data
         data = np.ones((4, 4), dtype=np.float32) * 100
@@ -324,7 +292,7 @@ class TestS2ResamplingEngine:
         da = xr.DataArray(data, dims=["y", "x"], coords=coords)
 
         # Downsample to 1x1
-        result = engine.downsample_variable(da, 1, 1, "reflectance")
+        result = downsample_variable(da, 1, 1, "reflectance")
 
         assert result.shape == (1, 1)
         assert result.values[0, 0] == 100.0
@@ -333,7 +301,7 @@ class TestS2ResamplingEngine:
 class TestDetermineVariableType:
     """Test cases for determine_variable_type function."""
 
-    def test_spectral_bands(self):
+    def test_spectral_bands(self) -> None:
         """Test recognition of spectral bands."""
         dummy_data = xr.DataArray([1, 2, 3])
 
@@ -347,27 +315,27 @@ class TestDetermineVariableType:
         assert determine_variable_type("cld", dummy_data) == "probability"
         assert determine_variable_type("quality_b01", dummy_data) == "quality_mask"
 
-    def test_classification_data(self):
+    def test_classification_data(self) -> None:
         """Test recognition of classification data."""
         dummy_data = xr.DataArray([1, 2, 3])
 
         assert determine_variable_type("scl", dummy_data) == "classification"
 
-    def test_probability_data(self):
+    def test_probability_data(self) -> None:
         """Test recognition of probability data."""
         dummy_data = xr.DataArray([1, 2, 3])
 
         assert determine_variable_type("cld", dummy_data) == "probability"
         assert determine_variable_type("snw", dummy_data) == "probability"
 
-    def test_atmospheric_quality(self):
+    def test_atmospheric_quality(self) -> None:
         """Test recognition of atmospheric quality data."""
         dummy_data = xr.DataArray([1, 2, 3])
 
         assert determine_variable_type("aot", dummy_data) == "reflectance"
         assert determine_variable_type("wvp", dummy_data) == "reflectance"
 
-    def test_quality_masks(self):
+    def test_quality_masks(self) -> None:
         """Test recognition of quality mask data."""
         dummy_data = xr.DataArray([1, 2, 3])
 
@@ -377,7 +345,7 @@ class TestDetermineVariableType:
         )
         assert determine_variable_type("quality_b02", dummy_data) == "quality_mask"
 
-    def test_unknown_variable_defaults_to_reflectance(self):
+    def test_unknown_variable_defaults_to_reflectance(self) -> None:
         """Test that unknown variables default to reflectance."""
         dummy_data = xr.DataArray([1, 2, 3])
 
@@ -388,9 +356,8 @@ class TestDetermineVariableType:
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_empty_data_array(self):
+    def test_empty_data_array(self) -> None:
         """Test handling of empty data arrays."""
-        engine = S2ResamplingEngine()
 
         # Create minimal data array
         data = np.array([[1]])
@@ -398,13 +365,12 @@ class TestEdgeCases:
         da = xr.DataArray(data, dims=["y", "x"], coords=coords)
 
         # This should work for 1x1 -> 1x1 downsampling
-        result = engine.downsample_variable(da, 1, 1, "reflectance")
+        result = downsample_variable(da, 1, 1, "reflectance")
         assert result.shape == (1, 1)
         assert result.values[0, 0] == 1
 
-    def test_preserve_attributes_and_encoding(self):
+    def test_preserve_attributes_and_encoding(self) -> None:
         """Test that attributes and encoding are preserved."""
-        engine = S2ResamplingEngine()
 
         data = np.ones((4, 4), dtype=np.uint16) * 1000
         coords = {"y": np.arange(4), "x": np.arange(4)}
@@ -418,21 +384,20 @@ class TestEdgeCases:
 
         da = xr.DataArray(data, dims=["y", "x"], coords=coords, attrs=attrs)
 
-        result = engine.downsample_variable(da, 2, 2, "reflectance")
+        result = downsample_variable(da, 2, 2, "reflectance")
 
         # Attributes should be preserved
         assert result.attrs == attrs
 
-    def test_coordinate_names_preserved(self):
+    def test_coordinate_names_preserved(self) -> None:
         """Test that coordinate names are preserved during downsampling."""
-        engine = S2ResamplingEngine()
 
         data = np.ones((4, 4), dtype=np.float32)
         coords = {"latitude": np.arange(4), "longitude": np.arange(4)}
 
         da = xr.DataArray(data, dims=["latitude", "longitude"], coords=coords)
 
-        result = engine.downsample_variable(da, 2, 2, "reflectance")
+        result = downsample_variable(da, 2, 2, "reflectance")
 
         # Coordinate names should be preserved
         assert "latitude" in result.coords
@@ -443,9 +408,8 @@ class TestEdgeCases:
 class TestIntegrationScenarios:
     """Integration test scenarios."""
 
-    def test_multiscale_pyramid_creation(self):
+    def test_multiscale_pyramid_creation(self) -> None:
         """Test creating a complete multiscale pyramid."""
-        engine = S2ResamplingEngine()
 
         # Start with 32x32 data
         original_size = 32
@@ -461,7 +425,7 @@ class TestIntegrationScenarios:
 
         while current_size >= 2:
             next_size = current_size // 2
-            downsampled = engine.downsample_variable(
+            downsampled = downsample_variable(
                 current_data, next_size, next_size, "reflectance"
             )
             levels.append(downsampled)
@@ -479,9 +443,8 @@ class TestIntegrationScenarios:
             assert not np.isnan(level.values).any()
             assert np.all(level.values >= 0)
 
-    def test_mixed_variable_types_processing(self):
+    def test_mixed_variable_types_processing(self) -> None:
         """Test processing different variable types together."""
-        engine = S2ResamplingEngine()
 
         # Create base 4x4 data
         size = 4
@@ -507,7 +470,7 @@ class TestIntegrationScenarios:
             ("scl", classification_data, "classification"),
             ("quality_b04", quality_data, "quality_mask"),
         ]:
-            results[var_name] = engine.downsample_variable(var_data, 2, 2, var_type)
+            results[var_name] = downsample_variable(var_data, 2, 2, var_type)
 
         # Verify all results have same dimensions
         for result in results.values():

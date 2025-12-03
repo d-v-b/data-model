@@ -1,8 +1,52 @@
 """Tests for the eopf-geozarr package."""
 
+import json
 import pathlib
 
+import pytest
 import xarray as xr
+from pydantic_zarr.v2 import GroupSpec
+
+s1_example_json_paths = tuple(
+    pathlib.Path("tests/test_data_api/s1_examples").glob("*.json")
+)
+s2_example_json_paths = tuple(
+    pathlib.Path("tests/test_data_api/s2_examples").glob("*.json")
+)
+
+
+def create_group_from_json(
+    source_path: pathlib.Path, out_path: pathlib.Path
+) -> pathlib.Path:
+    """
+    Create a Zarr V2 group from a JSON model
+    """
+    out_dir = out_path / (source_path.stem + ".zarr")
+    g = GroupSpec(**json.loads(source_path.read_text()))
+    g.to_zarr(out_dir, path="")
+    return out_dir
+
+
+@pytest.fixture(params=s1_example_json_paths, ids=lambda p: p.stem)
+def s1_group_example(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path
+) -> tuple[pathlib.Path, ...]:
+    """
+    A pytest fixture that returns the path to a Zarr group with the same layout as a sentinel 1
+    product
+    """
+    return create_group_from_json(request.param, tmp_path)
+
+
+@pytest.fixture(params=s2_example_json_paths, ids=lambda p: p.stem)
+def s2_group_example(
+    request: pytest.FixtureRequest, tmp_path: pathlib.Path
+) -> tuple[pathlib.Path, ...]:
+    """
+    A pytest fixture that returns the path to a Zarr group with the same layout as a sentinel 2
+    product
+    """
+    return create_group_from_json(request.param, tmp_path)
 
 
 def _verify_basic_structure(output_path: pathlib.Path, groups: list[str]) -> None:

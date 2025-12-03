@@ -4,7 +4,8 @@ import io
 import urllib
 import urllib.request
 from dataclasses import dataclass
-from typing import Annotated, Any, Mapping, Self, TypeVar
+from typing import Annotated, Any, Mapping, Self, TypeGuard, TypeVar
+from urllib.error import URLError
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel, Field, model_validator
@@ -98,12 +99,9 @@ def get_cf_standard_names(url: str) -> tuple[str, ...]:
 
     req = urllib.request.Request(url, headers=headers)
 
-    try:
-        with urllib.request.urlopen(req) as response:
-            content = response.read()  # Read the entire response body into memory
-            content_fobj = io.BytesIO(content)
-    except urllib.error.URLError as e:
-        raise e
+    with urllib.request.urlopen(req) as response:
+        content = response.read()  # Read the entire response body into memory
+        content_fobj = io.BytesIO(content)
 
     _info, table, _aliases = parse_cf_standard_name_table(source=content_fobj)
     return tuple(table.keys())
@@ -117,7 +115,13 @@ CF_STANDARD_NAME_URL = (
 
 # this does IO against github. consider locally storing this data instead if fetching every time
 # is problematic.
-CF_STANDARD_NAMES = get_cf_standard_names(url=CF_STANDARD_NAME_URL)
+
+try:
+    CF_STANDARD_NAMES = get_cf_standard_names(url=CF_STANDARD_NAME_URL)
+    DO_CF_NAME_VALIDATION = True
+except URLError:
+    CF_STANDARD_NAMES = ()
+    DO_CF_NAME_VALIDATION = False
 
 
 def check_standard_name(name: str) -> str:
@@ -139,12 +143,13 @@ def check_standard_name(name: str) -> str:
     ValueError
         If the standard name is not valid.
     """
-
-    if name in CF_STANDARD_NAMES:
-        return name
-    raise ValueError(
-        f"Invalid standard name: {name}. This name was not found in the list of CF standard names."
-    )
+    if DO_CF_NAME_VALIDATION:
+        if name in CF_STANDARD_NAMES:
+            return name
+        raise ValueError(
+            f"Invalid standard name: {name}. This name was not found in the list of CF standard names."
+        )
+    return name
 
 
 CFStandardName = Annotated[str, AfterValidator(check_standard_name)]
@@ -245,9 +250,9 @@ class TileMatrixSet(BaseModel):
     tileMatrices: tuple[TileMatrix, ...]
 
 
-class Multiscales(BaseModel, extra="allow"):
+class TMSMultiscales(BaseModel, extra="allow"):
     """
-    Multiscale metadata for a GeoZarr dataset.
+    Multiscale metadata for a GeoZarr dataset based on the OGC TileMatrixSet standard
 
     Attributes
     ----------
@@ -307,4 +312,8 @@ class MultiscaleGroupAttrs(BaseModel, extra="allow"):
     multiscales: MultiscaleAttrs
     """
 
-    multiscales: Multiscales
+    multiscales: TMSMultiscales
+
+
+def is_none(data: object) -> TypeGuard[None]:
+    return data is None

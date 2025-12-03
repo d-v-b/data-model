@@ -1,6 +1,9 @@
 """Types and constants for the GeoZarr data API."""
 
-from typing import Any, Final, Literal, NotRequired, TypedDict
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Final, Literal, NotRequired, TypedDict
 
 
 class TileMatrixLimitJSON(TypedDict):
@@ -11,9 +14,33 @@ class TileMatrixLimitJSON(TypedDict):
     maxTileRow: int
 
 
-class XarrayEncodingJSON(TypedDict):
+XARRAY_ENCODING_KEYS: Final[set[str]] = {
+    "chunks",
+    "preferred_chunks",
+    "compressors",
+    "filters",
+    "shards",
+    "_FillValue",
+    "scale_factor",
+    "add_offset",
+    "dtype",
+}
+
+
+class XarrayDataArrayEncoding(TypedDict):
+    """
+    The dict form of the encoding for xarray.DataArray
+    """
+
     chunks: NotRequired[tuple[int, ...]]
-    compressors: Any
+    preferred_chunks: NotRequired[tuple[int, ...]]
+    compressors: NotRequired[tuple[object, ...] | None]
+    filters: NotRequired[tuple[object, ...]]
+    shards: NotRequired[tuple[int, ...] | None]
+    _FillValue: NotRequired[object]
+    scale_factor: NotRequired[float]
+    add_offset: NotRequired[float]
+    dtype: NotRequired[object]
 
 
 class StandardXCoordAttrsJSON(TypedDict):
@@ -28,14 +55,6 @@ class StandardYCoordAttrsJSON(TypedDict):
     long_name: Literal["y coordinate of projection"]
     standard_name: Literal["projection_y_coordinate"]
     _ARRAY_DIMENSIONS: list[Literal["y"]]
-
-
-class OverviewLevelJSON(TypedDict):
-    level: int
-    zoom: int
-    width: int
-    height: int
-    scale_factor: int
 
 
 class TileMatrixJSON(TypedDict):
@@ -54,8 +73,23 @@ class TileMatrixSetJSON(TypedDict):
     title: str | None
     crs: str | None
     supportedCRS: str | None
-    orderedAxes: tuple[str, str] | None | list[str]
-    tileMatrices: tuple[TileMatrixJSON, ...] | list[TileMatrixJSON]
+    orderedAxes: tuple[str, str] | None
+    tileMatrices: tuple[TileMatrixJSON, ...]
+
+
+class TMSMultiscalesJSON(TypedDict):
+    """
+    Typeddict model of the `multiscales` attribute of Zarr groups that implement the
+    OGC TileMatrixSet multiscales structure
+    """
+
+    tile_matrix_set: TileMatrixSetJSON
+    resampling_method: ResamplingMethod
+    tile_matrix_limits: Mapping[str, TileMatrixLimitJSON]
+
+
+class TMSMultiscalesAttrsJSON(TypedDict):
+    multiscales: TMSMultiscalesJSON
 
 
 ResamplingMethod = Literal[

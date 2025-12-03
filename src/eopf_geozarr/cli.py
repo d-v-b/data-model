@@ -1183,14 +1183,6 @@ def add_s2_optimization_commands(subparsers: Any) -> None:
         help="Compression level 1-9 (default: 3)",
     )
     s2_parser.add_argument(
-        "--skip-geometry", action="store_true", help="Skip creating geometry group"
-    )
-    s2_parser.add_argument(
-        "--skip-meteorology",
-        action="store_true",
-        help="Skip creating meteorology group",
-    )
-    s2_parser.add_argument(
         "--skip-validation", action="store_true", help="Skip output validation"
     )
     s2_parser.add_argument(
@@ -1204,7 +1196,7 @@ def add_s2_optimization_commands(subparsers: Any) -> None:
     s2_parser.set_defaults(func=convert_s2_optimized_command)
 
 
-def convert_s2_optimized_command(args: Any) -> int:
+def convert_s2_optimized_command(args: Any) -> None:
     """Execute S2 optimized conversion command."""
     # Set up dask cluster if requested
     dask_client = setup_dask_cluster(
@@ -1229,22 +1221,10 @@ def convert_s2_optimized_command(args: Any) -> int:
             enable_sharding=args.enable_sharding,
             spatial_chunk=args.spatial_chunk,
             compression_level=args.compression_level,
-            create_geometry_group=not args.skip_geometry,
-            create_meteorology_group=not args.skip_meteorology,
             validate_output=not args.skip_validation,
-            verbose=args.verbose,
         )
 
         log.info("✅ S2 optimization completed", output_path=args.output_path)
-        return 0
-
-    except Exception as e:
-        log.info("❌ Error during S2 optimization", error=str(e))
-        if args.verbose:
-            import traceback
-
-            traceback.print_exc()
-        return 1
     finally:
         # Clean up dask client if it was created
         if dask_client is not None:
