@@ -226,9 +226,22 @@ In this case `lat` is both a coordinate variable and a data variable.
 
 ## Multiscale Dataset 
 
+This implementation supports **two multiscales metadata conventions**:
+
+1. **[Zarr Multiscales Convention](https://github.com/zarr-conventions/multiscales)**: An experimental convention for describing multi-resolution data with simple scale and translation metadata
+2. **GeoZarr 0.4 TileMatrixSet Specification**: The experimental GeoZarr specification using OGC TileMatrixSet definitions for geospatial data
+
+**Both conventions can coexist in the same Zarr store**, providing flexibility for different use cases and ensuring compatibility with various tools and workflows. The implementation follows the specifications defined in:
+
+- **[Zarr Multiscales Convention Specification](https://github.com/zarr-conventions/multiscales)** - For the experimental multiscales convention with examples at [https://github.com/zarr-conventions/multiscales/tree/main/examples](https://github.com/zarr-conventions/multiscales/tree/main/examples)
+  - See particularly [sentinel-2-multiresolution.json](https://github.com/zarr-conventions/multiscales/blob/main/examples/sentinel-2-multiresolution.json) for Sentinel-2 multi-resolution structure
+- **[GeoZarr Specification](https://zarr.dev/geozarr-spec/)** - For the OGC TileMatrixSet-based convention
+
+When both conventions are enabled, they are written to the same group attributes with different keys, allowing tools to use whichever convention they support.
+
 Downsampling is a process in which a collection of localized data points is resampled on a subset of its original sampling locations. 
 
-In the case of arrays, downsampling generally reduces an array's shape along at least one dimension. To downsample the 
+In the case of arrays, downsampling generally reduces an array's shape along at least one dimension. To downsample the
 contents of a Dataset `D` and generate a new Dataset `E`, all of the coordinate variable - data variable 
 relationships in `D` must be preserved in `E`. If `D/data` is a data variable with dimension names (`"a"` , `"b"`), then `D/a` and `D/b` are coordinate variables with shapes aligned to the dimensions of `D/data`. If we downsample `D/data` and assign the result to `E/data`, we must also generate (e.g., by more downsampling) coordinate variables `E/a` and `E/b` so that `E` can be a valid Dataset according to the relevant [Dataset members rule](#members).
 
@@ -240,7 +253,7 @@ detail for a data variable.
 
 The implementation uses a **pyramid-based downsampling approach** with the following characteristics:
 
-- **Factor-of-2 Downsampling**: Each overview level reduces dimensions by a factor of 2 (COG-style downsampling)
+- **Variable Downsampling Factors**: Overview levels use optimal downsampling factors based on data characteristics (e.g., 2x, 3x) rather than strictly factor-of-2. For Sentinel-2, this results in resolution levels: 10m → 20m → 60m → 120m (2x) → 360m (3x) → 720m (2x)
 - **Pyramid Generation**: Overview levels are created sequentially, with each level generated from the previous level rather than from the native resolution
 - **Minimum Dimension Threshold**: Overview generation stops when the smallest dimension falls below a configurable threshold (default: 256 pixels)
 - **Native CRS Preservation**: All overview levels maintain the same coordinate reference system as the native data
