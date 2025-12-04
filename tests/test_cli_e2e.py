@@ -47,13 +47,18 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     # don't care about that here, so we convert all lists to tuples before creating the GroupSpec
     observed_structure = GroupSpec(**tuplify_json(observed_structure_json))
     observed_structure_flat = observed_structure.to_flat()
+    expected_structure_path = Path(
+        "tests/test_data_api/optimized_geozarr_examples/"
+    ) / (s2_group_example.stem + ".json")
+
+    # Uncomment this section to write out the expected structure from the observed structure
+    # This is useful when the expected structure needs to be updated
+    # expected_structure_path.write_text(
+    #    json.dumps(observed_structure_json, indent=2, sort_keys=True)
+    # )
+
     expected_structure_json = tuplify_json(
-        json.loads(
-            (
-                Path("tests/test_data_api/optimized_geozarr_examples/")
-                / (s2_group_example.stem + ".json")
-            ).read_text()
-        )
+        json.loads(expected_structure_path.read_text())
     )
     expected_structure = GroupSpec(**expected_structure_json)
     expected_structure_flat = expected_structure.to_flat()

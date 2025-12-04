@@ -202,9 +202,6 @@ def _load_multiscales_examples() -> dict[str, dict[str, object]]:
     }
 
 
-MULTISCALES_EXAMPLES = _load_multiscales_examples()
-
-
 def _load_json_examples(
     *, prefix: Path, glob_str: str = "*.json"
 ) -> dict[str, dict[str, object]]:

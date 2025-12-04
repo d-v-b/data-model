@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import BaseModel, computed_field, model_validator
+from pydantic import BaseModel, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import NotRequired, TypedDict
 
@@ -85,7 +85,6 @@ class MultiscaleGroupAttrs(BaseModel):
             )
         return self
 
-    @computed_field  # type: ignore[prop-decorator]
     @property
     def multiscale_meta(self) -> MultiscaleMetaDict:
         out: MultiscaleMetaDict = {}
