@@ -171,6 +171,7 @@ def create_multiscale_from_datatree(
         r120m_dataset = create_downsampled_resolution_group(
             source_dataset, factor=factor
         ).compute()
+
         if r120m_dataset and len(r120m_dataset.data_vars) > 0:
             output_path_120 = f"{output_path}{r120m_path}"
             log.info("Writing r120m to {}", output_path_120=output_path_120)
@@ -791,7 +792,6 @@ def stream_write_dataset(
         encoding=encoding,
         compute=False,  # Create job first for progress tracking
     )
-    write_job = write_job.persist()
 
     if DISTRIBUTED_AVAILABLE:
         try:
