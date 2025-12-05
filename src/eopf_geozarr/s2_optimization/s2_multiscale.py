@@ -3,6 +3,8 @@ Streaming multiscale pyramid creation for optimized S2 structure.
 Uses lazy evaluation to minimize memory usage during dataset preparation.
 """
 
+from __future__ import annotations
+
 from collections.abc import Hashable, Mapping
 from typing import Any, Literal
 
@@ -11,6 +13,7 @@ import structlog
 import xarray as xr
 from dask import delayed
 from dask.array import from_delayed
+from pydantic.experimental.missing_sentinel import MISSING
 from pyproj import CRS
 
 from eopf_geozarr.conversion import fs_utils
@@ -18,9 +21,10 @@ from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
     create_native_crs_tile_matrix_set,
 )
-from eopf_geozarr.data_api.geozarr.multiscales import (
-    MULTISCALE_CONVENTION,
-    ScaleLevelJSON,
+from eopf_geozarr.data_api.geozarr.multiscales import tms, zcm
+from eopf_geozarr.data_api.geozarr.multiscales.geozarr import (
+    MultiscaleGroupAttrs,
+    MultiscaleMeta,
 )
 from eopf_geozarr.data_api.geozarr.types import (
     XARRAY_ENCODING_KEYS,
@@ -491,6 +495,9 @@ def add_multiscales_metadata_to_parent(
         return
 
     multiscales: dict[str, Any] = {"multiscales": {}}
+    layout: list[zcm.ScaleLevel] | MISSING = MISSING
+    tile_matrix_set: tms.TileMatrixSet | MISSING = MISSING
+    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | MISSING = MISSING
 
     if "ogc_tms" in multiscales_flavor:
         # Create tile matrix set using geozarr function
@@ -514,34 +521,34 @@ def add_multiscales_metadata_to_parent(
             }
         )
     if "experimental_multiscales_convention" in multiscales_flavor:
-        scale_levels: list[ScaleLevelJSON] = []
+        layout = []
         for overview_level in overview_levels:
-            scale_levels.append(
-                {
-                    "asset": str(overview_level["level"]),
-                    "scale": (overview_level["scale_relative"],),
-                    "translation": (
-                        overview_level["translation_relative"],
-                        overview_level["translation_relative"],
+            layout.append(
+                zcm.ScaleLevel(
+                    asset=str(overview_level["level"]),
+                    derived_from=str(all_resolutions[0]),
+                    transform=zcm.Transform(
+                        scale=(overview_level["scale_relative"],) * 2,
+                        translation=(overview_level["translation_relative"],) * 2,
                     ),
-                }
+                )
             )
-        multiscales["zarr_conventions_version"] = "0.1.0"
-        multiscales["zarr_conventions"] = MULTISCALE_CONVENTION
-        multiscales["multiscales"].update(
-            {
-                "layout": tuple(scale_levels),
-                "resampling_method": "average",
-            }
-        )
+    multiscale_attrs = MultiscaleGroupAttrs(
+        zarr_conventions=(zcm.MultiscaleConventionMetadata(),),
+        multiscales=MultiscaleMeta(
+            layout=layout,
+            resampling_method="average",
+            tile_matrix_set=tile_matrix_set,
+            tile_matrix_limits=tile_matrix_limits,
+        ),
+    )
 
     # Create parent group path
     parent_group_path = f"{output_path}{base_path}"
     dt_multiscale = xr.DataTree()
     for res in all_resolutions:
         dt_multiscale[res] = xr.DataTree()
-    dt_multiscale.attrs.update(multiscales)
-
+    dt_multiscale.attrs.update(multiscale_attrs.model_dump())
     dt_multiscale.to_zarr(
         parent_group_path,
         mode="a",

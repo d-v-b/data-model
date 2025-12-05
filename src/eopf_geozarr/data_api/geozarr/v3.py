@@ -10,10 +10,10 @@ from pydantic_zarr.v3 import ArraySpec, GroupSpec
 from eopf_geozarr.data_api.geozarr.common import (
     BaseDataArrayAttrs,
     DatasetAttrs,
-    MultiscaleGroupAttrs,
     check_grid_mapping,
     check_valid_coordinates,
 )
+from eopf_geozarr.data_api.geozarr.multiscales import MultiscaleGroupAttrs
 
 
 class DataArray(ArraySpec[BaseDataArrayAttrs]):

@@ -12,10 +12,10 @@ from eopf_geozarr.data_api.geozarr.common import (
     BaseDataArrayAttrs,
     DatasetAttrs,
     GridMappingAttrs,
-    MultiscaleGroupAttrs,
     check_grid_mapping,
     check_valid_coordinates,
 )
+from eopf_geozarr.data_api.geozarr.multiscales import MultiscaleGroupAttrs
 from eopf_geozarr.data_api.geozarr.types import XARRAY_DIMS_KEY
 
 
