@@ -211,3 +211,6 @@ tests-output/
 # uv
 uv.lock
 .vscode/settings.json
+
+# VCS versioning
+src/eopf_geozarr/_version.py
