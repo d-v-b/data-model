@@ -170,7 +170,7 @@ def create_multiscale_from_datatree(
 
         r120m_dataset = create_downsampled_resolution_group(
             source_dataset, factor=factor
-        )
+        ).compute()
         if r120m_dataset and len(r120m_dataset.data_vars) > 0:
             output_path_120 = f"{output_path}{r120m_path}"
             log.info("Writing r120m to {}", output_path_120=output_path_120)
@@ -194,7 +194,7 @@ def create_multiscale_from_datatree(
 
                 r360m_dataset = create_downsampled_resolution_group(
                     r120m_dataset, factor=3
-                )
+                ).compute()
 
                 if r360m_dataset and len(r360m_dataset.data_vars) > 0:
                     output_path_360 = f"{output_path}{r360m_path}"
@@ -219,7 +219,7 @@ def create_multiscale_from_datatree(
 
                         r720m_dataset = create_downsampled_resolution_group(
                             r360m_dataset, factor=2
-                        )
+                        ).compute()
 
                         if r720m_dataset and len(r720m_dataset.data_vars) > 0:
                             output_path_720 = f"{output_path}{r720m_path}"
