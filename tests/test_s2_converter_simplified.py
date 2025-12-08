@@ -6,7 +6,6 @@ Tests the new simplified approach that uses only xarray and proper metadata cons
 
 import json
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -243,32 +242,18 @@ def test_simple_root_consolidation_success(tmp_path: Path):
 class TestConvenienceFunction:
     """Test the convenience function."""
 
-    @patch("eopf_geozarr.s2_optimization.s2_converter.initialize_crs_from_dataset")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.get_zarr_group")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.is_sentinel2_dataset")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.create_multiscale_from_datatree")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.simple_root_consolidation")
     def test_convert_s2_optimized_convenience_function(
         self,
-        mock_consolidation,
-        mock_multiscale,
-        mock_is_s2,
-        mock_get_zarr_group,
-        mock_init_crs,
+        s2_group_example: Path,
+        tmp_path: Path,
     ):
-        """Test the convenience function parameter passing."""
-        # Setup mocks
-        mock_multiscale.return_value = {}
-        mock_is_s2.return_value = True
-        mock_get_zarr_group.return_value = Mock()
-        mock_init_crs.return_value = None  # Return None for CRS
+        """Test the convenience function with real S2 data."""
+        # Open the S2 example as a DataTree
+        dt_input = xr.open_datatree(s2_group_example, engine="zarr")
+        output_path = str(tmp_path / "test_output.zarr")
 
-        # Test parameter passing - Mock DataTree with groups attribute
-        dt_input = Mock()
-        dt_input.groups = ["/measurements/reflectance/r10m"]
-        output_path = "/test/path"
-
-        convert_s2_optimized(
+        # Run the conversion
+        result = convert_s2_optimized(
             dt_input,
             output_path=output_path,
             enable_sharding=False,
@@ -278,11 +263,15 @@ class TestConvenienceFunction:
             validate_output=False,
         )
 
-        # Verify multiscale function was called with correct args
-        mock_multiscale.assert_called_once()
-        call_kwargs = mock_multiscale.call_args.kwargs
-        assert call_kwargs["enable_sharding"] is False
-        assert call_kwargs["spatial_chunk"] == 512
+        # Verify the output was created
+        assert Path(output_path).exists()
+
+        # Verify the result is a DataTree
+        assert isinstance(result, xr.DataTree)
+
+        # Verify basic structure - output should have multiscale groups
+        output_dt = xr.open_datatree(output_path, engine="zarr")
+        assert len(output_dt.groups) > 0
 
 
 if __name__ == "__main__":
