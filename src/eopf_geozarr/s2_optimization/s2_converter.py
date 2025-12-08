@@ -21,7 +21,7 @@ from eopf_geozarr.conversion.geozarr import get_zarr_group
 from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
 
-from .s2_multiscale import create_multiscale_from_datatree
+from .s2_multiscale import create_multiscale_from_datatree, write_geo_metadata
 
 log = structlog.get_logger()
 
@@ -354,6 +354,31 @@ def reencode_group(
     return tree[path]
 
 
+def add_crs_and_grid_mapping(group: zarr.Group) -> None:
+    """
+    Add crs and grid mapping elements to a dataset, which is saved to a new memory-backed
+    Zarr group.
+    """
+    ds = xr.open_dataset(
+        group.store, group=group.path, engine="zarr", consolidated=False
+    )
+    write_geo_metadata(ds)
+
+    for var in ds.data_vars:
+        new_attrs = ds[var].attrs.copy()
+        new_attrs["coordinates"] = "spatial_ref"
+        group[var].attrs.update(new_attrs | {"grid_mapping": "spatial_ref"})
+
+    group.create_array(
+        "spatial_ref",
+        shape=ds["spatial_ref"].shape,
+        dtype=ds["spatial_ref"].dtype,
+        attributes=ds["spatial_ref"].attrs,
+        compressors=None,
+        filters=None,
+    )
+
+
 def convert_s2_optimized(
     dt_input: xr.DataTree,
     *,
@@ -381,32 +406,37 @@ def convert_s2_optimized(
     """
 
     start_time = time.time()
-
+    zg = get_zarr_group(dt_input)
     log.info(
         "Starting S2 optimized conversion",
         num_groups=len(dt_input.groups),
         output_path=output_path,
     )
     # Validate input is S2
-    if not is_sentinel2_dataset(get_zarr_group(dt_input)):
+    if not is_sentinel2_dataset(zg):
         raise ValueError("Input dataset is not a Sentinel-2 product")
     from zarr.storage._common import make_store
 
     out_store = zarr.core.sync.sync(make_store(output_path))
 
-    # re-encode the group
-    reencode_group(
-        get_zarr_group(dt_input), out_store, "", overwrite=True, zarr_format=3
-    )
-
     # Initialize CRS from dataset
     crs = initialize_crs_from_dataset(dt_input)
 
-    # Step 1: Process data while preserving original structure
-    log.info("Step 1: Processing data with original structure preserved")
+    log.info("Re-encoding source data to Zarr V3")
+    out_group = reencode_group(zg, out_store, "", overwrite=True, zarr_format=3)
+
+    log.info("Adding CRS elements to datasets in measurements")
+    for _, subgroup in out_group["measurements"].groups():
+        for _, dataset in subgroup.groups():
+            add_crs_and_grid_mapping(dataset)
+
+    log.info("Adding CRS elements to quality datasets")
+    for _, subgroup in out_group["quality"].groups():
+        for _, dataset in subgroup.groups():
+            add_crs_and_grid_mapping(dataset)
 
     # Step 2: Create multiscale pyramids for each group in the original structure
-    log.info("Step 2: Creating multiscale pyramids (preserving original hierarchy)")
+    log.info("Adding multiscale levels")
     new_dt_input = xr.open_datatree(out_store, engine="zarr", chunks="auto")
     datasets = create_multiscale_from_datatree(
         new_dt_input,

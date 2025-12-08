@@ -845,11 +845,9 @@ def write_geo_metadata(
             crs, grid_mapping_name=grid_mapping_var_name, inplace=True
         )
         dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
-        dataset.attrs["grid_mapping"] = grid_mapping_var_name
 
         for var in dataset.data_vars.values():
             var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
-            var.attrs["grid_mapping"] = grid_mapping_var_name
 
 
 def rechunk_dataset_for_encoding(
