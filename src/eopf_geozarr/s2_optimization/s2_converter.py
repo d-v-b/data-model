@@ -9,6 +9,7 @@ import time
 from collections.abc import Mapping
 from typing import Any, Literal, NotRequired, TypedDict
 
+import numcodecs
 import structlog
 import xarray as xr
 import zarr
@@ -184,11 +185,8 @@ def convert_compression(
     compressor: Any, filters: Any, dtype: Any
 ) -> tuple[dict[str, Any], ...]:
     """
-    Convert the compression parameters for a Zarr V2 array into Zarr V3.
+    Convert the compression parameters for a Zarr V2 array into a tuple of Zarr V3 codecs.
     """
-    import numcodecs
-
-    """The shuffle values permitted for the blosc codec"""
 
     if compressor is None and filters is None:
         return ()
@@ -256,17 +254,19 @@ def reencode_array(
     )
 
 
-async def set_coro(store, key, value) -> None:
+async def set_coro(store: zarr.abc.store.Store, key: str, value: Any) -> None:
     """
-    Call store.set(key, value) after awaiting value, and returning early if value is none
+    Call store.set(key, value) after awaiting value, if value awaits to None then do nothing.
     """
     value_actual = await value
     if value_actual is not None:
-        return await store.set(key, value_actual)
+        await store.set(key, value_actual)
     return None
 
 
-async def move_chunks(array_a, array_b, *, decompress: bool = True) -> None:
+async def move_chunks(
+    array_a: zarr.Array[Any], array_b: zarr.Array[Any], *, decompress: bool = True
+) -> None:
     """
     Copy chunks from one array to another. If decompress is false, the raw chunk bytes will be copied.
     If decompress is True, an error will be raised until this developer gets around to implementing
@@ -301,7 +301,9 @@ def reencode_group(
     zarr_format: Literal[2, 3] | None = None,
     use_consolidated_for_children: bool = False,
 ) -> zarr.group:
-    # collect all the members of this group
+    """
+    Re-encode a Zarr group, applying a re-encoding to all sub-groups and sub-arrays.
+    """
 
     all_members = dict(
         group.members(
@@ -346,9 +348,10 @@ def reencode_group(
         old_array = group[name]
         new_array = new_group[name]
 
-        result = asyncio.run(move_chunks(old_array, new_array, decompress=False))
+        asyncio.run(move_chunks(old_array, new_array, decompress=False))
 
-    return tree[""]
+    # return the root group
+    return tree[path]
 
 
 def convert_s2_optimized(
