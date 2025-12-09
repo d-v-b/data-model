@@ -10,13 +10,12 @@ import json
 import subprocess
 from pathlib import Path
 
+import jsondiff
 import pytest
 import xarray as xr
 import zarr
 from pydantic_zarr.core import tuplify_json
-from pydantic_zarr.v3 import GroupSpec
-
-from tests.test_data_api.conftest import view_json_diff
+from pydantic_zarr.experimental.v3 import GroupSpec
 
 
 def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
@@ -68,12 +67,20 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
 
     # Check that all of the keys are the same
     assert o_keys == e_keys
+
     # Check that all values are the same
-    assert [
-        k
-        for k in o_keys
-        if not expected_structure_flat[k] == observed_structure_flat[k]
-    ] == []
+    differences: dict[str, dict[str, object]] = {}
+    for k in o_keys:
+        expected_val = expected_structure_flat[k]
+        observed_val = observed_structure_flat[k]
+
+        expected_val_json = tuplify_json(expected_val.model_dump())
+        observed_val_json = tuplify_json(observed_val.model_dump())
+
+        if not expected_val_json == observed_val_json:
+            differences[k] = jsondiff.diff(expected_val_json, observed_val_json)
+
+    assert differences == {}
 
 
 def test_cli_convert_real_sentinel2_data(
@@ -188,9 +195,29 @@ def test_cli_convert_real_sentinel2_data(
     observed_structure_json = tuplify_json(
         GroupSpec.from_zarr(zarr.open_group(output_path)).model_dump()
     )
-    assert expected_structure_json == observed_structure_json, view_json_diff(
-        expected_structure_json, observed_structure_json
-    )
+    observed_structure = GroupSpec(**observed_structure_json)
+    observed_structure_flat = observed_structure.to_flat()
+    expected_structure = GroupSpec(**expected_structure_json)
+    expected_structure_flat = expected_structure.to_flat()
+
+    o_keys = set(observed_structure_flat.keys())
+    e_keys = set(expected_structure_flat.keys())
+
+    # Check that all of the keys are the same
+    assert o_keys == e_keys
+
+    differences: dict[str, dict[str, object]] = {}
+    for k in o_keys:
+        expected_val = expected_structure_flat[k]
+        observed_val = observed_structure_flat[k]
+
+        expected_val_json = tuplify_json(expected_val.model_dump())
+        observed_val_json = tuplify_json(observed_val.model_dump())
+
+        if not expected_val_json == observed_val_json:
+            differences[k] = jsondiff.diff(expected_val_json, observed_val_json)
+
+    assert differences == {}
 
 
 def test_cli_help_commands() -> None:
