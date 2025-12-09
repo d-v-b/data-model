@@ -329,7 +329,10 @@ def reencode_group(
             else:
                 dimension_names = None
             new_members[new_path] = reencode_array(
-                member, zarr_format=zarr_format, dimension_names=dimension_names
+                member,
+                zarr_format=zarr_format,
+                dimension_names=dimension_names,
+                attributes=member_attrs,
             )
             chunks_to_encode.append((name, new_path))
         else:
@@ -377,6 +380,9 @@ def add_crs_and_grid_mapping(group: zarr.Group) -> None:
         compressors=None,
         filters=None,
     )
+
+    # Set grid_mapping attribute on the group itself
+    group.attrs.update({"grid_mapping": "spatial_ref"})
 
 
 def convert_s2_optimized(
