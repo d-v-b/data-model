@@ -26,9 +26,7 @@ class TestCheckValidCoordinates:
             dimension_names=[f"dim_{s}" for s in range(len(data_shape))],
         )
         coords_arrays = {
-            f"dim_{idx}": DataArray.from_array(
-                np.arange(s), dimension_names=(f"dim_{idx}",)
-            )
+            f"dim_{idx}": DataArray.from_array(np.arange(s), dimension_names=(f"dim_{idx}",))
             for idx, s in enumerate(data_shape)
         }
         group = GroupSpec[Any, DataArray](members={"base": base_array, **coords_arrays})
@@ -50,9 +48,7 @@ class TestCheckValidCoordinates:
             dimension_names=[f"dim_{s}" for s in range(len(data_shape))],
         )
         coords_arrays = {
-            f"dim_{idx}": DataArray.from_array(
-                np.arange(s + 1), dimension_names=(f"dim_{idx}",)
-            )
+            f"dim_{idx}": DataArray.from_array(np.arange(s + 1), dimension_names=(f"dim_{idx}",))
             for idx, s in enumerate(data_shape)
         }
         group = GroupSpec[Any, DataArray](members={"base": base_array, **coords_arrays})
@@ -67,7 +63,7 @@ def test_dataarray_round_trip(example_group: Any) -> None:
     """
     source_untyped = GroupSpec.from_zarr(example_group)
     flat = source_untyped.to_flat()
-    for key, val in flat.items():
+    for val in flat.values():
         if isinstance(val, ArraySpec) and val.dimension_names is not None:
             model_json = val.model_dump()
             assert DataArray(**model_json).model_dump() == model_json
@@ -78,10 +74,7 @@ def test_multiscale_attrs_round_trip(example_group: Any) -> None:
     Test that multiscale datasets round-trip through the `Multiscales` model
     """
     source_group_members = dict(example_group.members(max_depth=None))
-    for key, val in source_group_members.items():
-        if isinstance(val, zarr.Group):
-            if "multiscales" in val.attrs.asdict():
-                model_json = MultiscaleGroup.from_zarr(val).model_dump()
-                assert MultiscaleGroup(**model_json).model_dump() == tuplify_json(
-                    model_json
-                )
+    for val in source_group_members.values():
+        if isinstance(val, zarr.Group) and "multiscales" in val.attrs.asdict():
+            model_json = MultiscaleGroup.from_zarr(val).model_dump()
+            assert MultiscaleGroup(**model_json).model_dump() == tuplify_json(model_json)

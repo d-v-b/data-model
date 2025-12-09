@@ -83,9 +83,7 @@ def sample_dataset_no_crs() -> xr.Dataset:
 class TestWriteGeoMetadata:
     """Test the _write_geo_metadata method."""
 
-    def test_write_geo_metadata_with_rio_crs(
-        self, sample_dataset_with_crs: xr.Dataset
-    ) -> None:
+    def test_write_geo_metadata_with_rio_crs(self, sample_dataset_with_crs: xr.Dataset) -> None:
         """Test _write_geo_metadata with dataset that has rioxarray CRS."""
 
         # Call the method
@@ -119,10 +117,7 @@ class TestWriteGeoMetadata:
         """Test _write_geo_metadata with dataset that has no CRS information."""
 
         # Verify initial state - no CRS
-        assert (
-            not hasattr(sample_dataset_no_crs, "rio")
-            or sample_dataset_no_crs.rio.crs is None
-        )
+        assert not hasattr(sample_dataset_no_crs, "rio") or sample_dataset_no_crs.rio.crs is None
 
         # Call the method - should not fail but also not add CRS
         write_geo_metadata(sample_dataset_no_crs)
@@ -211,9 +206,7 @@ class TestWriteGeoMetadata:
         # Verify rio CRS was used (priority over attributes)
         assert ds.rio.crs.to_epsg() == 4326  # Should still be 4326, not 32632
 
-    def test_write_geo_metadata_integration_with_stream_write(
-        self, tmp_path: Path
-    ) -> None:
+    def test_write_geo_metadata_integration_with_stream_write(self, tmp_path: Path) -> None:
         """Test that _write_geo_metadata is properly integrated in _stream_write_dataset."""
 
         # Create a simple dataset with CRS
@@ -230,9 +223,7 @@ class TestWriteGeoMetadata:
         ds = ds.rio.write_crs("EPSG:32632")
 
         # Create encoding for the dataset
-        encoding = create_measurements_encoding(
-            ds, spatial_chunk=1024, enable_sharding=True
-        )
+        encoding = create_measurements_encoding(ds, spatial_chunk=1024, enable_sharding=True)
 
         # Create a temporary output path that matches the pattern for geo metadata
         output_path = str(tmp_path / "measurements" / "test_dataset.zarr")
@@ -241,9 +232,7 @@ class TestWriteGeoMetadata:
         stream_write_dataset(ds, output_path, encoding, enable_sharding=True)
 
         # Re-open the written dataset to verify CRS was persisted
-        written_ds = xr.open_dataset(
-            output_path, engine="zarr", chunks={}, decode_coords="all"
-        )
+        written_ds = xr.open_dataset(output_path, engine="zarr", chunks={}, decode_coords="all")
 
         # Verify CRS was written and persisted
         assert hasattr(written_ds, "rio")

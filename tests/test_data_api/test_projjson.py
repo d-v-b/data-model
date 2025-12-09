@@ -563,9 +563,7 @@ class TestSerializationDeserialization:
         # Verify they're equivalent
         assert reconstructed_crs.name == original_crs.name
         assert reconstructed_crs.datum.name == original_crs.datum.name
-        assert (
-            reconstructed_crs.datum.ellipsoid.name == original_crs.datum.ellipsoid.name
-        )
+        assert reconstructed_crs.datum.ellipsoid.name == original_crs.datum.ellipsoid.name
 
     def test_projjson_union_type(self) -> None:
         """Test that ProjJSON union type works correctly"""
@@ -660,9 +658,7 @@ class TestRoundTripSerialization:
         for i, component in enumerate(round_trip_crs.components):
             assert component.name == original_crs.components[i].name
 
-    def test_datum_ensemble_round_trip(
-        self, datum_ensemble_json: dict[str, Any]
-    ) -> None:
+    def test_datum_ensemble_round_trip(self, datum_ensemble_json: dict[str, Any]) -> None:
         """Test round-trip serialization of datum ensemble example."""
         from eopf_geozarr.data_api.geozarr.projjson import GeodeticCRS
 
@@ -679,16 +675,12 @@ class TestRoundTripSerialization:
         assert round_trip_crs.name == original_crs.name
         assert round_trip_crs.type == original_crs.type
         if original_crs.datum_ensemble:
-            assert (
-                round_trip_crs.datum_ensemble.name == original_crs.datum_ensemble.name
-            )
+            assert round_trip_crs.datum_ensemble.name == original_crs.datum_ensemble.name
             assert len(round_trip_crs.datum_ensemble.members) == len(
                 original_crs.datum_ensemble.members
             )
 
-    def test_transformation_round_trip(
-        self, transformation_json: dict[str, Any]
-    ) -> None:
+    def test_transformation_round_trip(self, transformation_json: dict[str, Any]) -> None:
         """Test round-trip serialization of transformation example."""
         from eopf_geozarr.data_api.geozarr.projjson import SingleOperation
 
@@ -708,9 +700,7 @@ class TestRoundTripSerialization:
         if original_op.parameters:
             assert len(round_trip_op.parameters) == len(original_op.parameters)
 
-    def test_all_examples_round_trip(
-        self, all_projjson_examples: list[dict[str, Any]]
-    ) -> None:
+    def test_all_examples_round_trip(self, all_projjson_examples: list[dict[str, Any]]) -> None:
         """Test that all PROJ JSON examples can be round-tripped without error."""
         from eopf_geozarr.data_api.geozarr.projjson import (
             BoundCRS,
@@ -780,9 +770,7 @@ class TestRoundTripSerialization:
 
         # Ensure we successfully round-tripped at least some examples
         assert successful_round_trips > 0, "No examples were successfully round-tripped"
-        print(
-            f"Successfully round-tripped {successful_round_trips}/{total_examples} examples"
-        )
+        print(f"Successfully round-tripped {successful_round_trips}/{total_examples} examples")
 
 
 if __name__ == "__main__":

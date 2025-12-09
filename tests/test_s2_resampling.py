@@ -79,9 +79,7 @@ def sample_reflectance_data_3d() -> xr.DataArray:
 def sample_classification_data() -> xr.DataArray:
     """Create classification data for testing."""
     # SCL values: 0=no_data, 1=saturated, 4=vegetation, 6=water, etc.
-    data = np.array(
-        [[0, 1, 4, 4], [1, 4, 6, 6], [4, 4, 6, 8], [4, 6, 8, 8]], dtype=np.uint8
-    )
+    data = np.array([[0, 1, 4, 4], [1, 4, 6, 6], [4, 4, 6, 8], [4, 6, 8, 8]], dtype=np.uint8)
 
     coords = {
         "y": np.array([1000, 990, 980, 970]),
@@ -100,18 +98,14 @@ def sample_classification_data() -> xr.DataArray:
 def sample_quality_mask() -> xr.DataArray:
     """Create quality mask data for testing."""
     # Binary mask: 0=good, 1=bad
-    data = np.array(
-        [[0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 1], [0, 0, 1, 1]], dtype=np.uint8
-    )
+    data = np.array([[0, 0, 1, 0], [0, 1, 0, 0], [1, 0, 0, 1], [0, 0, 1, 1]], dtype=np.uint8)
 
     coords = {
         "y": np.array([1000, 990, 980, 970]),
         "x": np.array([500000, 500010, 500020, 500030]),
     }
 
-    return xr.DataArray(
-        data, dims=["y", "x"], coords=coords, attrs={"long_name": "Quality mask"}
-    )
+    return xr.DataArray(data, dims=["y", "x"], coords=coords, attrs={"long_name": "Quality mask"})
 
 
 @pytest.fixture
@@ -144,7 +138,7 @@ def sample_probability_data() -> xr.DataArray:
 class TestS2ResamplingEngine:
     """Test cases for S2ResamplingEngine class."""
 
-    def test_downsample_reflectance_2d(self, sample_reflectance_data_2d) -> None:
+    def test_downsample_reflectance_2d(self, sample_reflectance_data_2d: xr.DataArray) -> None:
         """Test reflectance downsampling for 2D data."""
 
         # Downsample from 4x4 to 2x2
@@ -170,7 +164,7 @@ class TestS2ResamplingEngine:
         # Check attributes are preserved
         assert result.attrs == sample_reflectance_data_2d.attrs
 
-    def test_downsample_reflectance_3d(self, sample_reflectance_data_3d) -> None:
+    def test_downsample_reflectance_3d(self, sample_reflectance_data_3d: xr.DataArray) -> None:
         """Test reflectance downsampling for 3D data."""
         # Downsample from 2x4x4 to 2x2x2
         result = downsample_variable(sample_reflectance_data_3d, 2, 2, "reflectance")
@@ -192,7 +186,7 @@ class TestS2ResamplingEngine:
         assert len(result.coords["y"]) == 2
         assert len(result.coords["x"]) == 2
 
-    def test_downsample_classification(self, sample_classification_data):
+    def test_downsample_classification(self, sample_classification_data: xr.DataArray) -> None:
         """Test classification downsampling using mode."""
 
         # Downsample from 4x4 to 2x2
@@ -210,7 +204,7 @@ class TestS2ResamplingEngine:
         # Check data type is preserved
         assert result.dtype == sample_classification_data.dtype
 
-    def test_downsample_quality_mask(self, sample_quality_mask):
+    def test_downsample_quality_mask(self, sample_quality_mask: xr.DataArray) -> None:
         """Test quality mask downsampling using logical OR."""
 
         # Downsample from 4x4 to 2x2
@@ -233,7 +227,7 @@ class TestS2ResamplingEngine:
         # Bottom-right block: [0, 1, 1, 1] -> any non-zero = 1
         assert result.values[1, 1] == 1
 
-    def test_downsample_probability(self, sample_probability_data):
+    def test_downsample_probability(self, sample_probability_data: xr.DataArray) -> None:
         """Test probability downsampling with value clamping."""
 
         # Downsample from 4x4 to 2x2
@@ -252,18 +246,18 @@ class TestS2ResamplingEngine:
         expected_val = (10.5 + 20.3 + 15.2 + 75.8) / 4
         np.testing.assert_almost_equal(result.values[0, 0], expected_val, decimal=2)
 
-    def test_detector_footprint_same_as_quality_mask(self, sample_quality_mask):
+    def test_detector_footprint_same_as_quality_mask(
+        self, sample_quality_mask: xr.DataArray
+    ) -> None:
         """Test that detector footprint uses same method as quality mask."""
 
         result_quality = downsample_variable(sample_quality_mask, 2, 2, "quality_mask")
-        result_detector = downsample_variable(
-            sample_quality_mask, 2, 2, "detector_footprint"
-        )
+        result_detector = downsample_variable(sample_quality_mask, 2, 2, "detector_footprint")
 
         # Results should be identical
         np.testing.assert_array_equal(result_quality.values, result_detector.values)
 
-    def test_invalid_variable_type(self, sample_reflectance_data_2d):
+    def test_invalid_variable_type(self, sample_reflectance_data_2d: xr.DataArray) -> None:
         """Test error handling for invalid variable type."""
 
         with pytest.raises(ValueError, match="Unknown variable type"):
@@ -339,10 +333,7 @@ class TestDetermineVariableType:
         """Test recognition of quality mask data."""
         dummy_data = xr.DataArray([1, 2, 3])
 
-        assert (
-            determine_variable_type("detector_footprint_b01", dummy_data)
-            == "quality_mask"
-        )
+        assert determine_variable_type("detector_footprint_b01", dummy_data) == "quality_mask"
         assert determine_variable_type("quality_b02", dummy_data) == "quality_mask"
 
     def test_unknown_variable_defaults_to_reflectance(self) -> None:
@@ -425,9 +416,7 @@ class TestIntegrationScenarios:
 
         while current_size >= 2:
             next_size = current_size // 2
-            downsampled = downsample_variable(
-                current_data, next_size, next_size, "reflectance"
-            )
+            downsampled = downsample_variable(current_data, next_size, next_size, "reflectance")
             levels.append(downsampled)
             current_data = downsampled
             current_size = next_size

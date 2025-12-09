@@ -20,7 +20,7 @@ from eopf_geozarr.s2_optimization.s2_converter import (
 
 
 @pytest.fixture
-def mock_s2_dataset():
+def mock_s2_dataset() -> xr.DataTree:
     """Create a mock S2 dataset for testing."""
     # Create test data arrays
     coords = {
@@ -51,7 +51,7 @@ def mock_s2_dataset():
 class TestS2FunctionalAPI:
     """Test the S2 functional API."""
 
-    def test_is_sentinel2_dataset_placeholder(self):
+    def test_is_sentinel2_dataset_placeholder(self) -> None:
         """Placeholder test for is_sentinel2_dataset.
 
         The actual is_sentinel2_dataset function uses complex pydantic validation
@@ -66,7 +66,7 @@ class TestS2FunctionalAPI:
 class TestCRSInitialization:
     """Test CRS initialization functionality."""
 
-    def test_initialize_crs_from_cpm_260_metadata(self):
+    def test_initialize_crs_from_cpm_260_metadata(self) -> None:
         """Test CRS initialization from CPM >= 2.6.0 metadata with integer EPSG."""
         # Create a DataTree with CPM 2.6.0+ style metadata (integer format)
         dt = xr.DataTree()
@@ -81,7 +81,7 @@ class TestCRSInitialization:
         assert crs is not None
         assert crs.to_epsg() == 32632
 
-    def test_initialize_crs_from_cpm_260_metadata_string(self):
+    def test_initialize_crs_from_cpm_260_metadata_string(self) -> None:
         """Test CRS initialization from CPM >= 2.6.0 metadata with string EPSG."""
         # Create a DataTree with CPM 2.6.0+ style metadata (string format)
         dt = xr.DataTree()
@@ -96,7 +96,7 @@ class TestCRSInitialization:
         assert crs is not None
         assert crs.to_epsg() == 32632
 
-    def test_initialize_crs_from_cpm_260_metadata_invalid_epsg(self):
+    def test_initialize_crs_from_cpm_260_metadata_invalid_epsg(self) -> None:
         """Test CRS initialization with invalid EPSG code in CPM 2.6.0 metadata."""
         # Create a DataTree with invalid EPSG code
         dt = xr.DataTree()
@@ -112,7 +112,7 @@ class TestCRSInitialization:
         # CRS should be None since there's no other CRS information
         assert crs is None
 
-    def test_initialize_crs_from_rio_accessor(self):
+    def test_initialize_crs_from_rio_accessor(self) -> None:
         """Test CRS initialization from rioxarray accessor."""
         # Create a dataset with rioxarray CRS
         coords = {
@@ -133,7 +133,7 @@ class TestCRSInitialization:
         assert crs is not None
         assert crs.to_epsg() == 32633
 
-    def test_initialize_crs_from_proj_epsg_attribute(self):
+    def test_initialize_crs_from_proj_epsg_attribute(self) -> None:
         """Test CRS initialization from proj:epsg attribute."""
         # Create a dataset with proj:epsg attribute
         coords = {
@@ -154,7 +154,7 @@ class TestCRSInitialization:
         assert crs is not None
         assert crs.to_epsg() == 32634
 
-    def test_initialize_crs_no_crs_information(self):
+    def test_initialize_crs_no_crs_information(self) -> None:
         """Test CRS initialization when no CRS information is available."""
         # Create a dataset without any CRS information
         coords = {
@@ -173,7 +173,7 @@ class TestCRSInitialization:
 
         assert crs is None
 
-    def test_initialize_crs_priority_cpm_260_over_rio(self):
+    def test_initialize_crs_priority_cpm_260_over_rio(self) -> None:
         """Test that CPM 2.6.0 metadata takes priority over rio accessor."""
         # Create a dataset with both CPM 2.6.0 metadata and rio CRS
         coords = {
@@ -201,7 +201,7 @@ class TestCRSInitialization:
         assert crs.to_epsg() == 32632
 
 
-def test_simple_root_consolidation_success(tmp_path: Path):
+def test_simple_root_consolidation_success(tmp_path: Path) -> None:
     """
     Test that simple_root_consolidation produces consolidated metadata at the root, and for the
     measurements/reflectance group, but not for other groups.
@@ -230,12 +230,10 @@ def test_simple_root_consolidation_success(tmp_path: Path):
     )
     atmos_zmeta = json.loads((tmp_path / "test.zarr/quality/zarr.json").read_text())
 
-    assert "consolidated_metadata" in root_z_meta and isinstance(
-        root_z_meta["consolidated_metadata"], dict
-    )
-    assert "consolidated_metadata" in reflectance_zmeta and isinstance(
-        reflectance_zmeta["consolidated_metadata"], dict
-    )
+    assert "consolidated_metadata" in root_z_meta
+    assert isinstance(root_z_meta["consolidated_metadata"], dict)
+    assert "consolidated_metadata" in reflectance_zmeta
+    assert isinstance(reflectance_zmeta["consolidated_metadata"], dict)
     if "consolidated_metadata" in atmos_zmeta:
         assert atmos_zmeta["consolidated_metadata"] is None
 
@@ -255,7 +253,7 @@ class TestConvenienceFunction:
         mock_is_s2,
         mock_get_zarr_group,
         mock_init_crs,
-    ):
+    ) -> None:
         """Test the convenience function parameter passing."""
         # Setup mocks
         mock_multiscale.return_value = {}

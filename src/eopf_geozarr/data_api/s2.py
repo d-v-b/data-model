@@ -32,17 +32,11 @@ class BandMetadata(BaseModel):
 
     bandwidth: Annotated[float | str, Field(description="Bandwidth in nm")]
     central_wavelength: Annotated[float, Field(description="Central wavelength in nm")]
-    onboard_compression_rate: Annotated[
-        str | float, Field(description="Compression rate")
-    ]
-    onboard_integration_time: Annotated[
-        str | float, Field(description="Integration time")
-    ]
+    onboard_compression_rate: Annotated[str | float, Field(description="Compression rate")]
+    onboard_integration_time: Annotated[str | float, Field(description="Integration time")]
     physical_gain: Annotated[str | float, Field(description="Physical gain factor")]
     spectral_response_step: Annotated[str, Field(description="Spectral response step")]
-    spectral_response_values: Annotated[
-        str, Field(description="Spectral response curve values")
-    ]
+    spectral_response_values: Annotated[str, Field(description="Spectral response curve values")]
     units: Annotated[str, Field(description="Unit of measurement")]
     wavelength_max: Annotated[float, Field(description="Maximum wavelength in nm")]
     wavelength_min: Annotated[float, Field(description="Minimum wavelength in nm")]
@@ -108,19 +102,13 @@ class OtherMetadata(BaseModel):
     L0_ancillary_data_quality: Annotated[
         str, Field(description="L0 ancillary data quality indicator")
     ]
-    L0_ephemeris_data_quality: Annotated[
-        str, Field(description="L0 ephemeris data quality")
-    ]
-    NUC_table_ID: Annotated[
-        int | str, Field(description="Non-Uniformity Correction table ID")
-    ]
+    L0_ephemeris_data_quality: Annotated[str, Field(description="L0 ephemeris data quality")]
+    NUC_table_ID: Annotated[int | str, Field(description="Non-Uniformity Correction table ID")]
     SWIR_rearrangement_flag: Annotated[
         str | None, Field(description="SWIR band rearrangement flag")
     ]
     UTM_zone_identification: Annotated[str, Field(description="UTM zone identifier")]
-    absolute_location_assessment_from_AOCS: Annotated[
-        str, Field(description="Location assessment")
-    ]
+    absolute_location_assessment_from_AOCS: Annotated[str, Field(description="Location assessment")]
 
     # Band information
     band_description: Annotated[
@@ -128,9 +116,7 @@ class OtherMetadata(BaseModel):
     ]
 
     # Accuracy declarations
-    declared_accuracy_of_AOT_model: Annotated[
-        float | None, Field(description="AOT model accuracy")
-    ]
+    declared_accuracy_of_AOT_model: Annotated[float | None, Field(description="AOT model accuracy")]
     declared_accuracy_of_radiative_transfer_model: Annotated[
         float | None, Field(description="Radiative transfer accuracy")
     ]
@@ -158,12 +144,8 @@ class OtherMetadata(BaseModel):
         dict[str, Any] | str | None,
         Field(description="Geometric refinement information"),
     ]
-    history: Annotated[
-        list[dict[str, Any]] | str | None, Field(description="Processing history")
-    ]
-    horizontal_CRS_code: Annotated[
-        str, Field(description="Coordinate Reference System code")
-    ]
+    history: Annotated[list[dict[str, Any]] | str | None, Field(description="Processing history")]
+    horizontal_CRS_code: Annotated[str, Field(description="Coordinate Reference System code")]
     horizontal_CRS_name: Annotated[str, Field(description="CRS name")]
     mean_sensing_time: Annotated[str | None, Field(description="Mean acquisition time")]
 
@@ -184,9 +166,7 @@ class OtherMetadata(BaseModel):
     ]
 
     # Meteo information (flexible structure)
-    meteo: Annotated[
-        dict[str, Any] | None, Field(description="Meteorological parameters")
-    ]
+    meteo: Annotated[dict[str, Any] | None, Field(description="Meteorological parameters")]
 
     # Quality assessments
     multispectral_registration_assessment: Annotated[
@@ -207,9 +187,7 @@ class OtherMetadata(BaseModel):
     ozone_value: Annotated[float | str | None, Field(description="Ozone value")]
 
     # Reference band
-    spectral_band_of_reference: Annotated[
-        str, Field(description="Reference spectral band")
-    ]
+    spectral_band_of_reference: Annotated[str, Field(description="Reference spectral band")]
 
     # Radiometric correction
     reflectance_correction_factor_from_the_Sun_Earth_distance_variation_computed_using_the_acquisition_date: Annotated[
@@ -471,13 +449,9 @@ class Sentinel2RootAttrs(BaseModel):
 class Sentinel2DataArray(ArraySpec[Sentinel2DataArrayAttrs]):
     """Sentinel-2 data array integrated with pydantic-zarr."""
 
-    ...
-
 
 class Sentinel2CoordinateArray(ArraySpec[Sentinel2DataArrayAttrs]):
     """Coordinate array for Sentinel-2 data."""
-
-    ...
 
 
 # TypedDict definitions for members structure
@@ -564,8 +538,6 @@ class Sentinel2AtmosphereResolutionDataset(
 ):
     """Atmosphere data at a single resolution."""
 
-    pass
-
 
 class Sentinel2AtmosphereMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for atmosphere group containing resolution datasets."""
@@ -578,27 +550,19 @@ class Sentinel2AtmosphereMembers(TypedDict, closed=True, total=False):  # type: 
 class Sentinel2AtmosphereDataset(GroupSpec[DatasetAttrs, Sentinel2AtmosphereMembers]):  # type: ignore[type-var]
     """Atmosphere quality data (AOT, WVP) at multiple resolutions."""
 
-    pass
-
 
 class Sentinel2ProbabilityDataset(
     GroupSpec[DatasetAttrs, ProbabilityResolutionMembers]  # type: ignore[type-var]
 ):
     """Probability data (cloud, snow) at multiple resolutions."""
 
-    pass
-
 
 class Sentinel2QuicklookDataset(GroupSpec[DatasetAttrs, QuicklookResolutionMembers]):  # type: ignore[type-var]
     """True Color Image (TCI) quicklook data at multiple resolutions."""
 
-    pass
-
 
 class Sentinel2MaskDataset(GroupSpec[DatasetAttrs, ConditionsMaskMembers]):  # type: ignore[type-var]
     """Mask data containing classification and detector footprints."""
-
-    pass
 
 
 class Sentinel2QualityMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
@@ -643,19 +607,13 @@ class Sentinel2QualityGroup(GroupSpec[DatasetAttrs, Sentinel2QualityMembers]):  
 class Sentinel2GeometryGroup(GroupSpec[DatasetAttrs, GeometryMembers]):  # type: ignore[type-var]
     """Geometry group containing sun and viewing angles."""
 
-    pass
-
 
 class Sentinel2MeteorologyGroup(GroupSpec[DatasetAttrs, MeteorologyMembers]):  # type: ignore[type-var]
     """Meteorology group containing CAMS and ECMWF atmospheric data."""
 
-    pass
-
 
 class Sentinel2ConditionsMaskGroup(GroupSpec[DatasetAttrs, ConditionsMaskMembers]):  # type: ignore[type-var]
     """Mask subgroup in conditions."""
-
-    pass
 
 
 class Sentinel2ConditionsMembers(TypedDict, closed=True):  # type: ignore[call-arg]

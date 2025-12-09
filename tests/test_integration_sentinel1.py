@@ -2,6 +2,7 @@
 
 import shutil
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,7 +21,7 @@ from .conftest import _verify_basic_structure
 class MockSentinel1L1GRDBuilder:
     """Builder class to generate a sample EOPF Sentinel-1 Level 1 GRD data product for testing purpose."""
 
-    def __init__(self, product_id):
+    def __init__(self, product_id) -> None:
         self.product_title = "S01SIWGRD"
         self.product_id = product_id
 
@@ -166,7 +167,7 @@ class MockSentinel1L1GRDBuilder:
 
 
 @pytest.fixture
-def sample_sentinel1_datatree():
+def sample_sentinel1_datatree() -> xr.DataTree:
     """Create a sample Sentinel-1 datatree with GCPs."""
 
     builder = MockSentinel1L1GRDBuilder("20170508T164830_0025_A094_8604_01B54C")
@@ -174,7 +175,7 @@ def sample_sentinel1_datatree():
 
 
 @pytest.fixture
-def temp_output_dir():
+def temp_output_dir() -> Generator[str, None, None]:
     """Create a temporary directory for test outputs."""
     temp_dir = tempfile.mkdtemp()
     yield temp_dir
@@ -184,7 +185,7 @@ def temp_output_dir():
 def test_no_gcp_group(temp_output_dir, sample_sentinel1_datatree) -> None:
     output_path = Path(temp_output_dir) / "temp.zarr"
 
-    with pytest.raises(ValueError, match="Detected Sentinel-1.*GCP group not provided"):
+    with pytest.raises(ValueError, match=r"Detected Sentinel-1.*GCP group not provided"):
         create_geozarr_dataset(
             sample_sentinel1_datatree,
             groups=["measurements"],
@@ -192,15 +193,13 @@ def test_no_gcp_group(temp_output_dir, sample_sentinel1_datatree) -> None:
         )
 
 
-def test_invalid_gcp_group_raises_error(
-    temp_output_dir, sample_sentinel1_datatree
-) -> None:
+def test_invalid_gcp_group_raises_error(temp_output_dir, sample_sentinel1_datatree) -> None:
     """Test that specifying a non-existent GCP group raises an error."""
     output_path = Path(temp_output_dir) / "test_s1_invalid_gcp.zarr"
     groups = ["measurements"]
 
     # Try with invalid GCP group
-    with pytest.raises(ValueError, match="GCP group.*not found"):
+    with pytest.raises(ValueError, match=r"GCP group.*not found"):
         create_geozarr_dataset(
             sample_sentinel1_datatree,
             groups=groups,
@@ -256,10 +255,7 @@ def test_sentinel1_gcp_conversion(
     # Verify Sentinel-1 GRD specific metadata - now reprojected to x/y coordinates
     grd = dt["measurements/0"].grd
     assert grd.dims == ("y", "x")  # Now reprojected to geographic coordinates
-    assert (
-        grd.attrs["standard_name"]
-        == "surface_backwards_scattering_coefficient_of_radar_wave"
-    )
+    assert grd.attrs["standard_name"] == "surface_backwards_scattering_coefficient_of_radar_wave"
     assert grd.attrs["units"] == "1"
     assert grd.attrs["grid_mapping"] == "spatial_ref"
 
@@ -285,18 +281,10 @@ def test_sentinel1_gcp_conversion(
     y_bounds = (ds_measurements.y.min().values, ds_measurements.y.max().values)
 
     # Should be within the original GCP bounds (15-18 lon, 39-41 lat)
-    assert 14.5 <= x_bounds[0] <= 15.5, (
-        f"X min bound {x_bounds[0]} outside expected range"
-    )
-    assert 17.5 <= x_bounds[1] <= 18.5, (
-        f"X max bound {x_bounds[1]} outside expected range"
-    )
-    assert 38.5 <= y_bounds[0] <= 39.5, (
-        f"Y min bound {y_bounds[0]} outside expected range"
-    )
-    assert 40.5 <= y_bounds[1] <= 41.5, (
-        f"Y max bound {y_bounds[1]} outside expected range"
-    )
+    assert 14.5 <= x_bounds[0] <= 15.5, f"X min bound {x_bounds[0]} outside expected range"
+    assert 17.5 <= x_bounds[1] <= 18.5, f"X max bound {x_bounds[1]} outside expected range"
+    assert 38.5 <= y_bounds[0] <= 39.5, f"Y min bound {y_bounds[0]} outside expected range"
+    assert 40.5 <= y_bounds[1] <= 41.5, f"Y max bound {y_bounds[1]} outside expected range"
 
     # Check multiscales 2 levels created: 0 (native, checked above) and 1
     assert "1" in dt["measurements"]

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import TYPE_CHECKING, NotRequired, Self
 
 from pydantic import BaseModel, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
-from typing_extensions import NotRequired, TypedDict
-
-from eopf_geozarr.data_api.geozarr.common import ZarrConventionMetadata
+from typing_extensions import TypedDict
 
 from . import tms, zcm
+
+if TYPE_CHECKING:
+    from eopf_geozarr.data_api.geozarr.common import ZarrConventionMetadata
 
 
 class MultiscaleMeta(BaseModel):
@@ -80,9 +81,7 @@ class MultiscaleGroupAttrs(BaseModel):
                 tile_matrix_set=self.multiscales.tile_matrix_set,
             )
         if self._tms_multiscales is None and self._zcm_multiscales is None:
-            raise ValueError(
-                "Either ZCM multiscales or TMS multiscales must be present"
-            )
+            raise ValueError("Either ZCM multiscales or TMS multiscales must be present")
         return self
 
     @property

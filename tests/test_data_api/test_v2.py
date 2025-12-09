@@ -35,9 +35,7 @@ class TestCheckValidCoordinates:
             dimension_names=[f"dim_{s}" for s in range(len(data_shape))],
         )
         coords_arrays = {
-            f"dim_{idx}": DataArray.from_array(
-                np.arange(s), dimension_names=(f"dim_{idx}",)
-            )
+            f"dim_{idx}": DataArray.from_array(np.arange(s), dimension_names=(f"dim_{idx}",))
             for idx, s in enumerate(data_shape)
         }
         group = GroupSpec[Any, DataArray](members={"base": base_array, **coords_arrays})
@@ -59,9 +57,7 @@ class TestCheckValidCoordinates:
             dimension_names=[f"dim_{s}" for s in range(len(data_shape))],
         )
         coords_arrays = {
-            f"dim_{idx}": DataArray.from_array(
-                np.arange(s + 1), dimension_names=(f"dim_{idx}",)
-            )
+            f"dim_{idx}": DataArray.from_array(np.arange(s + 1), dimension_names=(f"dim_{idx}",))
             for idx, s in enumerate(data_shape)
         }
         group = GroupSpec[Any, DataArray](members={"base": base_array, **coords_arrays})
@@ -77,7 +73,7 @@ def test_dataarray_attrs_round_trip() -> None:
     """
     source_untyped = GroupSpec.from_zarr(example_group)
     flat = source_untyped.to_flat()
-    for key, val in flat.items():
+    for val in flat.values():
         if isinstance(val, ArraySpec):
             model_json = val.model_dump()["attributes"]
             assert DataArrayAttrs(**model_json).model_dump() == model_json

@@ -34,9 +34,7 @@ def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS | None:
         CRS object if found, None otherwise
     """
     # For CPM >= 2.6.0, the EPSG code is stored in root attributes
-    epsg_cpm_260 = dt_input.attrs.get("other_metadata", {}).get(
-        "horizontal_CRS_code", None
-    )
+    epsg_cpm_260 = dt_input.attrs.get("other_metadata", {}).get("horizontal_CRS_code", None)
     if epsg_cpm_260 is not None:
         try:
             # Handle both integer (32632) and string ("EPSG:32632" or "32632") formats
@@ -48,13 +46,14 @@ def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS | None:
                 epsg_code = int(epsg_cpm_260)
             crs = CRS.from_epsg(epsg_code)
             log.info("Initialized CRS from CPM 2.6.0+ metadata", epsg=epsg_code)
-            return crs
         except Exception as e:
             log.warning(
                 "Failed to initialize CRS from CPM 2.6.0+ metadata",
                 epsg=epsg_cpm_260,
                 error=str(e),
             )
+        else:
+            return crs
 
     for group_path in dt_input.groups:
         if group_path == ".":
@@ -91,9 +90,10 @@ def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS | None:
                     epsg = var.attrs["proj:epsg"]
                     crs = CRS.from_epsg(epsg)
                     log.info("Initialized CRS from EPSG code", epsg=epsg)
-                    return crs
                 except Exception:
                     pass
+                else:
+                    return crs
 
     log.warning("Could not initialize CRS from dataset")
     return None
@@ -256,7 +256,7 @@ def simple_root_consolidation(output_path: str, datasets: dict[str, dict]) -> No
     # create missing intermediary groups (/conditions, /quality, etc.)
     # using the keys of the datasets dict
     missing_groups = set()
-    for group_path in datasets.keys():
+    for group_path in datasets:
         # extract all the parent paths
         parts = group_path.strip("/").split("/")
         for i in range(1, len(parts)):
@@ -283,7 +283,7 @@ def simple_root_consolidation(output_path: str, datasets: dict[str, dict]) -> No
         zarr_format=3,
     )
     dt_root = xr.DataTree()
-    for group_path, dataset in datasets.items():
+    for group_path in datasets:
         dt_root[group_path] = xr.DataTree()
 
     dt_root.to_zarr(
@@ -301,9 +301,7 @@ def simple_root_consolidation(output_path: str, datasets: dict[str, dict]) -> No
     zarr.consolidate_metadata(output_path, zarr_format=3)
 
 
-def optimization_summary(
-    dt_input: xr.DataTree, dt_output: xr.DataTree, output_path: str
-) -> None:
+def optimization_summary(dt_input: xr.DataTree, dt_output: xr.DataTree, output_path: str) -> None:
     """Print optimization summary statistics."""
     # Count groups
     input_groups = len(dt_input.groups) if hasattr(dt_input, "groups") else 0
@@ -372,7 +370,6 @@ def validate_optimized_dataset(dataset_path: str) -> dict[str, Any]:
     Returns:
         Validation results dictionary
     """
-    results = {"is_valid": True, "issues": [], "warnings": [], "summary": {}}
+    return {"is_valid": True, "issues": [], "warnings": [], "summary": {}}
 
     # Placeholder for validation logic
-    return results

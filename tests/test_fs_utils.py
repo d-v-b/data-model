@@ -18,7 +18,7 @@ from eopf_geozarr.conversion.fs_utils import (
 )
 
 
-def test_is_s3_path():
+def test_is_s3_path() -> None:
     """Test S3 path detection."""
     assert is_s3_path("s3://bucket/path")
     assert is_s3_path("s3://my-bucket/data/file.zarr")
@@ -27,7 +27,7 @@ def test_is_s3_path():
     assert not is_s3_path("gs://bucket/path")
 
 
-def test_parse_s3_path():
+def test_parse_s3_path() -> None:
     """Test S3 path parsing."""
     bucket, key = parse_s3_path("s3://my-bucket/data/file.zarr")
     assert bucket == "my-bucket"
@@ -41,11 +41,11 @@ def test_parse_s3_path():
     assert bucket == "bucket"
     assert key == "single-file"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Path must start with 's3://'"):
         parse_s3_path("https://example.com")
 
 
-def test_get_s3_credentials_info():
+def test_get_s3_credentials_info() -> None:
     """Test S3 credentials info retrieval."""
     with patch.dict(
         "os.environ",
@@ -62,7 +62,7 @@ def test_get_s3_credentials_info():
 
 
 @patch("eopf_geozarr.conversion.fs_utils.s3fs.S3FileSystem")
-def test_validate_s3_access_success(mock_s3fs):
+def test_validate_s3_access_success(mock_s3fs) -> None:
     """Test successful S3 access validation."""
     mock_fs = Mock()
     mock_fs.ls.return_value = ["file1", "file2"]
@@ -75,7 +75,7 @@ def test_validate_s3_access_success(mock_s3fs):
 
 
 @patch("eopf_geozarr.conversion.fs_utils.s3fs.S3FileSystem")
-def test_validate_s3_access_failure(mock_s3fs):
+def test_validate_s3_access_failure(mock_s3fs) -> None:
     """Test failed S3 access validation."""
     mock_fs = Mock()
     mock_fs.ls.side_effect = Exception("Access denied")
@@ -86,7 +86,7 @@ def test_validate_s3_access_failure(mock_s3fs):
     assert "Access denied" in error
 
 
-def test_get_s3_storage_options():
+def test_get_s3_storage_options() -> None:
     """Test that get_s3_storage_options returns correct configuration."""
     with patch.dict(
         "os.environ",
@@ -104,7 +104,7 @@ def test_get_s3_storage_options():
         assert options["client_kwargs"]["endpoint_url"] == "https://s3.example.com"
 
 
-def test_get_storage_options():
+def test_get_storage_options() -> None:
     """Test unified storage options function."""
     # Test S3 path
     with patch.dict("os.environ", {"AWS_DEFAULT_REGION": "us-west-2"}):
@@ -119,7 +119,7 @@ def test_get_storage_options():
     assert options is None
 
 
-def test_normalize_path():
+def test_normalize_path() -> None:
     """Test path normalization for different path types."""
     # Test S3 path with double slashes
     s3_path = "s3://bucket/path//to//file.zarr"
@@ -138,7 +138,7 @@ def test_normalize_path():
 
 
 @patch("eopf_geozarr.conversion.fs_utils.get_filesystem")
-def test_path_exists(mock_get_filesystem):
+def test_path_exists(mock_get_filesystem) -> None:
     """Test unified path existence check."""
     mock_fs = Mock()
     mock_fs.exists.return_value = True
@@ -156,7 +156,7 @@ def test_path_exists(mock_get_filesystem):
 
 
 @patch("eopf_geozarr.conversion.fs_utils.get_filesystem")
-def test_write_json_metadata(mock_get_filesystem):
+def test_write_json_metadata(mock_get_filesystem) -> None:
     """Test unified JSON metadata writing."""
     from unittest.mock import MagicMock, mock_open
 
@@ -179,7 +179,7 @@ def test_write_json_metadata(mock_get_filesystem):
 
 
 @patch("eopf_geozarr.conversion.fs_utils.get_filesystem")
-def test_read_json_metadata(mock_get_filesystem):
+def test_read_json_metadata(mock_get_filesystem) -> None:
     """Test unified JSON metadata reading."""
     from unittest.mock import MagicMock, mock_open
 

@@ -16,7 +16,7 @@ from eopf_geozarr.conversion import create_geozarr_dataset
 class MockSentinel1L1GRDBuilder:
     """Builder class to generate a sample EOPF Sentinel-1 Level 1 GRD data product for testing purpose."""
 
-    def __init__(self, product_id):
+    def __init__(self, product_id) -> None:
         self.product_title = "S01SIWGRD"
         self.product_id = product_id
         self.az_dim = "azimuth_time"
@@ -204,17 +204,13 @@ def test_titiler_compatibility(tmp_path: Path) -> None:
     x_min, x_max = ds_measurements.x.min().values, ds_measurements.x.max().values
     y_min, y_max = ds_measurements.y.min().values, ds_measurements.y.max().values
 
-    print(
-        f"   - Full data bounds: x=({x_min:.3f}, {x_max:.3f}), y=({y_min:.3f}, {y_max:.3f})"
-    )
+    print(f"   - Full data bounds: x=({x_min:.3f}, {x_max:.3f}), y=({y_min:.3f}, {y_max:.3f})")
 
     # Select a subset using spatial coordinates (use isel for index-based selection)
     x_quarter = ds_measurements.x.shape[0] // 4
     y_quarter = ds_measurements.y.shape[0] // 4
 
-    subset = ds_measurements.isel(
-        x=slice(x_quarter, -x_quarter), y=slice(y_quarter, -y_quarter)
-    )
+    subset = ds_measurements.isel(x=slice(x_quarter, -x_quarter), y=slice(y_quarter, -y_quarter))
     print(f"   - Spatial subset shape: {subset.grd.shape}")
 
     # Test coordinate-based selection with a smaller range
@@ -233,9 +229,7 @@ def test_titiler_compatibility(tmp_path: Path) -> None:
     center_x = (x_min + x_max) / 2
     center_y = (y_min + y_max) / 2
     point_value = ds_measurements.grd.sel(x=center_x, y=center_y, method="nearest")
-    print(
-        f"   - Point value at center ({center_x:.3f}, {center_y:.3f}): {point_value.values}"
-    )
+    print(f"   - Point value at center ({center_x:.3f}, {center_y:.3f}): {point_value.values}")
 
     # Validate overview levels
     print("✅ Validating overview levels...")
@@ -259,9 +253,7 @@ def test_titiler_compatibility(tmp_path: Path) -> None:
 
     # Check CRS for overview (may be in spatial_ref variable)
     if ds_overview.rio.crs is not None:
-        assert ds_overview.rio.crs.to_epsg() == 4326, (
-            "Expected EPSG:4326 CRS for overview"
-        )
+        assert ds_overview.rio.crs.to_epsg() == 4326, "Expected EPSG:4326 CRS for overview"
     elif "spatial_ref" in ds_overview:
         spatial_ref_overview = ds_overview.spatial_ref
         assert "crs_wkt" in spatial_ref_overview.attrs, (

@@ -4,9 +4,9 @@ from .geozarr import MultiscaleGroupAttrs, MultiscaleMeta
 from .zcm import MULTISCALE_CONVENTION_METADATA, Multiscales, ScaleLevel, ScaleLevelJSON
 
 __all__ = [
+    "MULTISCALE_CONVENTION_METADATA",
     "MultiscaleGroupAttrs",
     "MultiscaleMeta",
-    "MULTISCALE_CONVENTION_METADATA",
     "Multiscales",
     "ScaleLevel",
     "ScaleLevelJSON",

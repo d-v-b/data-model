@@ -26,9 +26,7 @@ def downsample_reflectance(
 
     # Perform block averaging
     if data.ndim == 3:  # (time, y, x) or similar
-        reshaped = data.values.reshape(
-            data.shape[0], target_height, block_h, target_width, block_w
-        )
+        reshaped = data.values.reshape(data.shape[0], target_height, block_h, target_width, block_w)
         downsampled = reshaped.mean(axis=(2, 4))
     else:  # (y, x)
         reshaped = data.values.reshape(target_height, block_h, target_width, block_w)
@@ -48,9 +46,7 @@ def downsample_reflectance(
     else:
         coords = {data.dims[-2]: y_coords, data.dims[-1]: x_coords}
 
-    return xr.DataArray(
-        downsampled, dims=data.dims, coords=coords, attrs=data.attrs.copy()
-    )
+    return xr.DataArray(downsampled, dims=data.dims, coords=coords, attrs=data.attrs.copy())
 
 
 def downsample_variable(
@@ -117,9 +113,7 @@ def downsample_classification(
     else:
         coords = {data.dims[-2]: y_coords, data.dims[-1]: x_coords}
 
-    return xr.DataArray(
-        downsampled, dims=data.dims, coords=coords, attrs=data.attrs.copy()
-    )
+    return xr.DataArray(downsampled, dims=data.dims, coords=coords, attrs=data.attrs.copy())
 
 
 def downsample_quality_mask(
@@ -136,9 +130,7 @@ def downsample_quality_mask(
     data = data[..., :new_height, :new_width]
 
     if data.ndim == 3:
-        reshaped = data.values.reshape(
-            data.shape[0], target_height, block_h, target_width, block_w
-        )
+        reshaped = data.values.reshape(data.shape[0], target_height, block_h, target_width, block_w)
         # Any non-zero value in block makes the downsampled pixel non-zero
         downsampled = (reshaped.sum(axis=(2, 4)) > 0).astype(data.dtype)
     else:
@@ -158,9 +150,7 @@ def downsample_quality_mask(
     else:
         coords = {data.dims[-2]: y_coords, data.dims[-1]: x_coords}
 
-    return xr.DataArray(
-        downsampled, dims=data.dims, coords=coords, attrs=data.attrs.copy()
-    )
+    return xr.DataArray(downsampled, dims=data.dims, coords=coords, attrs=data.attrs.copy())
 
 
 def downsample_probability(
@@ -206,7 +196,7 @@ def determine_variable_type(
     if var_name in ["aot", "wvp"]:  # Atmosphere quality - treat as reflectance
         return "reflectance"
 
-    if var_name.startswith("detector_footprint_") or var_name.startswith("quality_"):
+    if var_name.startswith(("detector_footprint_", "quality_")):
         return "quality_mask"
 
     # Default to reflectance for unknown variables

@@ -21,17 +21,13 @@ CONVENTION_SCHEMA_URL: Final[ConventionSchemaURL] = (
     "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v1/schema.json"
 )
 
-ConventionSpecURL = Literal[
-    "https://github.com/zarr-conventions/multiscales/blob/v1/README.md"
-]
+ConventionSpecURL = Literal["https://github.com/zarr-conventions/multiscales/blob/v1/README.md"]
 CONVENTION_SPEC_URL: Final[ConventionSpecURL] = (
     "https://github.com/zarr-conventions/multiscales/blob/v1/README.md"
 )
 
 ConventionDescription = Literal["Multiscale layout of zarr datasets"]
-CONVENTION_DESCRIPTION: Final[ConventionDescription] = (
-    "Multiscale layout of zarr datasets"
-)
+CONVENTION_DESCRIPTION: Final[ConventionDescription] = "Multiscale layout of zarr datasets"
 
 ConventionName = Literal["multiscales"]
 CONVENTION_NAME: Final[ConventionName] = "multiscales"
@@ -132,7 +128,6 @@ class MultiscalesAttrs(ZarrConventionAttrs):
                 success = True
             except ValueError as e:
                 errors[idx] = e
-                pass
         if not success:
             raise ValueError("Multiscales convention not found. Errors: " + str(errors))
         return value

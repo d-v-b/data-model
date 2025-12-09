@@ -10,7 +10,7 @@ import xarray as xr
 class S2DataConsolidator:
     """Consolidates S2 data from scattered structure into organized groups."""
 
-    def __init__(self, dt_input: xr.DataTree):
+    def __init__(self, dt_input: xr.DataTree) -> None:
         self.dt_input = dt_input
         self.measurements_data: dict[int, Any] = {}
         self.geometry_data: dict[str, Any] = {}
@@ -97,9 +97,7 @@ class S2DataConsolidator:
                 ds = self.dt_input[group_path].to_dataset()
 
                 for band in ds.data_vars:
-                    self.measurements_data[res_num]["quality"][f"quality_{band}"] = ds[
-                        band
-                    ]
+                    self.measurements_data[res_num]["quality"][f"quality_{band}"] = ds[band]
 
     def _extract_detector_footprints(self) -> None:
         """Extract detector footprint data."""
@@ -114,9 +112,7 @@ class S2DataConsolidator:
 
                 for band in ds.data_vars:
                     var_name = f"detector_footprint_{band}"
-                    self.measurements_data[res_num]["detector_footprints"][var_name] = (
-                        ds[band]
-                    )
+                    self.measurements_data[res_num]["detector_footprints"][var_name] = ds[band]
 
     def _extract_atmosphere_data(self) -> None:
         """Extract atmosphere quality data (aot, wvp) - native at 20m."""
@@ -196,7 +192,7 @@ def create_consolidated_dataset(data_dict: dict, resolution: int) -> xr.Dataset:
     all_vars = {}
 
     # Combine all data variables
-    for category, vars_dict in data_dict.items():
+    for vars_dict in data_dict.values():
         all_vars.update(vars_dict)
 
     if not all_vars:
@@ -206,14 +202,12 @@ def create_consolidated_dataset(data_dict: dict, resolution: int) -> xr.Dataset:
     ds = xr.Dataset(all_vars)
 
     # Set up coordinate system and metadata
-    if "x" in ds.coords and "y" in ds.coords:
-        # Ensure CRS information is present
-        if ds.rio.crs is None:
-            # Try to infer CRS from one of the variables
-            for var_name, var_data in all_vars.items():
-                if hasattr(var_data, "rio") and var_data.rio.crs:
-                    ds.rio.write_crs(var_data.rio.crs, inplace=True)
-                    break
+    if "x" in ds.coords and "y" in ds.coords and ds.rio.crs is None:
+        # Try to infer CRS from one of the variables
+        for var_data in all_vars.values():
+            if hasattr(var_data, "rio") and var_data.rio.crs:
+                ds.rio.write_crs(var_data.rio.crs, inplace=True)
+                break
 
     # Add resolution metadata
     ds.attrs["native_resolution_meters"] = resolution
