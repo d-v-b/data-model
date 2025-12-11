@@ -93,7 +93,9 @@ class TestConvenienceFunction:
     ) -> None:
         """Test the convenience function with real S2 data."""
         # Open the S2 example as a DataTree
-        dt_input = xr.open_datatree(s2_group_example, engine="zarr")
+        dt_input = xr.open_datatree(
+            s2_group_example, engine="zarr", decode_timedelta=True, consolidated=False
+        )
         output_path = str(tmp_path / "test_output.zarr")
 
         # Run the conversion
