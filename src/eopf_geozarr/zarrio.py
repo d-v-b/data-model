@@ -12,16 +12,8 @@ import structlog
 import zarr
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
-
-
-async def set_store(store: zarr.abc.store.Store, key: str, value: Any) -> None:
-    """
-    Call store.set(key, value) after awaiting value, if value awaits to None then do nothing.
-    """
-    value_actual = await value
-    if value_actual is not None:
-        await store.set(key, value_actual)
-    return None
+from zarr.core.sync import sync
+from zarr.storage._common import make_store_path
 
 
 class ChunkEncodingSpec(TypedDict):
@@ -40,13 +32,17 @@ def convert_compression(
         return ()
 
     SHUFFLE = ("noshuffle", "shuffle", "bitshuffle")
-    if isinstance(compressor, numcodecs.Blosc):
+    if isinstance(compressor, numcodecs.abc.Codec):
         old_config = compressor.get_config()
+    else:
+        old_config = compressor
+    if old_config["id"] == "blosc":
         new_codec = {
             "name": "blosc",
             "configuration": {
                 "cname": old_config["cname"],
                 "clevel": old_config["clevel"],
+                "blocksize": old_config["blocksize"],
                 "shuffle": SHUFFLE[old_config["shuffle"]],
             },
         }
@@ -85,7 +81,7 @@ def reencode_array(
     if chunking is not None and "read_chunks" in chunking:
         codecs = (
             {
-                "name": "sharding-indexed",
+                "name": "sharding_indexed",
                 "configuration": {
                     "chunk_shape": chunking["read_chunks"],
                     "index_codecs": ({"name": "bytes"}, {"name": "crc32c"}),
@@ -121,11 +117,15 @@ def reencode_group(
     overwrite: bool = False,
     use_consolidated_for_children: bool = False,
     chunk_reencoder: Callable[[zarr.Array[Any]], ChunkEncodingSpec] | None = None,
-) -> zarr.group:
+) -> zarr.Group:
     """
     Re-encode a Zarr group, applying a re-encoding to all sub-groups and sub-arrays.
     """
     log = structlog.get_logger()
+
+    # Convert store-like to a proper Store object
+    store_path = sync(make_store_path(store))
+    store = store_path.store
 
     all_members = dict(
         group.members(
