@@ -4,29 +4,30 @@ Main S2 optimization converter.
 
 from __future__ import annotations
 
-import asyncio
 import time
-from collections.abc import Mapping
-from typing import Any, Literal, NotRequired, TypedDict
+from pathlib import Path
+from typing import Any, TypedDict
 
-import numcodecs
 import structlog
 import xarray as xr
 import zarr
 from pydantic import TypeAdapter
 from pyproj import CRS
+from zarr.core.sync import sync
+from zarr.storage._common import make_store
 
 from eopf_geozarr.conversion.fs_utils import get_storage_options
 from eopf_geozarr.conversion.geozarr import get_zarr_group
 from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
+from eopf_geozarr.zarrio import ChunkEncodingSpec, reencode_group
 
 from .s2_multiscale import create_multiscale_from_datatree, write_geo_metadata
 
 log = structlog.get_logger()
 
 
-def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS | None:
+def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS:
     """
     Initialize CRS from dataset by checking data variables.
 
@@ -97,9 +98,7 @@ def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS | None:
                     return crs
                 except Exception:
                     pass
-
-    log.warning("Could not initialize CRS from dataset")
-    return None
+    raise ValueError("No CRS found.")
 
 
 def convert_s2(
@@ -176,196 +175,14 @@ class ConvertS2Params(TypedDict):
     max_retries: int
 
 
-class ArrayEncoding(TypedDict):
-    dimension_names: NotRequired[None | tuple[str | None, ...]]
-    attributes: NotRequired[Mapping[str, object] | None]
-
-
-def convert_compression(
-    compressor: Any, filters: Any, dtype: Any
-) -> tuple[dict[str, Any], ...]:
+def add_crs_and_grid_mapping(group: zarr.Group, crs: CRS) -> None:
     """
-    Convert the compression parameters for a Zarr V2 array into a tuple of Zarr V3 codecs.
-    """
-
-    if compressor is None and filters is None:
-        return ()
-
-    SHUFFLE = ("noshuffle", "shuffle", "bitshuffle")
-    if isinstance(compressor, numcodecs.Blosc):
-        old_config = compressor.get_config()
-        new_codec = {
-            "name": "blosc",
-            "configuration": {
-                "cname": old_config["cname"],
-                "clevel": old_config["clevel"],
-                "shuffle": SHUFFLE[old_config["shuffle"]],
-            },
-        }
-        return (new_codec,)
-
-    raise ValueError(
-        f"Only blosc -> blosc is supported. Got {compressor=} and {filters=}"
-    )
-
-
-def reencode_array(
-    array: zarr.Array,
-    *,
-    zarr_format: Literal[2, 3] | None = None,
-    dimension_names: None | tuple[str | None, ...] = None,
-    attributes: Mapping[str, object] | None = None,
-) -> zarr.core.metadata.v3.ArrayV3Metadata:
-    """
-    Re-encode a zarr array into a new array.
-    """
-
-    if array.metadata.zarr_format == 2 and zarr_format == 3:
-        new_codecs = convert_compression(
-            array.metadata.compressor, array.metadata.filters, array.dtype
-        )
-        if array.fill_value is None:
-            fill_value = 0
-        else:
-            fill_value = array.fill_value
-        if attributes is None:
-            attributes = array.attrs.asdict()
-        else:
-            attributes = attributes
-        new_array = zarr.core.metadata.v3.ArrayV3Metadata(
-            shape=array.shape,
-            data_type=array.metadata.dtype,
-            chunk_key_encoding={"name": "default", "configuration": {"separator": "/"}},
-            chunk_grid={
-                "name": "regular",
-                "configuration": {"chunk_shape": array.chunks},
-            },
-            fill_value=fill_value,
-            dimension_names=dimension_names,
-            codecs=(
-                {"name": "bytes", "configuration": {"endian": "little"}},
-                *new_codecs,
-            ),
-            attributes=attributes,
-        )
-        return new_array
-    raise ValueError(
-        f"Re-encoding from {array.zarr_format} to {zarr_format} is not supported"
-    )
-
-
-async def set_coro(store: zarr.abc.store.Store, key: str, value: Any) -> None:
-    """
-    Call store.set(key, value) after awaiting value, if value awaits to None then do nothing.
-    """
-    value_actual = await value
-    if value_actual is not None:
-        await store.set(key, value_actual)
-    return None
-
-
-async def move_chunks(
-    array_a: zarr.Array[Any], array_b: zarr.Array[Any], *, decompress: bool = True
-) -> None:
-    """
-    Copy chunks from one array to another. If decompress is false, the raw chunk bytes will be copied.
-    If decompress is True, an error will be raised until this developer gets around to implementing
-    decompression + recompression.
-    """
-    if not decompress:
-        coros = [
-            set_coro(
-                array_b.store,
-                f"{array_b.path}/{new_key}",
-                array_a.store.get(
-                    f"{array_a.path}/{old_key}",
-                    prototype=zarr.core.buffer.default_buffer_prototype(),
-                ),
-            )
-            for old_key, new_key in zip(
-                array_a._iter_shard_keys(), array_b._iter_shard_keys(), strict=True
-            )
-        ]
-    else:
-        raise ValueError("Decompression not supported yet")
-    await asyncio.gather(*coros)
-    return None
-
-
-def reencode_group(
-    group: zarr.Group,
-    store: Any,
-    path: str,
-    *,
-    overwrite: bool = False,
-    zarr_format: Literal[2, 3] | None = None,
-    use_consolidated_for_children: bool = False,
-) -> zarr.group:
-    """
-    Re-encode a Zarr group, applying a re-encoding to all sub-groups and sub-arrays.
-    """
-
-    all_members = dict(
-        group.members(
-            max_depth=None, use_consolidated_for_children=use_consolidated_for_children
-        )
-    )
-    from zarr.core.group import GroupMetadata
-    from zarr.core.metadata.v3 import ArrayV3Metadata
-
-    log = structlog.get_logger()
-    log.info(f"Begin re-encoding Zarr group {group}")
-    new_members: dict[str, ArrayV3Metadata | GroupMetadata] = {
-        path: GroupMetadata(zarr_format=zarr_format, attributes=group.attrs.asdict())
-    }
-    chunks_to_encode: list[tuple[str, str]] = []
-    for name, member in all_members.items():
-        log.info(f"re-encoding member {name}")
-        new_path = f"{path}/{name}"
-        member_attrs = member.attrs.asdict()
-        if isinstance(member, zarr.Array):
-            if "_ARRAY_DIMENSIONS" in member.attrs:
-                dimension_names = member_attrs.pop("_ARRAY_DIMENSIONS")
-            else:
-                dimension_names = None
-            new_members[new_path] = reencode_array(
-                member,
-                zarr_format=zarr_format,
-                dimension_names=dimension_names,
-                attributes=member_attrs,
-            )
-            chunks_to_encode.append((name, new_path))
-        else:
-            new_members[new_path] = GroupMetadata(
-                zarr_format=zarr_format,
-                attributes=member.attrs.asdict(),
-            )
-    log.info(f"Creating new Zarr hierarchy structure at {store}/{path}")
-    tree = dict(
-        zarr.create_hierarchy(store=store, nodes=new_members, overwrite=overwrite)
-    )
-    new_group = tree[path]
-
-    for name, new_path in chunks_to_encode:
-        log.info(f"Re-encoding chunks for array {name}")
-        old_array = group[name]
-        new_array = new_group[name]
-
-        asyncio.run(move_chunks(old_array, new_array, decompress=False))
-
-    # return the root group
-    return tree[path]
-
-
-def add_crs_and_grid_mapping(group: zarr.Group) -> None:
-    """
-    Add crs and grid mapping elements to a dataset, which is saved to a new memory-backed
-    Zarr group.
+    Add crs and grid mapping elements to a dataset.
     """
     ds = xr.open_dataset(
         group.store, group=group.path, engine="zarr", consolidated=False
     )
-    write_geo_metadata(ds)
+    write_geo_metadata(ds, crs=crs)
 
     for var in ds.data_vars:
         new_attrs = ds[var].attrs.copy()
@@ -413,6 +230,9 @@ def convert_s2_optimized(
 
     start_time = time.time()
     zg = get_zarr_group(dt_input)
+    s2root_model = Sentinel2Root.from_zarr(zg)
+    crs = s2root_model.crs
+
     log.info(
         "Starting S2 optimized conversion",
         num_groups=len(dt_input.groups),
@@ -421,25 +241,45 @@ def convert_s2_optimized(
     # Validate input is S2
     if not is_sentinel2_dataset(zg):
         raise ValueError("Input dataset is not a Sentinel-2 product")
-    from zarr.storage._common import make_store
 
-    out_store = zarr.core.sync.sync(make_store(output_path))
-
-    # Initialize CRS from dataset
-    crs = initialize_crs_from_dataset(dt_input)
+    out_store = sync(make_store(output_path))
 
     log.info("Re-encoding source data to Zarr V3")
-    out_group = reencode_group(zg, out_store, "", overwrite=True, zarr_format=3)
+
+    # Define a chunk reencoding function based on the requested chunking
+    def chunk_reencoder(array: zarr.Array[Any]) -> ChunkEncodingSpec:
+        group_name = str(Path(array.path).parent)
+        in_measurements_group = (
+            group_name.startswith("r")
+            and group_name.endswith("m")
+            and "/measurements/" in group_name
+        )
+        if in_measurements_group and array.ndim > 0:
+            if array.ndim == 1:
+                return {"write_chunks": (spatial_chunk,)}
+            elif array.ndim == 2:
+                return {"write_chunks": (spatial_chunk, spatial_chunk)}
+            else:
+                return {
+                    "write_chunks": (1,) * (array.ndim - 2)
+                    + (spatial_chunk, spatial_chunk)
+                }
+        else:
+            return {"write_chunks": array.chunks}
+
+    out_group = reencode_group(
+        zg, out_store, "", overwrite=True, chunk_reencoder=chunk_reencoder
+    )
 
     log.info("Adding CRS elements to datasets in measurements")
     for _, subgroup in out_group["measurements"].groups():
         for _, dataset in subgroup.groups():
-            add_crs_and_grid_mapping(dataset)
+            add_crs_and_grid_mapping(dataset, crs=crs)
 
     log.info("Adding CRS elements to quality datasets")
     for _, subgroup in out_group["quality"].groups():
         for _, dataset in subgroup.groups():
-            add_crs_and_grid_mapping(dataset)
+            add_crs_and_grid_mapping(dataset, crs=crs)
 
     # Step 2: Create multiscale pyramids for each group in the original structure
     log.info("Adding multiscale levels")

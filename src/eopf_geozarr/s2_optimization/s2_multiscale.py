@@ -818,8 +818,9 @@ def stream_write_dataset(
 
 def write_geo_metadata(
     dataset: xr.Dataset,
+    crs: CRS,
+    *,
     grid_mapping_var_name: str = "spatial_ref",
-    crs: CRS | None = None,
 ) -> None:
     """
     Write geographic metadata to the dataset.
@@ -829,25 +830,11 @@ def write_geo_metadata(
         grid_mapping_var_name: Name for grid mapping variable
         crs: Coordinate Reference System to use (if None, attempts to detect from dataset)
     """
-    # Use provided CRS or try to detect from dataset
-    if crs is None:
-        for var in dataset.data_vars.values():
-            if hasattr(var, "rio") and var.rio.crs:
-                crs = var.rio.crs
-                break
-            elif "proj:epsg" in var.attrs:
-                epsg = var.attrs["proj:epsg"]
-                crs = CRS.from_epsg(epsg)
-                break
+    dataset.rio.write_crs(crs, grid_mapping_name=grid_mapping_var_name, inplace=True)
+    dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
 
-    if crs is not None:
-        dataset.rio.write_crs(
-            crs, grid_mapping_name=grid_mapping_var_name, inplace=True
-        )
-        dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
-
-        for var in dataset.data_vars.values():
-            var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
+    for var in dataset.data_vars.values():
+        var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
 
 
 def rechunk_dataset_for_encoding(

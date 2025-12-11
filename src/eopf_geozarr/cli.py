@@ -13,6 +13,10 @@ from typing import Any
 
 import structlog
 import xarray as xr
+from zarr.core.sync import sync
+from zarr.experimental.cache_store import CacheStore
+from zarr.storage import MemoryStore
+from zarr.storage._common import make_store
 
 from eopf_geozarr.s2_optimization.s2_converter import convert_s2_optimized
 
@@ -1207,7 +1211,10 @@ def convert_s2_optimized_command(args: Any) -> None:
         # Load input dataset
         log.info("Loading Sentinel-2 dataset from", input_path=args.input_path)
         storage_options = get_storage_options(str(args.input_path))
-        store = args.input_path
+        # store = args.input_path
+        store = CacheStore(
+            sync(make_store(args.input_path, mode="r")), cache_store=MemoryStore()
+        )
         dt_input = xr.open_datatree(
             store,
             engine="zarr",
