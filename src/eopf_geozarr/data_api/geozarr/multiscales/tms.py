@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from eopf_geozarr.data_api.geozarr.types import ResamplingMethod
+from eopf_geozarr.data_api.geozarr.types import ResamplingMethod  # noqa: TC001
 
 
 class TileMatrix(BaseModel):

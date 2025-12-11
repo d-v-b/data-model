@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NotRequired, Self
+from typing import NotRequired, Self
 
 from pydantic import BaseModel, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import TypedDict
 
-from . import tms, zcm
+from eopf_geozarr.data_api.geozarr.common import ZarrConventionMetadata  # noqa: TC001
 
-if TYPE_CHECKING:
-    from eopf_geozarr.data_api.geozarr.common import ZarrConventionMetadata
+from . import tms, zcm
 
 
 class MultiscaleMeta(BaseModel):

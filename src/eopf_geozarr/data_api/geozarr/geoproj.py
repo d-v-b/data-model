@@ -4,15 +4,13 @@ Models for the GeoProj Zarr Convention
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import TypedDict
 
 from eopf_geozarr.data_api.geozarr.common import is_none
-
-if TYPE_CHECKING:
-    from eopf_geozarr.data_api.geozarr.projjson import ProjJSON
+from eopf_geozarr.data_api.geozarr.projjson import ProjJSON  # noqa: TC001
 
 GEO_PROJ_UUID: Literal["f17cb550-5864-4468-aeb7-f3180cfb622f"] = (
     "f17cb550-5864-4468-aeb7-f3180cfb622f"
