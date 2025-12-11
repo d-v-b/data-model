@@ -46,9 +46,9 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     # don't care about that here, so we convert all lists to tuples before creating the GroupSpec
     observed_structure = GroupSpec(**tuplify_json(observed_structure_json))
     observed_structure_flat = observed_structure.to_flat()
-    expected_structure_path = Path(
-        "tests/test_data_api/optimized_geozarr_examples/"
-    ) / (s2_group_example.stem + ".json")
+    expected_structure_path = Path("tests/test_data_api/optimized_geozarr_examples/") / (
+        s2_group_example.stem + ".json"
+    )
 
     # Uncomment this section to write out the expected structure from the observed structure
     # This is useful when the expected structure needs to be updated
@@ -56,9 +56,7 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     #    json.dumps(observed_structure_json, indent=2, sort_keys=True)
     # )
 
-    expected_structure_json = tuplify_json(
-        json.loads(expected_structure_path.read_text())
-    )
+    expected_structure_json = tuplify_json(json.loads(expected_structure_path.read_text()))
     expected_structure = GroupSpec(**expected_structure_json)
     expected_structure_flat = expected_structure.to_flat()
 
@@ -77,15 +75,13 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
         expected_val_json = tuplify_json(expected_val.model_dump())
         observed_val_json = tuplify_json(observed_val.model_dump())
 
-        if not expected_val_json == observed_val_json:
+        if expected_val_json != observed_val_json:
             differences[k] = jsondiff.diff(expected_val_json, observed_val_json)
 
     assert differences == {}
 
 
-def test_cli_convert_real_sentinel2_data(
-    s2_group_example: Path, tmp_path: Path
-) -> None:
+def test_cli_convert_real_sentinel2_data(s2_group_example: Path, tmp_path: Path) -> None:
     """
     Test CLI conversion using a Sentinel-2 hierarchy saved locally.
     """
@@ -115,29 +111,25 @@ def test_cli_convert_real_sentinel2_data(
         groups.append(quicklook_group)
 
     # Build CLI command with notebook parameters
-    cmd = (
-        [
-            "python",
-            "-m",
-            "eopf_geozarr",
-            "convert",
-            str(s2_group_example),
-            str(output_path),
-            "--groups",
-        ]
-        + groups
-        + [
-            "--spatial-chunk",
-            "1024",  # From notebook
-            "--min-dimension",
-            "256",  # From notebook
-            "--tile-width",
-            "256",  # From notebook
-            "--max-retries",
-            "3",  # From notebook
-            "--verbose",
-        ]
-    )
+    cmd = [
+        "python",
+        "-m",
+        "eopf_geozarr",
+        "convert",
+        str(s2_group_example),
+        str(output_path),
+        "--groups",
+        *groups,
+        "--spatial-chunk",
+        "1024",  # From notebook
+        "--min-dimension",
+        "256",  # From notebook
+        "--tile-width",
+        "256",  # From notebook
+        "--max-retries",
+        "3",  # From notebook
+        "--verbose",
+    ]
 
     # Execute the CLI command
     result = subprocess.run(
@@ -170,13 +162,9 @@ def test_cli_convert_real_sentinel2_data(
         str(output_path),
     ]
 
-    result_validate = subprocess.run(
-        cmd_validate, capture_output=True, text=True, timeout=60
-    )
+    result_validate = subprocess.run(cmd_validate, capture_output=True, text=True, timeout=60)
 
-    assert result_validate.returncode == 0, (
-        f"CLI validate command failed: {result_validate.stderr}"
-    )
+    assert result_validate.returncode == 0, f"CLI validate command failed: {result_validate.stderr}"
     # Verify validation output
     validate_output = result_validate.stdout
     assert "Validation Results:" in validate_output, "Should show validation header"
@@ -187,8 +175,7 @@ def test_cli_convert_real_sentinel2_data(
     expected_structure_json = tuplify_json(
         json.loads(
             (
-                Path("tests/test_data_api/geozarr_examples/")
-                / (s2_group_example.stem + ".json")
+                Path("tests/test_data_api/geozarr_examples/") / (s2_group_example.stem + ".json")
             ).read_text()
         )
     )
@@ -214,7 +201,7 @@ def test_cli_convert_real_sentinel2_data(
         expected_val_json = tuplify_json(expected_val.model_dump())
         observed_val_json = tuplify_json(observed_val.model_dump())
 
-        if not expected_val_json == observed_val_json:
+        if expected_val_json != observed_val_json:
             differences[k] = jsondiff.diff(expected_val_json, observed_val_json)
 
     assert differences == {}
@@ -236,7 +223,8 @@ def test_cli_help_commands() -> None:
         text=True,
     )
     assert result.returncode == 0, "Convert help command failed"
-    assert "input_path" in result.stdout and "output_path" in result.stdout
+    assert "input_path" in result.stdout
+    assert "output_path" in result.stdout
 
     # Test info help
     result = subprocess.run(
@@ -278,9 +266,7 @@ def test_cli_crs_groups_option() -> None:
     )
     assert result.returncode == 0, "Convert help command failed"
     assert "--crs-groups" in result.stdout, "--crs-groups option should be in help"
-    assert "Groups that need CRS information added" in result.stdout, (
-        "Help text should be present"
-    )
+    assert "Groups that need CRS information added" in result.stdout, "Help text should be present"
 
 
 def test_cli_convert_with_crs_groups(s2_group_example, tmp_path: Path) -> None:
@@ -302,31 +288,27 @@ def test_cli_convert_with_crs_groups(s2_group_example, tmp_path: Path) -> None:
     crs_groups = ["/conditions/geometry", "/conditions/viewing"]
 
     # Build CLI command with --crs-groups option
-    cmd = (
-        [
-            "python",
-            "-m",
-            "eopf_geozarr",
-            "convert",
-            str(s2_group_example),
-            str(output_path),
-            "--groups",
-        ]
-        + groups
-        + ["--crs-groups"]
-        + crs_groups
-        + [
-            "--spatial-chunk",
-            "1024",
-            "--min-dimension",
-            "256",
-            "--tile-width",
-            "256",
-            "--max-retries",
-            "3",
-            "--verbose",
-        ]
-    )
+    cmd = [
+        "python",
+        "-m",
+        "eopf_geozarr",
+        "convert",
+        str(s2_group_example),
+        str(output_path),
+        "--groups",
+        *groups,
+        "--crs-groups",
+        *crs_groups,
+        "--spatial-chunk",
+        "1024",
+        "--min-dimension",
+        "256",
+        "--tile-width",
+        "256",
+        "--max-retries",
+        "3",
+        "--verbose",
+    ]
 
     # Execute the CLI command
     result = subprocess.run(
@@ -338,8 +320,7 @@ def test_cli_convert_with_crs_groups(s2_group_example, tmp_path: Path) -> None:
 
     # Check command succeeded
     if result.returncode != 0 and not (
-        "not found in DataTree" in result.stdout
-        or "not found in DataTree" in result.stderr
+        "not found in DataTree" in result.stdout or "not found in DataTree" in result.stderr
     ):
         pytest.fail(f"CLI convert with --crs-groups command failed: {result.stderr}")
 
@@ -390,7 +371,5 @@ def test_cli_crs_groups_empty_list(tmp_path: str) -> None:
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
     # Should succeed (empty crs_groups list is valid)
-    assert result.returncode == 0, (
-        f"CLI with empty --crs-groups failed: {result.stderr}"
-    )
+    assert result.returncode == 0, f"CLI with empty --crs-groups failed: {result.stderr}"
     assert "CRS groups: []" in result.stdout, "Should show empty CRS groups list"

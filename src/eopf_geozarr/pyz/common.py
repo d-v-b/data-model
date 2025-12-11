@@ -16,9 +16,7 @@ def get_member_names(members: Any) -> list[str]:
     return []
 
 
-def format_text_repr(
-    class_name: str, member_names: list[str], max_members: int = 5
-) -> str:
+def format_text_repr(class_name: str, member_names: list[str], max_members: int = 5) -> str:
     """Format a condensed text representation of a GroupSpec.
 
     Args:
@@ -203,15 +201,10 @@ def _get_attributes_repr(attributes: Any) -> str:
 
     if isinstance(attributes, BaseModel):
         # For Pydantic models, show the model dump
-        fields = (
-            attributes.model_fields_set
-            if hasattr(attributes, "model_fields_set")
-            else set()
-        )
+        fields = attributes.model_fields_set if hasattr(attributes, "model_fields_set") else set()
         if fields:
             return f"{type(attributes).__name__}({', '.join(sorted(fields))})"
-        else:
-            return f"{type(attributes).__name__}()"
+        return f"{type(attributes).__name__}()"
 
     if isinstance(attributes, Mapping):
         keys = list(attributes.keys())[:5]
@@ -236,10 +229,9 @@ def _format_value_repr(value: Any) -> str:
         else:
             keys_str = ", ".join(keys)
         return f"{{{keys_str}}}"
-    elif isinstance(value, list):
+    if isinstance(value, list):
         return f"list[{len(value)}]"
-    else:
-        return repr(value)
+    return repr(value)
 
 
 def _render_list_html(lst: list[Any]) -> str:
@@ -435,15 +427,11 @@ def format_html_repr(
             # Check if member is a GroupSpec (has _repr_html_ method)
             if member_obj is not None and hasattr(member_obj, "_repr_html_"):
                 # Recursively render nested group
-                html_parts.append(
-                    f"<div style='margin: 8px 0;'><b>{member_name}</b>:</div>"
-                )
+                html_parts.append(f"<div style='margin: 8px 0;'><b>{member_name}</b>:</div>")
                 # Add indented nested repr
                 nested_html = member_obj._repr_html_()
                 # Wrap nested content with proper indentation
-                html_parts.append(
-                    f"<div style='margin-left: 20px;'>{nested_html}</div>"
-                )
+                html_parts.append(f"<div style='margin-left: 20px;'>{nested_html}</div>")
             else:
                 # Render as simple item - arrays get detailed html, others get simple text
                 if member_obj is not None:
@@ -453,15 +441,11 @@ def format_html_repr(
                             f"<div style='margin: 5px 0;'><b>{member_name}</b>:</div>"
                         )
                         array_html = _format_array_html(member_obj)
-                        html_parts.append(
-                            f"<div style='margin-left: 20px;'>{array_html}</div>"
-                        )
+                        html_parts.append(f"<div style='margin-left: 20px;'>{array_html}</div>")
                     else:
                         # Unknown object - show type name
                         member_info = _get_array_info(member_obj)
-                        html_parts.append(
-                            f"<div>• {member_name}: <i>{member_info}</i></div>"
-                        )
+                        html_parts.append(f"<div>• {member_name}: <i>{member_info}</i></div>")
                 else:
                     html_parts.append(f"<div>• {member_name}: <i>Unknown</i></div>")
 

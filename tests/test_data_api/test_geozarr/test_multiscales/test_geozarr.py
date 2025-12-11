@@ -10,9 +10,7 @@ from eopf_geozarr.data_api.geozarr.multiscales.geozarr import (
 )
 
 
-@pytest.mark.parametrize(
-    "multiscale_flavor", [{"zcm"}, {"tms"}, {"zcm", "tms"}], ids=str
-)
+@pytest.mark.parametrize("multiscale_flavor", [{"zcm"}, {"tms"}, {"zcm", "tms"}], ids=str)
 def test_multiscale_group_attrs(multiscale_flavor: set[Literal["zcm", "tms"]]) -> None:
     """
     Test that we can create a MultiscaleGroupAttrs with both ZCM and TMS metadata
@@ -28,9 +26,7 @@ def test_multiscale_group_attrs(multiscale_flavor: set[Literal["zcm", "tms"]]) -
                 transform={"scale": (1.0, 1.0), "translation": (0.0, 0.0)},
             ),
         )
-        zcm_meta = zcm.Multiscales(
-            layout=layout, resampling_method="nearest"
-        ).model_dump()
+        zcm_meta = zcm.Multiscales(layout=layout, resampling_method="nearest").model_dump()
         zarr_conventions_meta = (zcm.MULTISCALE_CONVENTION_METADATA,)
     if "tms" in multiscale_flavor:
         tile_matrix_set = tms.TileMatrixSet(
@@ -67,11 +63,7 @@ def test_multiscale_group_attrs(multiscale_flavor: set[Literal["zcm", "tms"]]) -
     )
     if "zcm" in multiscale_flavor:
         assert "zcm" in multiscale_group_attrs.multiscale_meta
-        assert multiscale_group_attrs.multiscale_meta["zcm"] == zcm.Multiscales(
-            **zcm_meta
-        )
+        assert multiscale_group_attrs.multiscale_meta["zcm"] == zcm.Multiscales(**zcm_meta)
     if "tms" in multiscale_flavor:
         assert "tms" in multiscale_group_attrs.multiscale_meta
-        assert multiscale_group_attrs.multiscale_meta["tms"] == tms.Multiscales(
-            **tms_meta
-        )
+        assert multiscale_group_attrs.multiscale_meta["tms"] == tms.Multiscales(**tms_meta)

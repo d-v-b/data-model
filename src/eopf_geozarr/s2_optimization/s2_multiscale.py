@@ -5,8 +5,7 @@ Uses lazy evaluation to minimize memory usage during dataset preparation.
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Mapping
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import structlog
@@ -14,7 +13,6 @@ import xarray as xr
 from dask import delayed
 from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
-from pyproj import CRS
 
 from eopf_geozarr.conversion import fs_utils
 from eopf_geozarr.conversion.geozarr import (
@@ -31,9 +29,15 @@ from eopf_geozarr.data_api.geozarr.types import (
     XarrayDataArrayEncoding,
 )
 from eopf_geozarr.s2_optimization.common import DISTRIBUTED_AVAILABLE
-from eopf_geozarr.types import OverviewLevelJSON
 
 from .s2_resampling import determine_variable_type, downsample_variable
+
+if TYPE_CHECKING:
+    from collections.abc import Hashable, Mapping
+
+    from pyproj import CRS
+
+    from eopf_geozarr.types import OverviewLevelJSON
 
 log = structlog.get_logger()
 
@@ -49,16 +53,11 @@ pyramid_levels = {
 }
 
 
-def get_grid_spacing(
-    ds: xr.DataArray, coords: tuple[Hashable, ...]
-) -> tuple[float | int, ...]:
+def get_grid_spacing(ds: xr.DataArray, coords: tuple[Hashable, ...]) -> tuple[float | int, ...]:
     """
     Get the grid spacing of a regularly-gridded DataArray along the specified coordinates.
     """
-    result = []
-    for coord in coords:
-        result.append(np.abs(ds.coords[coord][0].data - ds.coords[coord][1].data))
-    return tuple(result)
+    return tuple(np.abs(ds.coords[coord][0].data - ds.coords[coord][1].data) for coord in coords)
 
 
 def create_multiscale_from_datatree(
@@ -135,7 +134,7 @@ def create_multiscale_from_datatree(
     # Find all resolution-based groups under /measurements/ and organize by base path
     resolution_groups = {}
     base_path = "/measurements/reflectance"
-    for group_path in processed_groups.keys():
+    for group_path in processed_groups:
         # Only process groups under /measurements/reflectance
         if not group_path.startswith(base_path):
             continue
@@ -155,9 +154,7 @@ def create_multiscale_from_datatree(
             break
 
     if not source_dataset or source_resolution is None:
-        log.info(
-            "No source resolution found for downsampling, skipping downsampled levels"
-        )
+        log.info("No source resolution found for downsampling, skipping downsampled levels")
         return processed_groups  # Stop processing if no valid source dataset is found
 
     log.info(
@@ -172,16 +169,12 @@ def create_multiscale_from_datatree(
         factor = 120 // source_resolution
         log.info("Creating r120m with factor {}", factor=factor)
 
-        r120m_dataset = create_downsampled_resolution_group(
-            source_dataset, factor=factor
-        ).compute()
+        r120m_dataset = create_downsampled_resolution_group(source_dataset, factor=factor).compute()
 
         if r120m_dataset and len(r120m_dataset.data_vars) > 0:
             output_path_120 = f"{output_path}{r120m_path}"
             log.info("Writing r120m to {}", output_path_120=output_path_120)
-            encoding_120 = create_measurements_encoding(
-                r120m_dataset, spatial_chunk=spatial_chunk
-            )
+            encoding_120 = create_measurements_encoding(r120m_dataset, spatial_chunk=spatial_chunk)
             ds_120 = stream_write_dataset(
                 r120m_dataset,
                 output_path_120,
@@ -258,9 +251,7 @@ def create_multiscale_from_datatree(
                 else:
                     log.info("    r360m dataset is empty, skipping")
             except Exception as e:
-                log.warning(
-                    "Could not create r360m for {}: {}", base_path=base_path, e=e
-                )
+                log.warning("Could not create r360m for {}: {}", base_path=base_path, e=e)
             # Track r120m for multiscales if created
 
             log.info("Tracking r120m for multiscales metadata")
@@ -335,7 +326,9 @@ def create_measurements_encoding(
                 var_encoding[key] = var_data.encoding[key]  # type: ignore[literal-required]
         if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
             log.warning(
-                f"Unknown encoding keys in {var_name}: {set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS}"
+                "Unknown encoding keys in %s: %s",
+                var_name,
+                set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS,
             )
         encoding[var_name] = var_encoding
 
@@ -376,7 +369,7 @@ def calculate_simple_shard_dimensions(
     """
     shard_dims = []
 
-    for i, (dim_size, chunk_size) in enumerate(zip(data_shape, chunks)):
+    for i, (dim_size, chunk_size) in enumerate(zip(data_shape, chunks, strict=False)):
         if i == 0 and len(data_shape) == 3:
             # First dimension in 3D data (time) - use single time slice per shard
             shard_dims.append(1)
@@ -403,13 +396,12 @@ def add_multiscales_metadata_to_parent(
     output_path: str,
     base_path: str,
     res_groups: Mapping[str, xr.Dataset],
-    multiscales_flavor: set[MultiscalesFlavor] = {
-        "ogc_tms",
-        "experimental_multiscales_convention",
-    },
+    multiscales_flavor: set[MultiscalesFlavor] | None = None,
 ) -> xr.DataTree:
     """Add GeoZarr-compliant multiscales metadata to parent group."""
     # Sort by resolution (finest to coarsest)
+    if multiscales_flavor is None:
+        multiscales_flavor = {"ogc_tms", "experimental_multiscales_convention"}
     res_order = {
         "r10m": 10,
         "r20m": 20,
@@ -419,16 +411,14 @@ def add_multiscales_metadata_to_parent(
         "r720m": 720,
     }
 
-    all_resolutions = sorted(
-        set(res_groups.keys()), key=lambda x: res_order.get(x, 999)
-    )
+    all_resolutions = sorted(set(res_groups.keys()), key=lambda x: res_order.get(x, 999))
 
     if len(all_resolutions) < 2:
         log.info(
             "Skipping {} - only one resolution available",
             base_path=base_path,
         )
-        return
+        return None
 
     # Get CRS and bounds from first available dataset (load from output path)
     first_res = all_resolutions[0]
@@ -438,17 +428,15 @@ def add_multiscales_metadata_to_parent(
     native_crs = first_dataset.rio.crs if hasattr(first_dataset, "rio") else None
     if native_crs is None:
         log.info("No CRS found, skipping multiscales metadata", base_path=base_path)
-        return
+        return None
 
-    native_bounds = (
-        first_dataset.rio.bounds() if hasattr(first_dataset, "rio") else None
-    )
+    native_bounds = first_dataset.rio.bounds() if hasattr(first_dataset, "rio") else None
     if native_bounds is None:
         log.info(
             "No bounds found, skipping multiscales metadata",
             base_path=base_path,
         )
-        return
+        return None
 
     # Create overview_levels structure with string-based level names
     overview_levels: list[OverviewLevelJSON] = []
@@ -493,7 +481,7 @@ def add_multiscales_metadata_to_parent(
 
     if len(overview_levels) < 2:
         log.info("    Could not create overview levels for {}", base_path=base_path)
-        return
+        return None
 
     multiscales: dict[str, Any] = {"multiscales": {}}
     layout: list[zcm.ScaleLevel] | MISSING = MISSING
@@ -557,9 +545,7 @@ def add_multiscales_metadata_to_parent(
         zarr_format=3,
     )
 
-    log.info(
-        f"Added {len(overview_levels)} multiscale levels to {base_path}",
-    )
+    log.info("Added %s multiscale levels to %s", len(overview_levels), base_path)
 
     return dt_multiscale
 
@@ -582,7 +568,9 @@ def create_original_encoding(dataset: xr.Dataset) -> dict[str, XarrayDataArrayEn
                 var_encoding[key] = var_data.encoding[key]  # type: ignore[literal-required]
         if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
             log.warning(
-                f"Unknown encoding keys in {var_name}: {set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS}"
+                "Unknown encoding keys in %s: %s",
+                var_name,
+                set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS,
             )
         encoding[var_name] = var_encoding
 
@@ -592,9 +580,7 @@ def create_original_encoding(dataset: xr.Dataset) -> dict[str, XarrayDataArrayEn
     return encoding
 
 
-def create_downsampled_resolution_group(
-    source_dataset: xr.Dataset, factor: int
-) -> xr.Dataset:
+def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int) -> xr.Dataset:
     """Create a downsampled version of a dataset by given factor."""
     if not source_dataset or len(source_dataset.data_vars) == 0:
         return xr.Dataset()
@@ -618,21 +604,15 @@ def create_downsampled_resolution_group(
             continue
         var_typ = determine_variable_type(var_name, var_data)
         if var_typ == "quality_mask":
-            lazy_downsampled = var_data.coarsen(
-                {"x": factor, "y": factor}, boundary="trim"
-            ).max()
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").max()
         elif var_typ == "reflectance":
-            lazy_downsampled = var_data.coarsen(
-                {"x": factor, "y": factor}, boundary="trim"
-            ).mean()
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").mean()
         elif var_typ == "classification":
-            lazy_downsampled = var_data.coarsen(
-                {"x": factor, "y": factor}, boundary="trim"
-            ).reduce(subsample_2)
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").reduce(
+                subsample_2
+            )
         elif var_typ == "probability":
-            lazy_downsampled = var_data.coarsen(
-                {"x": factor, "y": factor}, boundary="trim"
-            ).mean()
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").mean()
         else:
             raise ValueError(f"Unknown variable type {var_typ}")
 
@@ -645,19 +625,14 @@ def create_downsampled_resolution_group(
         return xr.Dataset()
 
     # Create dataset with lazy variables and coordinates
-    dataset = xr.Dataset(lazy_vars, attrs=source_dataset.attrs)
-
-    return dataset
+    return xr.Dataset(lazy_vars, attrs=source_dataset.attrs)
 
 
 def subsample_2(a: xr.DataArray, axis: tuple[int, ...] | None = None) -> xr.DataArray:
     if axis is None:
         return a[((slice(None, None, 2),) * a.ndim)]
-    else:
-        indexer = [
-            slice(None, None, 2) if i in axis else slice(None) for i in range(a.ndim)
-        ]
-        return a[tuple(indexer)]
+    indexer = [slice(None, None, 2) if i in axis else slice(None) for i in range(a.ndim)]
+    return a[tuple(indexer)]
 
 
 def create_downsampled_coordinates(
@@ -692,9 +667,13 @@ def create_downsampled_coordinates(
     coords["y"] = (["y"], y_coords_downsampled, y_attrs)
 
     # Copy any other coordinates that might exist
-    for coord_name, coord_data in level_2_dataset.coords.items():
-        if coord_name not in ["x", "y"]:
-            coords[coord_name] = coord_data
+    coords.update(
+        {
+            coord_name: coord_data
+            for coord_name, coord_data in level_2_dataset.coords.items()
+            if coord_name not in ["x", "y"]
+        }
+    )
 
     return coords
 
@@ -723,9 +702,9 @@ def create_lazy_downsample_operation_from_existing(
         chunks = (min(256, target_height), min(256, target_width))
 
     # Create Dask array from delayed operation
-    dask_array = from_delayed(
-        lazy_result, shape=output_shape, dtype=source_data.dtype
-    ).rechunk(chunks)
+    dask_array = from_delayed(lazy_result, shape=output_shape, dtype=source_data.dtype).rechunk(
+        chunks
+    )
 
     # Return as xarray DataArray with lazy data - no coords to avoid alignment issues
     # Coordinates will be set when the lazy operation is computed
@@ -767,13 +746,12 @@ def stream_write_dataset(
             "Level path {} already exists. Skipping write.",
             dataset_path=dataset_path,
         )
-        existing_ds = xr.open_dataset(
+        return xr.open_dataset(
             dataset_path,
             engine="zarr",
             chunks={},
             decode_coords="all",
         )
-        return existing_ds
 
     log.info("Streaming computation and write to {}", dataset_path=dataset_path)
     log.info("Variables", variables=list(dataset.data_vars.keys()))
@@ -852,9 +830,7 @@ def rechunk_dataset_for_encoding(
 
             # If sharding is enabled, rechunk based on shard dimensions
             if "shards" in var_encoding and var_encoding["shards"] is not None:
-                target_chunks = var_encoding[
-                    "shards"
-                ]  # Use shard dimensions for rechunking
+                target_chunks = var_encoding["shards"]  # Use shard dimensions for rechunking
             elif "chunks" in var_encoding:
                 target_chunks = var_encoding["chunks"]  # Fallback to chunk dimensions
             else:
@@ -876,11 +852,7 @@ def rechunk_dataset_for_encoding(
             rechunked_vars[var_name] = var_data
 
     # Create new dataset with rechunked variables, preserving coordinates
-    rechunked_dataset = xr.Dataset(
-        rechunked_vars, coords=dataset.coords, attrs=dataset.attrs
-    )
-
-    return rechunked_dataset
+    return xr.Dataset(rechunked_vars, coords=dataset.coords, attrs=dataset.attrs)
 
 
 def extract_scale_offset_encoding(

@@ -9,7 +9,7 @@ import argparse
 import sys
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import structlog
 import xarray as xr
@@ -28,6 +28,9 @@ from .conversion.fs_utils import (
     validate_s3_access,
 )
 
+if TYPE_CHECKING:
+    from dask.distributed import Client
+
 log = structlog.get_logger()
 
 # Suppress xarray FutureWarning about timedelta decoding
@@ -38,7 +41,7 @@ warnings.filterwarnings("ignore", message=".*", category=UserWarning)
 warnings.filterwarnings("ignore", message=".*", category=RuntimeWarning)
 
 
-def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Any | None:
+def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> "Client | None":
     """
     Set up a dask cluster for parallel processing.
 
@@ -73,16 +76,16 @@ def setup_dask_cluster(enable_dask: bool, verbose: bool = False) -> Any | None:
         else:
             log.info("🚀 Dask cluster started for parallel processing")
 
-        return client
-
     except ImportError:
-        log.error(
+        log.exception(
             "dask.distributed not available. Install with: pip install 'dask[distributed]'"
         )
         sys.exit(1)
-    except Exception as e:
-        log.error("Error starting dask cluster", error=str(e))
+    except Exception:
+        log.exception("Error starting dask cluster")
         sys.exit(1)
+    else:
+        return client
 
 
 def convert_command(args: argparse.Namespace) -> None:
@@ -134,7 +137,7 @@ def convert_command(args: argparse.Namespace) -> None:
                 log.error(msg)
                 if args.verbose:
                     creds_info = get_s3_credentials_info()
-                    log.info(f"🔧 Current AWS configuration: {creds_info.items()}")
+                    log.info("🔧 Current AWS configuration: %s", creds_info.items())
                 sys.exit(1)
 
             log.info("✅ S3 access validated successfully")
@@ -146,13 +149,13 @@ def convert_command(args: argparse.Namespace) -> None:
             output_path = str(output_path)
 
         if args.verbose:
-            log.info(f"Loading EOPF dataset from {input_path}")
-            log.info(f"Groups to convert: {args.groups}")
-            log.info(f"CRS groups: {args.crs_groups}")
-            log.info(f"Output path: {output_path}")
-            log.info(f"Spatial chunk size: {args.spatial_chunk}")
-            log.info(f"Min dimension: {args.min_dimension}")
-            log.info(f"Tile width: {args.tile_width}")
+            log.info("Loading EOPF dataset from %s", input_path)
+            log.info("Groups to convert: %s", args.groups)
+            log.info("CRS groups: %s", args.crs_groups)
+            log.info("Output path: %s", output_path)
+            log.info("Spatial chunk size: %s", args.spatial_chunk)
+            log.info("Min dimension: %s", args.min_dimension)
+            log.info("Tile width: %s", args.tile_width)
 
         # Load the EOPF DataTree with appropriate storage options
         log.info("Loading EOPF dataset...")
@@ -165,8 +168,8 @@ def convert_command(args: argparse.Namespace) -> None:
         )
 
         if args.verbose:
-            log.info(f"Loaded DataTree with {len(dt.children)} groups")
-            log.info(f"Available groups: {tuple(dt.children.keys())}")
+            log.info("Loaded DataTree with %s groups", len(dt.children))
+            log.info("Available groups: %s", tuple(dt.children.keys()))
 
         # Convert to GeoZarr compliant format
         log.info("Converting to GeoZarr compliant format...")
@@ -184,12 +187,12 @@ def convert_command(args: argparse.Namespace) -> None:
         )
 
         log.info("✅ Successfully converted EOPF dataset to GeoZarr format")
-        log.info(f"Output saved to {output_path}")
+        log.info("Output saved to %s", output_path)
 
         if args.verbose:
             # Check if dt_geozarr is a DataTree or Dataset
             if hasattr(dt_geozarr, "children"):
-                log.info(f"Converted groups: {tuple(dt_geozarr.children.keys())}")
+                log.info("Converted groups: %s", tuple(dt_geozarr.children.keys()))
             else:
                 log.info("Converted dataset (single group)")
 
@@ -284,7 +287,7 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
         HTML representation of the optimized tree
     """
 
-    def has_meaningful_content(node: Any) -> bool:
+    def has_meaningful_content(node: xr.DataTree) -> bool:
         """Check if a node has meaningful content (data variables, attributes, or meaningful children)."""
         if hasattr(node, "ds") and node.ds is not None:
             # Has data variables
@@ -296,19 +299,17 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
 
         # Check if any children have meaningful content
         if hasattr(node, "children") and node.children:
-            return any(
-                has_meaningful_content(child) for child in node.children.values()
-            )
+            return any(has_meaningful_content(child) for child in node.children.values())
 
         return False
 
-    def format_dimensions(dims: Any) -> str:
+    def format_dimensions(dims: dict[str, int]) -> str:
         """Format dimensions in a compact way."""
         if not dims:
             return ""
         return f"({', '.join(f'{k}: {v}' for k, v in dims.items())})"
 
-    def format_data_vars(data_vars: Any) -> str:
+    def format_data_vars(data_vars: dict[str, xr.DataArray]) -> str:
         """Format data variables using xarray's rich HTML representation."""
         if not data_vars:
             return ""
@@ -319,14 +320,11 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
         # Get xarray's HTML representation and extract just the variables section
         try:
             html_repr = temp_ds._repr_html_()
-            # Extract the variables section from xarray's HTML
-            # This gives us the rich, interactive variable display
-            return f'<div class="xarray-variables">{html_repr}</div>'
         except Exception:
             # Fallback to simple format if xarray HTML fails
             vars_html = []
             for name, var in data_vars.items():
-                dims_str = format_dimensions(dict(zip(var.dims, var.shape)))
+                dims_str = format_dimensions(dict(zip(var.dims, var.shape, strict=True)))
                 dtype_str = str(var.dtype)
                 vars_html.append(
                     f"""
@@ -338,8 +336,12 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
                 """
                 )
             return "".join(vars_html)
+        else:
+            # Extract the variables section from xarray's HTML
+            # This gives us the rich, interactive variable display
+            return f'<div class="xarray-variables">{html_repr}</div>'
 
-    def format_attributes(attrs: Any) -> str:
+    def format_attributes(attrs: dict[str, object]) -> str:
         """Format attributes in a compact way."""
         if not attrs:
             return ""
@@ -368,7 +370,7 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
 
         return "".join(attrs_html)
 
-    def render_node(node: Any, path: str = "", level: int = 0) -> str:
+    def render_node(node: xr.DataTree, path: str = "", level: int = 0) -> str:
         """Render a single node and its children."""
         if not has_meaningful_content(node):
             return ""  # Skip empty nodes
@@ -382,17 +384,9 @@ def _generate_optimized_tree_html(dt: xr.DataTree) -> str:
         data_vars_count = (
             len(node.ds.data_vars) if has_data and hasattr(node.ds, "data_vars") else 0
         )
-        attrs_count = (
-            len(node.ds.attrs) if has_data and hasattr(node.ds, "attrs") else 0
-        )
+        attrs_count = len(node.ds.attrs) if has_data and hasattr(node.ds, "attrs") else 0
         children_count = (
-            len(
-                [
-                    child
-                    for child in node.children.values()
-                    if has_meaningful_content(child)
-                ]
-            )
+            len([child for child in node.children.values() if has_meaningful_content(child)])
             if hasattr(node, "children")
             else 0
         )
@@ -912,9 +906,7 @@ def _generate_html_output(
         log.info("✅ HTML visualization generated", output_file=str(output_file))
 
         if verbose:
-            log.info(
-                "   File size", file_size_kb=round(output_file.stat().st_size / 1024, 1)
-            )
+            log.info("   File size", file_size_kb=round(output_file.stat().st_size / 1024, 1))
             log.info("   Groups included", group_count=len(dt.children))
 
         # Try to open in browser if possible
@@ -926,9 +918,7 @@ def _generate_html_output(
         except Exception as e:
             if verbose:
                 log.info("   Note: Could not auto-open browser", error=str(e))
-            log.info(
-                "   You can open the file manually", path=str(output_file.absolute())
-            )
+            log.info("   You can open the file manually", path=str(output_file.absolute()))
 
     except Exception as e:
         log.info("❌ Error generating HTML output", error=str(e))
@@ -996,10 +986,7 @@ def validate_command(args: argparse.Namespace) -> None:
                     issues.append("Missing standard_name attribute")
 
                 # Check for grid_mapping (for data variables, not grid_mapping variables)
-                if (
-                    "grid_mapping" not in var.attrs
-                    and "grid_mapping_name" not in var.attrs
-                ):
+                if "grid_mapping" not in var.attrs and "grid_mapping_name" not in var.attrs:
                     issues.append("Missing grid_mapping attribute")
 
                 if issues:
@@ -1109,9 +1096,7 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         help="Groups where Ground Control Points (GCPs) are located (e.g., /conditions/gcp) (Sentinel-1)",
     )
-    convert_parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose output"
-    )
+    convert_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     convert_parser.add_argument(
         "--dask-cluster",
         action="store_true",
@@ -1125,13 +1110,9 @@ def create_parser() -> argparse.ArgumentParser:
     convert_parser.set_defaults(func=convert_command)
 
     # Info command
-    info_parser = subparsers.add_parser(
-        "info", help="Display information about an EOPF dataset"
-    )
+    info_parser = subparsers.add_parser("info", help="Display information about an EOPF dataset")
     info_parser.add_argument("input_path", type=str, help="Path to EOPF dataset")
-    info_parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose output"
-    )
+    info_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     info_parser.add_argument(
         "--html-output",
         type=str,
@@ -1143,12 +1124,8 @@ def create_parser() -> argparse.ArgumentParser:
     validate_parser = subparsers.add_parser(
         "validate", help="Validate GeoZarr compliance of a dataset"
     )
-    validate_parser.add_argument(
-        "input_path", type=str, help="Path to dataset to validate"
-    )
-    validate_parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose output"
-    )
+    validate_parser.add_argument("input_path", type=str, help="Path to dataset to validate")
+    validate_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     validate_parser.set_defaults(func=validate_command)
 
     # Add S2 optimization commands
@@ -1157,7 +1134,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def add_s2_optimization_commands(subparsers: Any) -> None:
+def add_s2_optimization_commands(subparsers: argparse._SubParsersAction) -> None:
     """Add S2 optimization commands to CLI parser."""
 
     # Convert S2 optimized command
@@ -1167,18 +1144,14 @@ def add_s2_optimization_commands(subparsers: Any) -> None:
     s2_parser.add_argument(
         "input_path", type=str, help="Path to input Sentinel-2 dataset (Zarr format)"
     )
-    s2_parser.add_argument(
-        "output_path", type=str, help="Path for output optimized dataset"
-    )
+    s2_parser.add_argument("output_path", type=str, help="Path for output optimized dataset")
     s2_parser.add_argument(
         "--spatial-chunk",
         type=int,
         default=256,
         help="Spatial chunk size (default: 256)",
     )
-    s2_parser.add_argument(
-        "--enable-sharding", action="store_true", help="Enable Zarr v3 sharding"
-    )
+    s2_parser.add_argument("--enable-sharding", action="store_true", help="Enable Zarr v3 sharding")
     s2_parser.add_argument(
         "--compression-level",
         type=int,
@@ -1186,12 +1159,8 @@ def add_s2_optimization_commands(subparsers: Any) -> None:
         choices=range(1, 10),
         help="Compression level 1-9 (default: 3)",
     )
-    s2_parser.add_argument(
-        "--skip-validation", action="store_true", help="Skip output validation"
-    )
-    s2_parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose output"
-    )
+    s2_parser.add_argument("--skip-validation", action="store_true", help="Skip output validation")
+    s2_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     s2_parser.add_argument(
         "--dask-cluster",
         action="store_true",
@@ -1200,7 +1169,7 @@ def add_s2_optimization_commands(subparsers: Any) -> None:
     s2_parser.set_defaults(func=convert_s2_optimized_command)
 
 
-def convert_s2_optimized_command(args: Any) -> None:
+def convert_s2_optimized_command(args: argparse.Namespace) -> None:
     """Execute S2 optimized conversion command."""
     # Set up dask cluster if requested
     dask_client = setup_dask_cluster(
@@ -1212,9 +1181,7 @@ def convert_s2_optimized_command(args: Any) -> None:
         log.info("Loading Sentinel-2 dataset from", input_path=args.input_path)
         storage_options = get_storage_options(str(args.input_path))
         # store = args.input_path
-        store = CacheStore(
-            sync(make_store(args.input_path, mode="r")), cache_store=MemoryStore()
-        )
+        store = CacheStore(sync(make_store(args.input_path, mode="r")), cache_store=MemoryStore())
         dt_input = xr.open_datatree(
             store,
             engine="zarr",

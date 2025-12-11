@@ -1,8 +1,6 @@
 """Types and constants for the GeoZarr data API."""
 
-from typing import Any, Final, Literal, TypedDict
-
-from typing_extensions import NotRequired
+from typing import Any, Final, Literal, NotRequired, TypedDict
 
 
 class TileMatrixLimitJSON(TypedDict):

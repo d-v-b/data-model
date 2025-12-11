@@ -42,12 +42,8 @@ def downsample_2d_array(
 
     if block_size_y > 1 and block_size_x > 1:
         # Block averaging with nodata handling
-        reshaped = source_data[
-            : target_height * block_size_y, : target_width * block_size_x
-        ]
-        reshaped = reshaped.reshape(
-            target_height, block_size_y, target_width, block_size_x
-        )
+        reshaped = source_data[: target_height * block_size_y, : target_width * block_size_x]
+        reshaped = reshaped.reshape(target_height, block_size_y, target_width, block_size_x)
 
         if nodata_value is not None and not np.isnan(nodata_value):
             # Create mask for valid data (not nodata)
@@ -60,9 +56,7 @@ def downsample_2d_array(
                 valid_count = valid_mask.sum(axis=(1, 3))
 
                 # Calculate mean, preserving nodata where no valid data exists
-                downsampled = np.where(
-                    valid_count > 0, valid_sum / valid_count, nodata_value
-                )
+                downsampled = np.where(valid_count > 0, valid_sum / valid_count, nodata_value)
         elif nodata_value is not None and np.isnan(nodata_value):
             # Handle NaN nodata values
             with np.errstate(invalid="ignore"):
@@ -96,9 +90,12 @@ def is_grid_mapping_variable(ds: xr.Dataset, var_name: str) -> bool:
         True if this variable is referenced as a grid_mapping
     """
     for data_var in ds.data_vars:
-        if data_var != var_name and "grid_mapping" in ds[data_var].attrs:
-            if ds[data_var].attrs["grid_mapping"] == var_name:
-                return True
+        if (
+            data_var != var_name
+            and "grid_mapping" in ds[data_var].attrs
+            and ds[data_var].attrs["grid_mapping"] == var_name
+        ):
+            return True
     return False
 
 
@@ -155,10 +152,7 @@ def validate_existing_band_data(
     """
     try:
         # Check if the variable exists
-        if (
-            var_name not in existing_group.data_vars
-            and var_name not in existing_group.coords
-        ):
+        if var_name not in existing_group.data_vars and var_name not in existing_group.coords:
             return False
 
         # Check shape matches
@@ -192,19 +186,17 @@ def validate_existing_band_data(
                 if array_info.size == 0:
                     return False
                 # read a piece of data to ensure it's valid
-                test = array_info.isel(
-                    {dim: 0 for dim in array_info.dims}
-                ).values.mean()
+                test = array_info.isel(dict.fromkeys(array_info.dims, 0)).values.mean()
                 if np.isnan(test):
                     return False
             except Exception as e:
                 log.info("Error validating variable", var_name=var_name, error=str(e))
                 return False
 
-        return True
-
     except Exception:
         return False
+    else:
+        return True
 
 
 def compute_overview_gcps(
@@ -231,7 +223,7 @@ def compute_overview_gcps(
         merged together by averaging their latitude, longitude and height.
 
     """
-    ds_gcp_overview = (
+    return (
         # compute the new decimated line/pixel coordinates
         # TODO: trim line values with height and pixel values with width?
         ds_gcp.assign_coords(
@@ -245,5 +237,3 @@ def compute_overview_gcps(
         # re-assign original dimensions
         .rename_dims(line="azimuth_time", pixel="ground_range")
     )
-
-    return ds_gcp_overview

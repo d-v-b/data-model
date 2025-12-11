@@ -18,7 +18,7 @@ from eopf_geozarr.s2_optimization.s2_converter import (
 
 
 @pytest.fixture
-def mock_s2_dataset():
+def mock_s2_dataset() -> xr.DataTree:
     """Create a mock S2 dataset for testing."""
     # Create test data arrays
     coords = {
@@ -46,7 +46,7 @@ def mock_s2_dataset():
     return dt
 
 
-def test_simple_root_consolidation_success(tmp_path: Path):
+def test_simple_root_consolidation_success(tmp_path: Path) -> None:
     """
     Test that simple_root_consolidation produces consolidated metadata at the root, and for the
     measurements/reflectance group, but not for other groups.
@@ -75,12 +75,10 @@ def test_simple_root_consolidation_success(tmp_path: Path):
     )
     atmos_zmeta = json.loads((tmp_path / "test.zarr/quality/zarr.json").read_text())
 
-    assert "consolidated_metadata" in root_z_meta and isinstance(
-        root_z_meta["consolidated_metadata"], dict
-    )
-    assert "consolidated_metadata" in reflectance_zmeta and isinstance(
-        reflectance_zmeta["consolidated_metadata"], dict
-    )
+    assert "consolidated_metadata" in root_z_meta
+    assert isinstance(root_z_meta["consolidated_metadata"], dict)
+    assert "consolidated_metadata" in reflectance_zmeta
+    assert isinstance(reflectance_zmeta["consolidated_metadata"], dict)
     if "consolidated_metadata" in atmos_zmeta:
         assert atmos_zmeta["consolidated_metadata"] is None
 
@@ -92,7 +90,7 @@ class TestConvenienceFunction:
         self,
         s2_group_example: Path,
         tmp_path: Path,
-    ):
+    ) -> None:
         """Test the convenience function with real S2 data."""
         # Open the S2 example as a DataTree
         dt_input = xr.open_datatree(s2_group_example, engine="zarr")

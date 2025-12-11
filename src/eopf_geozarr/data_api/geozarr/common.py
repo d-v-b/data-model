@@ -6,15 +6,28 @@ import io
 import urllib
 import urllib.request
 from dataclasses import dataclass
-from typing import Annotated, Any, Mapping, NotRequired, Self, TypeGuard, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Final,
+    Literal,
+    NotRequired,
+    Self,
+    TypeGuard,
+    TypeVar,
+)
 from urllib.error import URLError
 
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
-from typing_extensions import Final, Literal, Protocol, TypedDict, runtime_checkable
+from typing_extensions import Protocol, TypedDict, runtime_checkable
 
-from eopf_geozarr.data_api.geozarr.projjson import ProjJSON
+from eopf_geozarr.data_api.geozarr.projjson import ProjJSON  # noqa: TC001
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclass(frozen=True)
@@ -22,8 +35,6 @@ class UNSET_TYPE:
     """
     Sentinel value to indicate that a value is not set.
     """
-
-    ...
 
 
 GEO_PROJ_VERSION: Final = "0.1"
@@ -38,14 +49,8 @@ class ZarrConventionMetadata(BaseModel):
 
     @model_validator(mode="after")
     def ensure_identifiable(self) -> Self:
-        if (
-            self.uuid is MISSING
-            and self.schema_url is MISSING
-            and self.spec_url is MISSING
-        ):
-            raise ValueError(
-                "At least one of uuid, schema_url, or spec_url must be provided."
-            )
+        if self.uuid is MISSING and self.schema_url is MISSING and self.spec_url is MISSING:
+            raise ValueError("At least one of uuid, schema_url, or spec_url must be provided.")
 
         return self
 
@@ -226,7 +231,7 @@ def check_valid_coordinates(model: TGroupLike) -> TGroupLike:
                 )
             member = model.members[dim]
             if isinstance(member, GroupLike):
-                raise ValueError(
+                raise TypeError(
                     f"Dimension '{dim}' for array '{key}' should be a group. Found an array instead."
                 )
             if member.shape[0] != array.shape[idx]:
@@ -256,8 +261,6 @@ class DatasetAttrs(BaseModel, extra="allow"):
 
     A dataset is a collection of DataArrays. This class models the attributes of a dataset
     """
-
-    ...
 
 
 @runtime_checkable

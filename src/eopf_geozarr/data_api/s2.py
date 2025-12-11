@@ -289,13 +289,9 @@ class Sentinel2RootAttrs(BaseModel):
 class Sentinel2DataArray(ArraySpec[Sentinel2DataArrayAttrs]):
     """Sentinel-2 data array integrated with pydantic-zarr."""
 
-    ...
-
 
 class Sentinel2CoordinateArray(ArraySpec[Sentinel2DataArrayAttrs]):
     """Coordinate array for Sentinel-2 data."""
-
-    ...
 
 
 # TypedDict definitions for members structure
@@ -382,8 +378,6 @@ class Sentinel2AtmosphereResolutionDataset(
 ):
     """Atmosphere data at a single resolution."""
 
-    pass
-
 
 class Sentinel2AtmosphereMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
     """Members for atmosphere group containing resolution datasets."""
@@ -396,27 +390,19 @@ class Sentinel2AtmosphereMembers(TypedDict, closed=True, total=False):  # type: 
 class Sentinel2AtmosphereDataset(GroupSpec[DatasetAttrs, Sentinel2AtmosphereMembers]):  # type: ignore[type-var]
     """Atmosphere quality data (AOT, WVP) at multiple resolutions."""
 
-    pass
-
 
 class Sentinel2ProbabilityDataset(
     GroupSpec[DatasetAttrs, ProbabilityResolutionMembers]  # type: ignore[type-var]
 ):
     """Probability data (cloud, snow) at multiple resolutions."""
 
-    pass
-
 
 class Sentinel2QuicklookDataset(GroupSpec[DatasetAttrs, QuicklookResolutionMembers]):  # type: ignore[type-var]
     """True Color Image (TCI) quicklook data at multiple resolutions."""
 
-    pass
-
 
 class Sentinel2MaskDataset(GroupSpec[DatasetAttrs, ConditionsMaskMembers]):  # type: ignore[type-var]
     """Mask data containing classification and detector footprints."""
-
-    pass
 
 
 class Sentinel2QualityMembers(TypedDict, closed=True, total=False):  # type: ignore[call-arg]
@@ -461,19 +447,13 @@ class Sentinel2QualityGroup(GroupSpec[DatasetAttrs, Sentinel2QualityMembers]):  
 class Sentinel2GeometryGroup(GroupSpec[DatasetAttrs, GeometryMembers]):  # type: ignore[type-var]
     """Geometry group containing sun and viewing angles."""
 
-    pass
-
 
 class Sentinel2MeteorologyGroup(GroupSpec[DatasetAttrs, MeteorologyMembers]):  # type: ignore[type-var]
     """Meteorology group containing CAMS and ECMWF atmospheric data."""
 
-    pass
-
 
 class Sentinel2ConditionsMaskGroup(GroupSpec[DatasetAttrs, ConditionsMaskMembers]):  # type: ignore[type-var]
     """Mask subgroup in conditions."""
-
-    pass
 
 
 class Sentinel2ConditionsMembers(TypedDict, closed=True):  # type: ignore[call-arg]
@@ -556,6 +536,5 @@ class Sentinel2Root(GroupSpec[Sentinel2RootAttrs, Sentinel2RootMembers]):  # typ
         """Get the coordinate reference system (CRS) for this product"""
         crs_code = self.attributes.other_metadata["horizontal_CRS_code"]
         # Handle both "EPSG:32635" and "32635" formats
-        if crs_code.startswith("EPSG:"):
-            crs_code = crs_code[5:]  # Remove "EPSG:" prefix
+        crs_code = crs_code.removeprefix("EPSG:")  # Remove "EPSG:" prefix
         return CRS.from_epsg(int(crs_code))

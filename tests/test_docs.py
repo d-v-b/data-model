@@ -81,7 +81,7 @@ def _validate_output(example: CodeExample, captured_output: str) -> None:
             f"Actual:\n{chr(10).join(actual_lines)}"
         )
 
-    for i, (expected, actual) in enumerate(zip(expected_lines, actual_lines)):
+    for i, (expected, actual) in enumerate(zip(expected_lines, actual_lines, strict=False)):
         if expected != actual:
             raise AssertionError(
                 f"Output mismatch on line {i + 1} in {example.path} (lines {example.start_line}-{example.end_line}):\n"
@@ -131,9 +131,7 @@ def test_doc_example_group(group_examples: list[CodeExample]) -> None:
         # If we're about to execute an example but we've skipped some,
         # we might have missing dependencies
         if any_skipped:
-            pytest.skip(
-                "Earlier examples in group were skipped; dependencies may be missing"
-            )
+            pytest.skip("Earlier examples in group were skipped; dependencies may be missing")
 
         # Execute the example code with shared namespace and capture output
         try:

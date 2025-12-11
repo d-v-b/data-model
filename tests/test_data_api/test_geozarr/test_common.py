@@ -23,9 +23,7 @@ from eopf_geozarr.data_api.geozarr.v2 import DataArray as DataArray_V3
 @pytest.mark.parametrize(
     "obj",
     [
-        DataArray_V2.from_array(
-            np.arange(10), attributes={"_ARRAY_DIMENSIONS": ("time",)}
-        ),
+        DataArray_V2.from_array(np.arange(10), attributes={"_ARRAY_DIMENSIONS": ("time",)}),
         DataArray_V3.from_array(np.arange(10), dimension_names=("time",)),
     ],
 )
@@ -71,7 +69,7 @@ def test_check_standard_name_invalid() -> None:
     """
     Test the check_standard_name function with an invalid standard name.
     """
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"Invalid standard name.*not found in the list"):
         check_standard_name("invalid_standard_name")
 
 
@@ -94,7 +92,7 @@ def test_projattrs_crs_required() -> None:
     Test that the ProjAttrs model raises a ValueError if none of the CRS fields are specified.
     """
     with pytest.raises(
-        ValueError, match="One of 'code', 'wkt2', or 'projjson' must be provided."
+        ValueError, match=r"One of 'code', 'wkt2', or 'projjson' must be provided\."
     ):
         ProjAttrs()
 
@@ -107,7 +105,7 @@ def test_projattrs_json_examples(
     """
     proj_examples_found: int = 0
 
-    for _, json_block in proj_attrs_examples.items():
+    for json_block in proj_attrs_examples.values():
         # Check if this JSON block contains geo.proj attributes
         if "attributes" in json_block and isinstance(json_block["attributes"], dict):
             geo: Any = json_block["attributes"].get("geo")

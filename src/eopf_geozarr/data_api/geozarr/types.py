@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Final, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Final, Literal, NotRequired, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 class TileMatrixLimitJSON(TypedDict):

@@ -19,9 +19,7 @@ def test_json_examples_exist() -> None:
     assert len(ZCM_MULTISCALES_EXAMPLES) > 0
 
 
-@pytest.mark.parametrize(
-    "json_example", ZCM_MULTISCALES_EXAMPLES.items(), ids=lambda v: v[0]
-)
+@pytest.mark.parametrize("json_example", ZCM_MULTISCALES_EXAMPLES.items(), ids=lambda v: v[0])
 def test_multiscales_rt(json_example: tuple[str, dict[str, object]]) -> None:
     """
     Test that the multiscales metadata round-trips input JSON

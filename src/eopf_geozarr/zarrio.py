@@ -4,16 +4,19 @@ This module contains zarr-specific IO routines
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
-from typing import Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 import numcodecs
 import structlog
 import zarr
 from zarr.core.group import GroupMetadata
-from zarr.core.metadata.v3 import ArrayV3Metadata
 from zarr.core.sync import sync
 from zarr.storage._common import make_store_path
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+
+    from zarr.core.metadata.v3 import ArrayV3Metadata
 
 
 class ChunkEncodingSpec(TypedDict):
@@ -48,9 +51,7 @@ def convert_compression(
         }
         return (new_codec,)
 
-    raise ValueError(
-        f"Only blosc -> blosc or None -> () is supported. Got {compressor=}"
-    )
+    raise ValueError(f"Only blosc -> blosc or None -> () is supported. Got {compressor=}")
 
 
 def reencode_array(
@@ -69,14 +70,8 @@ def reencode_array(
         fill_value = array.metadata.dtype.default_scalar()
     else:
         fill_value = array.fill_value
-    if attributes is None:
-        attributes = array.attrs.asdict()
-    else:
-        attributes = attributes
-    if chunking is not None:
-        chunk_grid_shape = chunking["write_chunks"]
-    else:
-        chunk_grid_shape = array.chunks
+    attributes = array.attrs.asdict() if attributes is None else attributes
+    chunk_grid_shape = chunking["write_chunks"] if chunking is not None else array.chunks
 
     if chunking is not None and "read_chunks" in chunking:
         codecs = (
@@ -93,7 +88,7 @@ def reencode_array(
     else:
         codecs = ({"name": "bytes"}, *new_codecs)  # type: ignore[assignment]
 
-    new_meta = zarr.core.metadata.v3.ArrayV3Metadata(
+    return zarr.core.metadata.v3.ArrayV3Metadata(
         shape=array.shape,
         data_type=array.metadata.dtype,
         chunk_key_encoding={"name": "default", "configuration": {"separator": "/"}},
@@ -106,7 +101,6 @@ def reencode_array(
         codecs=codecs,
         attributes=attributes,
     )
-    return new_meta
 
 
 def reencode_group(
@@ -128,19 +122,17 @@ def reencode_group(
     store = store_path.store
 
     all_members = dict(
-        group.members(
-            max_depth=None, use_consolidated_for_children=use_consolidated_for_children
-        )
+        group.members(max_depth=None, use_consolidated_for_children=use_consolidated_for_children)
     )
 
     log = structlog.get_logger()
-    log.info(f"Begin re-encoding Zarr group {group}")
+    log.info("Begin re-encoding Zarr group %s", group)
     new_members: dict[str, ArrayV3Metadata | GroupMetadata] = {
         path: GroupMetadata(zarr_format=3, attributes=group.attrs.asdict())
     }
-    chunks_to_encode: list[tuple[str, str]] = []
+    chunks_to_encode: list[str] = []
     for name, member in all_members.items():
-        log.info(f"re-encoding member {name}")
+        log.info("re-encoding member %s", name)
         new_path = f"{path}/{name}"
         member_attrs = member.attrs.asdict()
         if isinstance(member, zarr.Array):
@@ -148,30 +140,24 @@ def reencode_group(
                 dimension_names = member_attrs.pop("_ARRAY_DIMENSIONS")
             else:
                 dimension_names = None
-            if chunk_reencoder is None:
-                chunking = None
-            else:
-                chunking = chunk_reencoder(member)
+            chunking = None if chunk_reencoder is None else chunk_reencoder(member)
             new_members[new_path] = reencode_array(
                 member,
                 dimension_names=dimension_names,
                 attributes=member_attrs,
                 chunking=chunking,
             )
-            chunks_to_encode.append((name, new_path))
+            chunks_to_encode.append(name)
         else:
             new_members[new_path] = GroupMetadata(
                 zarr_format=3,
                 attributes=member.attrs.asdict(),
             )
-    log.info(f"Creating new Zarr hierarchy structure at {store}/{path}")
-    tree = dict(
-        zarr.create_hierarchy(store=store, nodes=new_members, overwrite=overwrite)
-    )
-    new_group = tree[path]
-
-    for name, new_path in chunks_to_encode:
-        log.info(f"Re-encoding chunks for array {name}")
+    log.info("Creating new Zarr hierarchy structure at %s", f"{store}/{path}")
+    tree = dict(zarr.create_hierarchy(store=store, nodes=new_members, overwrite=overwrite))
+    new_group: zarr.Group = tree[path]
+    for name in chunks_to_encode:
+        log.info("Re-encoding chunks for array %s", name)
         old_array = group[name]
         new_array = new_group[name]
 

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any, Iterable, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 from pydantic import ConfigDict, Field, model_validator
 from pydantic_zarr.v2 import ArraySpec, GroupSpec, auto_attributes
@@ -17,6 +16,9 @@ from eopf_geozarr.data_api.geozarr.common import (
 )
 from eopf_geozarr.data_api.geozarr.multiscales import MultiscaleGroupAttrs
 from eopf_geozarr.data_api.geozarr.types import XARRAY_DIMS_KEY
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 
 class DataArrayAttrs(BaseDataArrayAttrs):
@@ -55,22 +57,19 @@ class DataArray(ArraySpec[DataArrayAttrs]):
         chunks: tuple[int, ...] | Literal["auto"] = "auto",
         attributes: Mapping[str, object] | Literal["auto"] = "auto",
         fill_value: object | Literal["auto"] = "auto",
-        order: Literal["C", "F"] | Literal["auto"] = "auto",
+        order: Literal["C", "F", "auto"] = "auto",
         filters: tuple[Any, ...] | Literal["auto"] = "auto",
-        dimension_separator: Literal[".", "/"] | Literal["auto"] = "auto",
+        dimension_separator: Literal[".", "/", "auto"] = "auto",
         compressor: Any | Literal["auto"] = "auto",
         dimension_names: Iterable[str] | Literal["auto"] = "auto",
     ) -> Self:
         """
         Override the default from_array method to include a dimension_names parameter.
         """
-        if attributes == "auto":
-            auto_attrs = dict(auto_attributes(array))
-        else:
-            auto_attrs = dict(attributes)
+        auto_attrs = dict(auto_attributes(array)) if attributes == "auto" else dict(attributes)
         if dimension_names != "auto":
             auto_attrs = auto_attrs | {XARRAY_DIMS_KEY: tuple(dimension_names)}
-        model = super().from_array(
+        return super().from_array(  # type: ignore[no-any-return]
             array=array,
             chunks=chunks,
             attributes=auto_attrs,
@@ -80,13 +79,10 @@ class DataArray(ArraySpec[DataArrayAttrs]):
             dimension_separator=dimension_separator,
             compressor=compressor,
         )
-        return model  # type: ignore[no-any-return]
 
     @model_validator(mode="after")
     def check_array_dimensions(self) -> Self:
-        if (len_dim := len(self.attributes.array_dimensions)) != (
-            ndim := len(self.shape)
-        ):
+        if (len_dim := len(self.attributes.array_dimensions)) != (ndim := len(self.shape)):
             msg = (
                 f"The {XARRAY_DIMS_KEY} attribute has length {len_dim}, which does not "
                 f"match the number of dimensions for this array (got {ndim})."
@@ -109,8 +105,6 @@ class GridMappingVariable(ArraySpec[GridMappingAttrs]):
     ----------
     https://cfconventions.org/Data/cf-conventions/cf-conventions-1.12/cf-conventions.html#grid-mappings-and-projections
     """
-
-    ...
 
 
 class Dataset(GroupSpec[DatasetAttrs, DataArray | GridMappingVariable]):
@@ -142,5 +136,3 @@ class MultiscaleGroup(GroupSpec[MultiscaleGroupAttrs, DataArray | GroupSpec[Any,
     """
     A GeoZarr Multiscale Group.
     """
-
-    ...

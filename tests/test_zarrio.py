@@ -52,7 +52,7 @@ def test_convert_compression_fails() -> None:
     Test that convert compression will fail on out of band input
     """
     source = {"id": "gzip"}
-    with pytest.raises(ValueError, match="Only blosc -> blosc or None -> ()"):
+    with pytest.raises(ValueError, match=r"Only blosc -> blosc or None -> ()"):
         convert_compression(source)
 
 
@@ -63,12 +63,9 @@ def test_reencode_array_dimension_names(
     """
     Test that dimension names are handled correctly when re-encoding an array
     """
-    array_a = zarr.create_array(
-        {}, shape=(1,), dtype="uint8", zarr_format=2, compressors=None
-    )
+    array_a = zarr.create_array({}, shape=(1,), dtype="uint8", zarr_format=2, compressors=None)
     assert (
-        reencode_array(array_a, dimension_names=dimension_names).dimension_names
-        == dimension_names
+        reencode_array(array_a, dimension_names=dimension_names).dimension_names == dimension_names
     )
 
 
@@ -76,9 +73,7 @@ def test_reencode_array_attributes_default() -> None:
     """
     Test that original attributes are preserved when no custom attributes provided
     """
-    array_a = zarr.create_array(
-        {}, shape=(1,), dtype="uint8", zarr_format=2, compressors=None
-    )
+    array_a = zarr.create_array({}, shape=(1,), dtype="uint8", zarr_format=2, compressors=None)
     array_a.attrs["original"] = "value"
 
     meta = reencode_array(array_a)
@@ -89,9 +84,7 @@ def test_reencode_array_attributes_custom() -> None:
     """
     Test that custom attributes override original attributes
     """
-    array_a = zarr.create_array(
-        {}, shape=(1,), dtype="uint8", zarr_format=2, compressors=None
-    )
+    array_a = zarr.create_array({}, shape=(1,), dtype="uint8", zarr_format=2, compressors=None)
     array_a.attrs["original"] = "value"
 
     custom_attrs = {"custom": "new_value", "foo": "bar"}
@@ -184,9 +177,7 @@ def test_reencode_array_blosc_compression_converts() -> None:
     """
     Test that blosc compression is properly converted from v2 to v3
     """
-    compressor = numcodecs.Blosc(
-        cname="zstd", clevel=5, shuffle=numcodecs.Blosc.BITSHUFFLE
-    )
+    compressor = numcodecs.Blosc(cname="zstd", clevel=5, shuffle=numcodecs.Blosc.BITSHUFFLE)
 
     # Verify the conversion function works
     converted = convert_compression(compressor)
