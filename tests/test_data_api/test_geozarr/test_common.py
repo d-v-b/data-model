@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -18,6 +18,9 @@ from eopf_geozarr.data_api.geozarr.common import (
 )
 from eopf_geozarr.data_api.geozarr.v2 import DataArray as DataArray_V2
 from eopf_geozarr.data_api.geozarr.v2 import DataArray as DataArray_V3
+
+if TYPE_CHECKING:
+    import zarr
 
 
 @pytest.mark.parametrize(
@@ -73,7 +76,8 @@ def test_check_standard_name_invalid() -> None:
         check_standard_name("invalid_standard_name")
 
 
-def test_multiscales_round_trip(example_group) -> None:
+@pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
+def test_multiscales_round_trip(example_group: zarr.Group) -> None:
     """
     Ensure that we can round-trip multiscale metadata through the `Multiscales` model.
     """

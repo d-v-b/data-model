@@ -63,7 +63,8 @@ class TestCheckValidCoordinates:
             check_valid_coordinates(group)
 
 
-def test_dataarray_round_trip(example_group: Any) -> None:
+@pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
+def test_dataarray_round_trip(example_group: zarr.Group) -> None:
     """
     Ensure that we can round-trip dataarray attributes through the `Multiscales` model.
     """

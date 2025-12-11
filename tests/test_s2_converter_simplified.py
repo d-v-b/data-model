@@ -86,6 +86,7 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
 class TestConvenienceFunction:
     """Test the convenience function."""
 
+    @pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
     def test_convert_s2_optimized_convenience_function(
         self,
         s2_group_example: Path,

@@ -18,6 +18,7 @@ from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.experimental.v3 import GroupSpec
 
 
+@pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
 def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     """
     Test the convert-s2-optimized CLI command on a local copy of sentinel data
@@ -81,6 +82,7 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     assert differences == {}
 
 
+@pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
 def test_cli_convert_real_sentinel2_data(s2_group_example: Path, tmp_path: Path) -> None:
     """
     Test CLI conversion using a Sentinel-2 hierarchy saved locally.
@@ -335,6 +337,7 @@ def test_cli_convert_with_crs_groups(s2_group_example, tmp_path: Path) -> None:
     assert (output_path / "zarr.json").exists(), "Main zarr.json not found"
 
 
+@pytest.mark.filterwarnings("ignore:.*:zarr.errors.ZarrUserWarning")
 def test_cli_crs_groups_empty_list(tmp_path: str) -> None:
     """Test CLI with --crs-groups but no groups specified (empty list)."""
     # Create a minimal test dataset
