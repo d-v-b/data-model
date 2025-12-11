@@ -41,7 +41,7 @@ def test_parse_s3_path() -> None:
     assert bucket == "bucket"
     assert key == "single-file"
 
-    with pytest.raises(ValueError, match=r"Path must start with 's3://'"):
+    with pytest.raises(ValueError, match=r"Invalid S3 path"):
         parse_s3_path("https://example.com")
 
 
