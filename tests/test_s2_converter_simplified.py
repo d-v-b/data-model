@@ -114,7 +114,7 @@ class TestConvenienceFunction:
         assert isinstance(result, xr.DataTree)
 
         # Verify basic structure - output should have multiscale groups
-        output_dt = xr.open_datatree(output_path, engine="zarr")
+        output_dt = xr.open_datatree(output_path, engine="zarr", decode_timedelta=True)
         assert len(output_dt.groups) > 0
 
 

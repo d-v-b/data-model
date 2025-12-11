@@ -89,7 +89,9 @@ def test_cli_convert_real_sentinel2_data(s2_group_example: Path, tmp_path: Path)
     output_path = tmp_path / "s2b_geozarr_cli_test.zarr"
 
     # Detect product level (L1C vs L2A) by checking which quicklook group exists
-    dt_source = xr.open_datatree(s2_group_example, engine="zarr")
+    dt_source = xr.open_datatree(
+        s2_group_example, engine="zarr", consolidated=False, decode_timedelta=True
+    )
     has_l2a_quicklook = "/quality/l2a_quicklook" in dt_source.groups
     has_l1c_quicklook = "/quality/l1c_quicklook" in dt_source.groups
 

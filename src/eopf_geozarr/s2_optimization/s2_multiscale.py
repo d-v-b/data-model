@@ -751,6 +751,8 @@ def stream_write_dataset(
             engine="zarr",
             chunks={},
             decode_coords="all",
+            decode_timedelta=True,
+            consolidated=False,
         )
 
     log.info("Streaming computation and write to {}", dataset_path=dataset_path)

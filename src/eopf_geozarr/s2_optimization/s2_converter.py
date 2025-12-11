@@ -272,7 +272,9 @@ def convert_s2_optimized(
 
     # Step 2: Create multiscale pyramids for each group in the original structure
     log.info("Adding multiscale levels")
-    new_dt_input = xr.open_datatree(out_store, engine="zarr", chunks="auto")
+    new_dt_input = xr.open_datatree(
+        out_store, engine="zarr", chunks="auto", decode_timedelta=True, consolidated=False
+    )
     datasets = create_multiscale_from_datatree(
         new_dt_input,
         output_path,
@@ -395,6 +397,7 @@ def create_result_datatree(output_path: str) -> xr.DataTree:
             engine="zarr",
             chunks="auto",
             storage_options=storage_options,
+            decode_timedelta=True,
         )
     except Exception as e:
         log.warning("Could not open result DataTree", error=str(e))
