@@ -105,34 +105,66 @@ def reencode_array(
 
 def reencode_group(
     group: zarr.Group,
-    store: Any,
+    store: zarr.storage.StoreLike,
     path: str,
     *,
     overwrite: bool = False,
     use_consolidated_for_children: bool = False,
+    omit_nodes: set[str] | None = None,
     chunk_reencoder: Callable[[zarr.Array[Any]], ChunkEncodingSpec] | None = None,
 ) -> zarr.Group:
     """
     Re-encode a Zarr group, applying a re-encoding to all sub-groups and sub-arrays.
+
+    Parameters
+    ----------
+    group : zarr.Group
+        The Zarr group to re-encode
+    store : zarr.storage.StoreLike
+        The store to write into
+    path : str
+        The path in the new store to use
+    overwrite : bool, default = False
+        Whether to overwrite contents of the new store
+    omit_nodes : set[str], default = {}
+        The names of groups or arrays to omit from re-encoding.
+    chunk_reencoder : Callable[[zarr.Array[Any], ChunkEncodingSpec]] | None, default = None
+        A function that takes a Zarr array object and returns a ChunkEncodingSpec, which is a dict
+        that defines a new chunk encoding. Use this parameter to define per-array chunk encoding
+        logic.
+
     """
+    if omit_nodes is None:
+        omit_nodes = set()
+
     log = structlog.get_logger()
 
     # Convert store-like to a proper Store object
     store_path = sync(make_store_path(store))
     store = store_path.store
 
-    all_members = dict(
+    members = dict(
         group.members(max_depth=None, use_consolidated_for_children=use_consolidated_for_children)
     )
 
-    log = structlog.get_logger()
     log.info("Begin re-encoding Zarr group %s", group)
     new_members: dict[str, ArrayV3Metadata | GroupMetadata] = {
         path: GroupMetadata(zarr_format=3, attributes=group.attrs.asdict())
     }
     chunks_to_encode: list[str] = []
-    for name, member in all_members.items():
-        log.info("re-encoding member %s", name)
+    for name in omit_nodes:
+        if not any(k.startswith(name) for k in members):
+            log.warning(
+                "The name %s was provided in omit_nodes but no such array or group exists.", name
+            )
+    for name, member in members.items():
+        if any(name.startswith(v) for v in omit_nodes):
+            log.info(
+                "Skipping node %s because it is contained in a subgroup declared in the omit_groups parameter",
+                name,
+            )
+            continue
+        log.info("Re-encoding member %s", name)
         new_path = f"{path}/{name}"
         member_attrs = member.attrs.asdict()
         if isinstance(member, zarr.Array):

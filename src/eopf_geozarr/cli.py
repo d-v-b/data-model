@@ -1159,6 +1159,9 @@ def add_s2_optimization_commands(subparsers: argparse._SubParsersAction) -> None
         choices=range(1, 10),
         help="Compression level 1-9 (default: 3)",
     )
+    s2_parser.add_argument(
+        "--omit-nodes", help="The names of groups or arrays to skip.", default="", type=str
+    )
     s2_parser.add_argument("--skip-validation", action="store_true", help="Skip output validation")
     s2_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     s2_parser.add_argument(
@@ -1189,12 +1192,15 @@ def convert_s2_optimized_command(args: argparse.Namespace) -> None:
             storage_options=storage_options,
         )
 
+        omit_nodes = set(args.omit_nodes.split())
+
         # Convert
         convert_s2_optimized(
             dt_input=dt_input,
             output_path=args.output_path,
             enable_sharding=args.enable_sharding,
             spatial_chunk=args.spatial_chunk,
+            omit_nodes=omit_nodes,
             compression_level=args.compression_level,
             validate_output=not args.skip_validation,
         )

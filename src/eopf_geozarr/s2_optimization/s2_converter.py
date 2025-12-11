@@ -206,6 +206,7 @@ def convert_s2_optimized(
     spatial_chunk: int,
     compression_level: int,
     validate_output: bool,
+    omit_nodes: set[str] | None = None,
     max_retries: int = 3,
 ) -> xr.DataTree:
     """
@@ -223,6 +224,9 @@ def convert_s2_optimized(
     Returns:
         Optimized DataTree
     """
+
+    if omit_nodes is None:
+        omit_nodes = set()
 
     start_time = time.time()
     zg = get_zarr_group(dt_input)
@@ -258,17 +262,26 @@ def convert_s2_optimized(
             return {"write_chunks": (1,) * (array.ndim - 2) + (spatial_chunk, spatial_chunk)}
         return {"write_chunks": array.chunks}
 
-    out_group = reencode_group(zg, out_store, "", overwrite=True, chunk_reencoder=chunk_reencoder)
+    out_group = reencode_group(
+        zg,
+        out_store,
+        path="",
+        overwrite=True,
+        chunk_reencoder=chunk_reencoder,
+        omit_nodes=omit_nodes,
+    )
 
-    log.info("Adding CRS elements to datasets in measurements")
-    for _, subgroup in out_group["measurements"].groups():
-        for _, dataset in subgroup.groups():
-            add_crs_and_grid_mapping(dataset, crs=crs)
+    if "measurements" not in omit_nodes:
+        log.info("Adding CRS elements to datasets in measurements")
+        for _, subgroup in out_group["measurements"].groups():
+            for _, dataset in subgroup.groups():
+                add_crs_and_grid_mapping(dataset, crs=crs)
 
-    log.info("Adding CRS elements to quality datasets")
-    for _, subgroup in out_group["quality"].groups():
-        for _, dataset in subgroup.groups():
-            add_crs_and_grid_mapping(dataset, crs=crs)
+    if "quality" not in omit_nodes:
+        log.info("Adding CRS elements to quality datasets")
+        for _, subgroup in out_group["quality"].groups():
+            for _, dataset in subgroup.groups():
+                add_crs_and_grid_mapping(dataset, crs=crs)
 
     # Step 2: Create multiscale pyramids for each group in the original structure
     log.info("Adding multiscale levels")
