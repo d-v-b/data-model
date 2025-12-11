@@ -50,7 +50,7 @@
               "dimension_names": [
                 "angle"
               ],
-              "fill_value": "0",
+              "fill_value": "",
               "node_type": "array",
               "shape": [
                 2
@@ -101,7 +101,7 @@
               "dimension_names": [
                 "band"
               ],
-              "fill_value": "0",
+              "fill_value": "",
               "node_type": "array",
               "shape": [
                 13
