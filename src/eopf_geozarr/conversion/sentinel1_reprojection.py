@@ -144,7 +144,7 @@ def _create_target_coordinates(
     x_coords = np.array([transform * (i + 0.5, 0) for i in range(width)])[:, 0]
     y_coords = np.array([transform * (0, j + 0.5) for j in range(height)])[:, 1]
 
-    coords = {
+    return {
         "x": (
             ["x"],
             x_coords,
@@ -175,8 +175,6 @@ def _create_target_coordinates(
         ),
     }
 
-    return coords
-
 
 def _determine_nodata_value(data_var: xr.DataArray) -> float | np.floating:
     """
@@ -195,9 +193,9 @@ def _determine_nodata_value(data_var: xr.DataArray) -> float | np.floating:
     # Check if nodata is already defined in attributes
     if "_FillValue" in data_var.attrs:
         return float(data_var.attrs["_FillValue"])
-    elif "missing_value" in data_var.attrs:
+    if "missing_value" in data_var.attrs:
         return float(data_var.attrs["missing_value"])
-    elif hasattr(data_var, "rio") and data_var.rio.nodata is not None:
+    if hasattr(data_var, "rio") and data_var.rio.nodata is not None:
         return float(data_var.rio.nodata)
 
     # Determine based on data type
@@ -205,15 +203,13 @@ def _determine_nodata_value(data_var: xr.DataArray) -> float | np.floating:
         # For integer types, use 0 or max value depending on data range
         if data_var.dtype == np.uint8:
             return 255.0  # Use max value for uint8
-        elif data_var.dtype == np.uint16:
+        if data_var.dtype == np.uint16:
             return 65535.0  # Use max value for uint16
-        elif data_var.dtype == np.int16:
+        if data_var.dtype == np.int16:
             return -32768.0  # Use min value for int16
-        else:
-            return 0.0  # Default for other integer types
-    else:
-        # For floating point types, use NaN
-        return np.nan
+        return 0.0  # Default for other integer types
+    # For floating point types, use NaN
+    return np.nan
 
 
 def _reproject_data_variable(
@@ -238,9 +234,7 @@ def _reproject_data_variable(
     elif data_var.ndim == 3:
         # 3D array (time, azimuth_time, ground_range)
         time_size = data_var.shape[0]
-        reprojected_data = np.full(
-            (time_size, height, width), nodata_value, dtype=data_var.dtype
-        )
+        reprojected_data = np.full((time_size, height, width), nodata_value, dtype=data_var.dtype)
 
         for t in range(time_size):
             reprojected_data[t] = _reproject_2d_array(
@@ -295,14 +289,13 @@ def _reproject_2d_array(
         dst_array = np.full((dst_height, dst_width), np.nan, dtype=np.float32)
         dst_dtype = np.float32
     else:
-        dst_array = np.full(
-            (dst_height, dst_width), nodata_value, dtype=src_array.dtype
-        )
+        dst_array = np.full((dst_height, dst_width), nodata_value, dtype=src_array.dtype)
         dst_dtype = src_array.dtype
 
     # Create a temporary in-memory rasterio dataset with GCPs
-    with rasterio.MemoryFile() as memfile:
-        with memfile.open(
+    with (
+        rasterio.MemoryFile() as memfile,
+        memfile.open(
             driver="GTiff",
             height=src_height,
             width=src_width,
@@ -310,25 +303,26 @@ def _reproject_2d_array(
             dtype=src_array.dtype,
             crs="EPSG:4326",  # GCPs are in lat/lon
             nodata=nodata_value if not np.isnan(nodata_value) else None,
-        ) as src_dataset:
-            # Write source data
-            src_dataset.write(src_array, 1)
+        ) as src_dataset,
+    ):
+        # Write source data
+        src_dataset.write(src_array, 1)
 
-            # Set GCPs
-            src_dataset.gcps = (gcps, "EPSG:4326")
+        # Set GCPs
+        src_dataset.gcps = (gcps, "EPSG:4326")
 
-            # Perform reprojection with proper nodata handling
-            reproject(
-                source=rasterio.band(src_dataset, 1),
-                destination=dst_array,
-                src_transform=src_dataset.transform,
-                src_crs=src_dataset.crs,
-                dst_transform=dst_transform,
-                dst_crs="EPSG:4326",
-                resampling=resampling,
-                src_nodata=nodata_value if not np.isnan(nodata_value) else None,
-                dst_nodata=nodata_value if not np.isnan(nodata_value) else None,
-            )
+        # Perform reprojection with proper nodata handling
+        reproject(
+            source=rasterio.band(src_dataset, 1),
+            destination=dst_array,
+            src_transform=src_dataset.transform,
+            src_crs=src_dataset.crs,
+            dst_transform=dst_transform,
+            dst_crs="EPSG:4326",
+            resampling=resampling,
+            src_nodata=nodata_value if not np.isnan(nodata_value) else None,
+            dst_nodata=nodata_value if not np.isnan(nodata_value) else None,
+        )
 
     return dst_array.astype(dst_dtype)
 

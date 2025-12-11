@@ -6,7 +6,8 @@ Uses the new pyz.GroupSpec with TypedDict members to enforce strict structure va
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Union
+from collections.abc import Mapping
+from typing import Any
 
 from pydantic import BaseModel
 from typing_extensions import TypedDict
@@ -20,7 +21,7 @@ from eopf_geozarr.pyz.v2 import ArraySpec, GroupSpec
 
 # Member type for groups with any nested structures (groups or arrays)
 # Used for groups with dynamic or variable nested structures
-AnyMembers = Mapping[str, Union[GroupSpec[Any, Any], ArraySpec[Any]]]
+AnyMembers = Mapping[str, GroupSpec[Any, Any] | ArraySpec[Any]]
 
 
 class Sentinel1DataArrayAttrs(BaseDataArrayAttrs):
@@ -40,8 +41,6 @@ class Sentinel1RootAttrs(BaseModel):
 
 class Sentinel1DataArray(ArraySpec[Sentinel1DataArrayAttrs]):
     """Sentinel-1 data array integrated with pydantic-zarr."""
-
-    pass
 
 
 # Conditions groups
@@ -917,9 +916,7 @@ class Sentinel1PolarizationGroup(GroupSpec[DatasetAttrs, Sentinel1PolarizationMe
 
 
 # Root model - uses any members since polarizations can have variable names (VH_xxx, VV_xxx)
-class Sentinel1Root(
-    GroupSpec[Sentinel1RootAttrs, dict[str, Sentinel1PolarizationGroup]]
-):
+class Sentinel1Root(GroupSpec[Sentinel1RootAttrs, dict[str, Sentinel1PolarizationGroup]]):
     """Complete Sentinel-1 EOPF Zarr hierarchy.
 
     The hierarchy follows EOPF organization with separate groups for each
@@ -938,24 +935,22 @@ class Sentinel1Root(
 
     def get_polarization_groups(self) -> dict[str, Sentinel1PolarizationGroup]:
         """Get all polarization groups (VH, VV, etc.)."""
-        pol_groups = {}
-        for name, member in self.members.items():
-            if isinstance(member, Sentinel1PolarizationGroup):
-                pol_groups[name] = member
-        return pol_groups
+        return {
+            name: member
+            for name, member in self.members.items()
+            if isinstance(member, Sentinel1PolarizationGroup)
+        }
 
     def get_vh_group(self) -> Sentinel1PolarizationGroup | None:
         """Get the VH polarization group."""
         for name, member in self.members.items():
-            if "VH" in name:
-                if isinstance(member, Sentinel1PolarizationGroup):
-                    return member
+            if "VH" in name and isinstance(member, Sentinel1PolarizationGroup):
+                return member
         return None
 
     def get_vv_group(self) -> Sentinel1PolarizationGroup | None:
         """Get the VV polarization group."""
         for name, member in self.members.items():
-            if "VV" in name:
-                if isinstance(member, Sentinel1PolarizationGroup):
-                    return member
+            if "VV" in name and isinstance(member, Sentinel1PolarizationGroup):
+                return member
         return None

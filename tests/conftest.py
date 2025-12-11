@@ -7,17 +7,11 @@ import pytest
 import xarray as xr
 from pydantic_zarr.v2 import GroupSpec
 
-s1_example_json_paths = tuple(
-    pathlib.Path("tests/test_data_api/s1_examples").glob("*.json")
-)
-s2_example_json_paths = tuple(
-    pathlib.Path("tests/test_data_api/s2_examples").glob("*.json")
-)
+s1_example_json_paths = tuple(pathlib.Path("tests/test_data_api/s1_examples").glob("*.json"))
+s2_example_json_paths = tuple(pathlib.Path("tests/test_data_api/s2_examples").glob("*.json"))
 
 
-def create_group_from_json(
-    source_path: pathlib.Path, out_path: pathlib.Path
-) -> pathlib.Path:
+def create_group_from_json(source_path: pathlib.Path, out_path: pathlib.Path) -> pathlib.Path:
     """
     Create a Zarr V2 group from a JSON model
     """
@@ -65,9 +59,7 @@ def _verify_basic_structure(output_path: pathlib.Path, groups: list[str]) -> Non
         # Check that level 0 (native resolution) exists
         level_0_path = group_path / "0"
         assert level_0_path.exists(), f"Level 0 not found for {group}"
-        assert (level_0_path / "zarr.json").exists(), (
-            f"Level 0 missing zarr.json for {group}"
-        )
+        assert (level_0_path / "zarr.json").exists(), f"Level 0 missing zarr.json for {group}"
 
 
 def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> None:
@@ -99,9 +91,7 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
             assert ds[var_name].attrs["_ARRAY_DIMENSIONS"] == list(ds[var_name].dims), (
                 f"Incorrect _ARRAY_DIMENSIONS for {var_name} in {group}"
             )
-            print(
-                f"    ✅ _ARRAY_DIMENSIONS: {ds[var_name].attrs['_ARRAY_DIMENSIONS']}"
-            )
+            print(f"    ✅ _ARRAY_DIMENSIONS: {ds[var_name].attrs['_ARRAY_DIMENSIONS']}")
 
     # Check coordinates
     for coord_name in ds.coords:
@@ -119,9 +109,9 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
             assert "standard_name" in ds[var_name].attrs, (
                 f"Missing standard_name for {var_name} in {group}"
             )
-            assert (
-                ds[var_name].attrs["standard_name"] == "toa_bidirectional_reflectance"
-            ), f"Incorrect standard_name for {var_name} in {group}"
+            assert ds[var_name].attrs["standard_name"] == "toa_bidirectional_reflectance", (
+                f"Incorrect standard_name for {var_name} in {group}"
+            )
             print(f"    ✅ standard_name: {ds[var_name].attrs['standard_name']}")
 
     # Check 3: Grid mapping attributes (required by GeoZarr spec)
@@ -143,9 +133,7 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
     assert ds["spatial_ref"].attrs["_ARRAY_DIMENSIONS"] == [], (
         f"Incorrect _ARRAY_DIMENSIONS for spatial_ref in {group}"
     )
-    print(
-        f"    ✅ spatial_ref _ARRAY_DIMENSIONS: {ds['spatial_ref'].attrs['_ARRAY_DIMENSIONS']}"
-    )
+    print(f"    ✅ spatial_ref _ARRAY_DIMENSIONS: {ds['spatial_ref'].attrs['_ARRAY_DIMENSIONS']}")
 
     # Check 5: GeoTransform attribute (from notebook verification)
     if "GeoTransform" in ds["spatial_ref"].attrs:
@@ -161,19 +149,12 @@ def _verify_geozarr_spec_compliance(output_path: pathlib.Path, group: str) -> No
 
     # Check 7: Coordinate standard names (from notebook verification)
     for coord in ["x", "y"]:
-        if coord in ds.coords:
-            if "standard_name" in ds[coord].attrs:
-                expected_name = (
-                    "projection_x_coordinate"
-                    if coord == "x"
-                    else "projection_y_coordinate"
-                )
-                assert ds[coord].attrs["standard_name"] == expected_name, (
-                    f"Incorrect standard_name for {coord} coordinate in {group}"
-                )
-                print(
-                    f"    ✅ {coord} standard_name: {ds[coord].attrs['standard_name']}"
-                )
+        if coord in ds.coords and "standard_name" in ds[coord].attrs:
+            expected_name = "projection_x_coordinate" if coord == "x" else "projection_y_coordinate"
+            assert ds[coord].attrs["standard_name"] == expected_name, (
+                f"Incorrect standard_name for {coord} coordinate in {group}"
+            )
+            print(f"    ✅ {coord} standard_name: {ds[coord].attrs['standard_name']}")
 
     ds.close()
 
@@ -189,9 +170,7 @@ def _verify_multiscale_structure(output_path: pathlib.Path, group: str) -> None:
     assert len(level_dirs) >= 1, (
         f"Expected at least 1 overview level for {group}, found {len(level_dirs)}"
     )
-    print(
-        f"    Found {len(level_dirs)} overview levels: {sorted([d.name for d in level_dirs])}"
-    )
+    print(f"    Found {len(level_dirs)} overview levels: {sorted([d.name for d in level_dirs])}")
 
     # For larger datasets, expect multiple levels
     level_0_path = str(group_path / "0")
@@ -220,9 +199,8 @@ def _verify_multiscale_structure(output_path: pathlib.Path, group: str) -> None:
         assert len(ds.data_vars) > 0, f"No data variables in {level_path}"
 
         # Verify that spatial dimensions exist
-        assert "x" in ds.dims and "y" in ds.dims, (
-            f"Missing spatial dimensions in {level_path}"
-        )
+        assert "x" in ds.dims, f"Missing 'x' dimension in {level_path}"
+        assert "y" in ds.dims, f"Missing 'y' dimension in {level_path}"
 
         # Store shape for progression verification
         level_shapes[level_num] = (ds.dims["y"], ds.dims["x"])
@@ -278,13 +256,9 @@ def _verify_rgb_data_access(output_path: pathlib.Path, groups: list[str]) -> Non
 
         # Test access to different overview levels (as in notebook)
         group_path = output_path / group.lstrip("/")
-        level_dirs = [
-            d for d in group_path.iterdir() if d.is_dir() and d.name.isdigit()
-        ]
+        level_dirs = [d for d in group_path.iterdir() if d.is_dir() and d.name.isdigit()]
 
-        for level_dir in sorted(level_dirs, key=lambda x: int(x.name))[
-            :3
-        ]:  # Test first 3 levels
+        for level_dir in sorted(level_dirs, key=lambda x: int(x.name))[:3]:  # Test first 3 levels
             level_num = int(level_dir.name)
             level_path = str(level_dir)
 
@@ -306,8 +280,6 @@ def _verify_rgb_data_access(output_path: pathlib.Path, groups: list[str]) -> Non
             assert green_data.size > 0, f"Empty green data in {group} level {level_num}"
             assert blue_data.size > 0, f"Empty blue data in {group} level {level_num}"
 
-            print(
-                f"      Level {level_num}: RGB access successful, shape {red_data.shape}"
-            )
+            print(f"      Level {level_num}: RGB access successful, shape {red_data.shape}")
 
             ds.close()

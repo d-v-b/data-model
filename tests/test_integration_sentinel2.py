@@ -8,6 +8,7 @@ docs/analysis/eopf-geozarr/EOPF_Sentinel2_ZarrV3_geozarr_compliant.ipynb
 
 import shutil
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import patch
 
@@ -221,7 +222,7 @@ def sample_sentinel2_datatree() -> xr.DataTree:
 
 
 @pytest.fixture
-def temp_output_dir():
+def temp_output_dir() -> Generator[str, None, None]:
     """Create a temporary directory for test outputs."""
     temp_dir = tempfile.mkdtemp()
     yield temp_dir
@@ -290,9 +291,7 @@ def test_complete_sentinel2_conversion_notebook_workflow(
 
 
 @pytest.mark.slow
-def test_performance_characteristics(
-    sample_sentinel2_datatree, temp_output_dir
-) -> None:
+def test_performance_characteristics(sample_sentinel2_datatree, temp_output_dir) -> None:
     """
     Test performance characteristics following notebook analysis.
 
@@ -305,9 +304,7 @@ def test_performance_characteristics(
     output_path = Path(temp_output_dir) / "sentinel2_performance_test.zarr"
 
     # Convert with performance-focused parameters
-    groups = [
-        "/measurements/reflectance/r10m"
-    ]  # Focus on one group for performance testing
+    groups = ["/measurements/reflectance/r10m"]  # Focus on one group for performance testing
 
     with patch("eopf_geozarr.conversion.geozarr.print"):
         create_geozarr_dataset(
@@ -326,9 +323,7 @@ def test_performance_characteristics(
     level_dirs = [d for d in group_path.iterdir() if d.is_dir() and d.name.isdigit()]
 
     timing_data = []
-    for level_dir in sorted(level_dirs, key=lambda x: int(x.name))[
-        :4
-    ]:  # Test first 4 levels
+    for level_dir in sorted(level_dirs, key=lambda x: int(x.name))[:4]:  # Test first 4 levels
         level_num = int(level_dir.name)
         level_path = str(level_dir)
 
@@ -344,7 +339,7 @@ def test_performance_characteristics(
             pixel_count = data.size
         else:
             # Fallback to first available data variable
-            first_var = list(ds.data_vars)[0]
+            first_var = next(iter(ds.data_vars))
             if first_var != "spatial_ref":
                 data = ds[first_var].values
                 pixel_count = data.size
@@ -354,9 +349,7 @@ def test_performance_characteristics(
         access_time = time.time() - start_time
         ds.close()
 
-        timing_data.append(
-            {"level": level_num, "time": access_time, "pixels": pixel_count}
-        )
+        timing_data.append({"level": level_num, "time": access_time, "pixels": pixel_count})
 
         print(f"    Level {level_num}: {access_time:.3f}s, {pixel_count:,} pixels")
 

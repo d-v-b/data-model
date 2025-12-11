@@ -2,8 +2,8 @@
 Tests for S2 multiscale pyramid creation with xy-aligned sharding.
 """
 
-import shutil
-import tempfile
+from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import numpy as np
@@ -20,7 +20,7 @@ from eopf_geozarr.s2_optimization.s2_multiscale import (
 
 
 @pytest.fixture
-def sample_dataset():
+def sample_dataset() -> xr.Dataset:
     """Create a sample xarray dataset for testing."""
     x = np.linspace(0, 1000, 100)
     y = np.linspace(0, 1000, 100)
@@ -48,23 +48,13 @@ def sample_dataset():
         name="scl",
     )
 
-    dataset = xr.Dataset({"b02": b02, "b05": b05, "scl": scl})
-
-    return dataset
-
-
-@pytest.fixture
-def temp_dir():
-    """Create a temporary directory for testing."""
-    temp_dir = tempfile.mkdtemp()
-    yield temp_dir
-    shutil.rmtree(temp_dir)
+    return xr.Dataset({"b02": b02, "b05": b05, "scl": scl})
 
 
 class TestS2MultiscaleFunctions:
     """Test suite for S2 multiscale functions."""
 
-    def test_calculate_simple_shard_dimensions(self):
+    def test_calculate_simple_shard_dimensions(self) -> None:
         """Test simplified shard dimensions calculation."""
         # Test 3D data (time, y, x) - shards are multiples of chunks
         data_shape = (5, 1024, 1024)
@@ -85,12 +75,10 @@ class TestS2MultiscaleFunctions:
 
         assert len(shard_dims) == 2
         # Should use largest multiple of chunk_size that fits
-        assert (
-            shard_dims[0] == 768
-        )  # 3 * 256 = 768 (largest multiple that fits in 1000)
+        assert shard_dims[0] == 768  # 3 * 256 = 768 (largest multiple that fits in 1000)
         assert shard_dims[1] == 768  # 3 * 256 = 768
 
-    def test_create_measurements_encoding(self, sample_dataset):
+    def test_create_measurements_encoding(self, sample_dataset: xr.Dataset) -> None:
         """Test measurements encoding creation with xy-aligned sharding."""
         encoding = create_measurements_encoding(
             sample_dataset, enable_sharding=True, spatial_chunk=1024
@@ -118,7 +106,7 @@ class TestS2MultiscaleFunctions:
                     or encoding[coord_name].get("compressors") is None
                 )
 
-    def test_create_measurements_encoding_time_chunking(self, sample_dataset):
+    def test_create_measurements_encoding_time_chunking(self, sample_dataset: xr.Dataset) -> None:
         """Test that time dimension is chunked to 1 for single file per time."""
         encoding = create_measurements_encoding(
             sample_dataset, enable_sharding=True, spatial_chunk=1024
@@ -129,7 +117,7 @@ class TestS2MultiscaleFunctions:
                 chunks = encoding[var_name]["chunks"]
                 assert chunks[0] == 1  # Time dimension should be chunked to 1
 
-    def test_calculate_aligned_chunk_size(self):
+    def test_calculate_aligned_chunk_size(self) -> None:
         """Test aligned chunk size calculation."""
         # Test with spatial_chunk that divides evenly
         chunk_size = calculate_aligned_chunk_size(1024, 256)
@@ -145,7 +133,7 @@ class TestS2MultiscaleIntegration:
     """Integration tests for S2 multiscale functions."""
 
     @pytest.fixture
-    def simple_datatree(self):
+    def simple_datatree(self) -> xr.DataTree:
         """Create a simple DataTree for integration testing."""
         # Create sample data
         x = np.linspace(0, 1000, 100)
@@ -172,8 +160,8 @@ class TestS2MultiscaleIntegration:
 
     @patch("eopf_geozarr.s2_optimization.s2_multiscale.stream_write_dataset")
     def test_create_multiscale_from_datatree(
-        self, mock_write, simple_datatree, tmp_path
-    ):
+        self, mock_write: Any, simple_datatree: xr.DataTree, tmp_path: Path
+    ) -> None:
         """Test multiscale creation from DataTree."""
         output_path = str(tmp_path / "output.zarr")
 

@@ -19,7 +19,8 @@ class MyGroup(GroupSpec[Any, MyMembers])
 
 from __future__ import annotations
 
-from typing import Any, Generic, Mapping, TypeAlias, TypeVar, Union
+from collections.abc import Mapping
+from typing import Any, Generic, TypeAlias, TypeVar, Union
 
 from pydantic_zarr.v2 import ArraySpec as ArraySpecV2
 from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
@@ -53,7 +54,7 @@ class GroupSpec(GroupSpecV2[TAttr, TMembers]):
         """Return an HTML representation for Jupyter/IPython."""
         class_name = self.__class__.__name__
         member_names = get_member_names(self.members)
-        members_dict = {k: v for k, v in self.members.items()} if self.members else None
+        members_dict = dict(self.members.items()) if self.members else None
         return format_html_repr(
             class_name,
             member_names,

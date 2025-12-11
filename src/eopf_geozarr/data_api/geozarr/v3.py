@@ -66,5 +66,3 @@ class MultiscaleGroup(GroupSpec[MultiscaleGroupAttrs, DataArray | GroupSpec[Any,
     """
     A GeoZarr Multiscale Group.
     """
-
-    ...

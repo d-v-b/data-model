@@ -25,19 +25,18 @@ from eopf_geozarr.data_api.s2 import (
 )
 
 __all__ = [
-    # Type literals
-    "BandName",
-    "QualityDataName",
-    "ResolutionLevel",
-    "VariableType",
     # Constants
     "ALL_BAND_NAMES",
     "NATIVE_BANDS",
     "RESOLUTION_TO_METERS",
+    # Type literals
+    "BandName",
+    "QualityDataName",
+    "ResolutionLevel",
     # Models
     "Sentinel2BandInfo",
-    "Sentinel2CoordinateArray",
     "Sentinel2ConditionsGroup",
+    "Sentinel2CoordinateArray",
     "Sentinel2DataArray",
     "Sentinel2MeasurementsGroup",
     "Sentinel2QualityGroup",
@@ -45,4 +44,5 @@ __all__ = [
     "Sentinel2ResolutionDataset",
     "Sentinel2Root",
     "Sentinel2RootAttrs",
+    "VariableType",
 ]

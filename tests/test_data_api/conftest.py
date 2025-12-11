@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def example_group() -> Group:
     meta = _load_geozarr_file("sentinel_2.json")
-    example_group = open_group(
+    return open_group(
         store={
             "zarr.json": default_buffer_prototype().buffer.from_bytes(
                 json.dumps(meta).encode("utf-8")
@@ -28,14 +28,13 @@ def example_group() -> Group:
         },
         mode="r",
     )
-    return example_group
 
 
 def _load_geozarr_file(filename: str) -> dict[str, Any]:
     """Load an example Geozarr group metadata file from the geozarr_examples directory."""
     examples_dir = Path(__file__).parent / "geozarr_examples"
     file_path = examples_dir / filename
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         return json.load(f)
 
 
@@ -43,7 +42,7 @@ def _load_projjson_file(filename: str) -> dict[str, Any]:
     """Load a PROJ JSON file from the projjson_examples directory."""
     examples_dir = Path(__file__).parent / "projjson_examples"
     file_path = examples_dir / filename
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         return json.load(f)
 
 
@@ -115,7 +114,7 @@ def all_projjson_examples() -> list[dict[str, Any]]:
     examples_dir = Path(__file__).parent / "projjson_examples"
     examples = []
     for json_file in examples_dir.glob("*.json"):
-        with open(json_file, "r") as f:
+        with open(json_file) as f:
             examples.append(json.load(f))
     return examples
 
@@ -168,23 +167,17 @@ def extract_json_code_blocks(
     return code_blocks
 
 
-@pytest.fixture()
+@pytest.fixture
 def proj_attrs_examples() -> dict[tuple[int, int], dict[str, object]]:
     """
     Extract JSON code blocks from the proj extension README.md.
     """
-    spec_md = (
-        Path(__file__).parent.parent.parent
-        / "attributes"
-        / "geo"
-        / "proj"
-        / "README.md"
-    )
+    spec_md = Path(__file__).parent.parent.parent / "attributes" / "geo" / "proj" / "README.md"
     content = spec_md.read_text(encoding="utf-8")
     return extract_json_code_blocks(content)
 
 
-@pytest.fixture()
+@pytest.fixture
 def json_code_blocks_from_readme(
     request: pytest.FixtureRequest,
 ) -> dict[tuple[int, int], dict[str, object]]:
@@ -194,18 +187,14 @@ def json_code_blocks_from_readme(
     return extract_json_code_blocks(content)
 
 
-def _load_json_examples(
-    *, prefix: Path, glob_str: str = "*.json"
-) -> dict[str, dict[str, object]]:
+def _load_json_examples(*, prefix: Path, glob_str: str = "*.json") -> dict[str, dict[str, object]]:
     """
     Loads JSON examples from a prefix / directory. By default all files ending with .json are collected.
     """
     return {path.name: json.loads(path.read_text()) for path in prefix.glob(glob_str)}
 
 
-GEOPROJ_EXAMPLES = _load_json_examples(
-    prefix=Path(__file__).parent / "geoproj_examples"
-)
+GEOPROJ_EXAMPLES = _load_json_examples(prefix=Path(__file__).parent / "geoproj_examples")
 
 
 def view_json_diff(
@@ -244,9 +233,7 @@ def json_eq(a: object, b: object) -> bool:
 
     # both are sequences → compare element-wise
     if isinstance(a, seq_types) and isinstance(b, seq_types):
-        return len(a) == len(b) and all(
-            json_eq(x, y) for x, y in zip(a, b, strict=False)
-        )
+        return len(a) == len(b) and all(json_eq(x, y) for x, y in zip(a, b, strict=False))
 
     # recurse into mappings
     if isinstance(a, Mapping) and isinstance(b, Mapping):

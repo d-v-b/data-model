@@ -44,12 +44,7 @@ def normalize_s3_path(s3_path: str) -> str:
     normalized_parts = [part for part in parts if part]
 
     # Reconstruct the path
-    if normalized_parts:
-        normalized_path = scheme + "/".join(normalized_parts)
-    else:
-        normalized_path = scheme
-
-    return normalized_path
+    return scheme + "/".join(normalized_parts) if normalized_parts else scheme
 
 
 def is_s3_path(path: str) -> bool:
@@ -113,9 +108,7 @@ def get_s3_storage_options(s3_path: str, **s3_kwargs: Any) -> S3FsOptions:
     default_s3_kwargs: S3FsOptions = {
         "anon": False,  # Use credentials
         "use_ssl": True,
-        "client_kwargs": {
-            "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-        },
+        "client_kwargs": {"region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")},
     }
 
     # Add custom endpoint support (e.g., for OVH Cloud)
@@ -176,16 +169,13 @@ def normalize_path(path: str) -> str:
     """
     if is_s3_path(path):
         return normalize_s3_path(path)
-    else:
-        # For local paths, normalize by removing double slashes and cleaning up
-        import os.path
+    # For local paths, normalize by removing double slashes and cleaning up
+    import os.path
 
-        return os.path.normpath(path)
+    return os.path.normpath(path)
 
 
-def write_s3_json_metadata(
-    s3_path: str, metadata: Mapping[str, Any], **s3_kwargs: Any
-) -> None:
+def write_s3_json_metadata(s3_path: str, metadata: Mapping[str, Any], **s3_kwargs: Any) -> None:
     """
     Write JSON metadata directly to S3.
 
@@ -206,9 +196,7 @@ def write_s3_json_metadata(
         "anon": False,
         "use_ssl": True,
         "asynchronous": False,  # Force synchronous mode
-        "client_kwargs": {
-            "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-        },
+        "client_kwargs": {"region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")},
     }
 
     # Add custom endpoint support (e.g., for OVH Cloud)
@@ -248,9 +236,7 @@ def read_s3_json_metadata(s3_path: str, **s3_kwargs: Any) -> dict[str, Any]:
         "anon": False,
         "use_ssl": True,
         "asynchronous": False,  # Force synchronous mode
-        "client_kwargs": {
-            "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-        },
+        "client_kwargs": {"region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")},
     }
 
     # Add custom endpoint support (e.g., for OVH Cloud)
@@ -290,9 +276,7 @@ def s3_path_exists(s3_path: str, **s3_kwargs: Any) -> bool:
         "anon": False,
         "use_ssl": True,
         "asynchronous": False,  # Force synchronous mode
-        "client_kwargs": {
-            "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-        },
+        "client_kwargs": {"region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")},
     }
 
     # Add custom endpoint support (e.g., for OVH Cloud)
@@ -328,9 +312,7 @@ def open_s3_zarr_group(s3_path: str, mode: str = "r", **s3_kwargs: Any) -> zarr.
         Zarr group
     """
     storage_options = get_s3_storage_options(s3_path, **s3_kwargs)
-    return zarr.open_group(
-        s3_path, mode=mode, zarr_format=3, storage_options=storage_options
-    )
+    return zarr.open_group(s3_path, mode=mode, zarr_format=3, storage_options=storage_options)
 
 
 def get_s3_credentials_info() -> S3Credentials:
@@ -344,9 +326,7 @@ def get_s3_credentials_info() -> S3Credentials:
     """
     return {
         "aws_access_key_id": "***" if os.environ.get("AWS_ACCESS_KEY_ID") else None,
-        "aws_secret_access_key": "***"
-        if os.environ.get("AWS_SECRET_ACCESS_KEY")
-        else None,
+        "aws_secret_access_key": "***" if os.environ.get("AWS_SECRET_ACCESS_KEY") else None,
         "aws_session_token": "***" if os.environ.get("AWS_SESSION_TOKEN") else None,
         "aws_default_region": os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
         "aws_profile": os.environ.get("AWS_PROFILE"),
@@ -377,9 +357,7 @@ def validate_s3_access(s3_path: str, **s3_kwargs: Any) -> tuple[bool, str | None
             "anon": False,
             "use_ssl": True,
             "asynchronous": False,  # Force synchronous mode
-            "client_kwargs": {
-                "region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-            },
+            "client_kwargs": {"region_name": os.environ.get("AWS_DEFAULT_REGION", "us-east-1")},
         }
 
         # Add custom endpoint support (e.g., for OVH Cloud)
@@ -395,10 +373,10 @@ def validate_s3_access(s3_path: str, **s3_kwargs: Any) -> tuple[bool, str | None
         # Try to list the bucket to check access
         fs.ls(f"s3://{bucket}", detail=False)
 
-        return True, None
-
     except Exception as e:
         return False, str(e)
+    else:
+        return True, None
 
 
 def get_filesystem(path: str, **kwargs: Any) -> LocalFileSystem | S3FileSystem:
@@ -422,9 +400,8 @@ def get_filesystem(path: str, **kwargs: Any) -> LocalFileSystem | S3FileSystem:
         # Get S3 storage options and use them for fsspec
         storage_options = get_s3_storage_options(path, **kwargs)
         return S3FileSystem(**storage_options)
-    else:
-        # For local paths, use the local filesystem
-        return LocalFileSystem(**kwargs)
+    # For local paths, use the local filesystem
+    return LocalFileSystem(**kwargs)
 
 
 def write_json_metadata(path: str, metadata: dict[str, Any], **kwargs: Any) -> None:
@@ -519,6 +496,4 @@ def open_zarr_group(path: str, mode: str = "r", **kwargs: Any) -> zarr.Group:
         Zarr group
     """
     storage_options = get_storage_options(path, **kwargs)
-    return zarr.open_group(
-        path, mode=mode, zarr_format=3, storage_options=storage_options
-    )
+    return zarr.open_group(path, mode=mode, zarr_format=3, storage_options=storage_options)
