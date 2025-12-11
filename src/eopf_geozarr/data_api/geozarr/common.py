@@ -24,10 +24,10 @@ from pydantic import AfterValidator, BaseModel, Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import Protocol, TypedDict, runtime_checkable
 
+from eopf_geozarr.data_api.geozarr.projjson import ProjJSON  # noqa: TC001
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
-
-    from eopf_geozarr.data_api.geozarr.projjson import ProjJSON
 
 
 @dataclass(frozen=True)
