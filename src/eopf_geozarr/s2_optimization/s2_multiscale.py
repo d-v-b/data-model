@@ -598,9 +598,7 @@ def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int)
             continue
         var_typ = determine_variable_type(var_name, var_data)
         if var_typ == "quality_mask":
-            lazy_downsampled = (
-                var_data.coarsen({"x": factor, "y": factor}, boundary="trim").max().sdyupr
-            )
+            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").max()
         elif var_typ == "reflectance":
             lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").mean()
         elif var_typ == "classification":
