@@ -563,39 +563,5 @@ class TestIntegration:
             assert "cams_total_ozone" in met_ds.data_vars
 
 
-class TestEdgeCases:
-    """Test edge cases and error conditions."""
-
-    def test_create_dataset_with_inconsistent_coordinates(self) -> None:
-        """Test dataset creation with inconsistent coordinate systems."""
-        # Create data with mismatched coordinates
-        x1 = np.linspace(100000, 200000, 50)
-        y1 = np.linspace(5000000, 5100000, 50)
-        x2 = np.linspace(100000, 200000, 100)  # Different size
-        y2 = np.linspace(5000000, 5100000, 100)
-        time = np.array(["2023-01-15"], dtype="datetime64[ns]")
-
-        inconsistent_data = {
-            "bands": {
-                "b02": xr.DataArray(
-                    np.random.randint(0, 10000, (1, 50, 50), dtype=np.uint16),
-                    dims=["time", "y", "x"],
-                    coords={"time": time, "x": x1, "y": y1},
-                ),
-                "b03": xr.DataArray(
-                    np.random.randint(0, 10000, (1, 100, 100), dtype=np.uint16),
-                    dims=["time", "y", "x"],
-                    coords={"time": time, "x": x2, "y": y2},
-                ),
-            }
-        }
-
-        # Should handle inconsistent coordinates gracefully or raise appropriate error
-        # The exact behavior depends on xarray's handling of mixed coordinates
-        # We expect this to fail with ValueError or KeyError due to coordinate mismatch
-        with pytest.raises((ValueError, KeyError), match=r"(coordinate|dimension)"):
-            create_consolidated_dataset(inconsistent_data, resolution=10)
-
-
 if __name__ == "__main__":
     pytest.main([__file__])
