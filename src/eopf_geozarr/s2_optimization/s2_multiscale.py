@@ -5,6 +5,7 @@ Uses lazy evaluation to minimize memory usage during dataset preparation.
 
 from __future__ import annotations
 
+from itertools import pairwise
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -35,6 +36,7 @@ from .s2_resampling import determine_variable_type, downsample_variable
 if TYPE_CHECKING:
     from collections.abc import Hashable, Mapping
 
+    import zarr
     from pyproj import CRS
 
     from eopf_geozarr.types import OverviewLevelJSON
@@ -60,218 +62,41 @@ def get_grid_spacing(ds: xr.DataArray, coords: tuple[Hashable, ...]) -> tuple[fl
     return tuple(np.abs(ds.coords[coord][0].data - ds.coords[coord][1].data) for coord in coords)
 
 
-def create_multiscale_from_datatree(
-    dt_input: xr.DataTree,
-    output_path: str,
-    enable_sharding: bool,
-    spatial_chunk: int,
-    crs: CRS | None = None,
-) -> dict[str, dict]:
+def create_multiscale_levels(group: zarr.Group, path: str) -> None:
     """
-    Create multiscale versions preserving original structure.
-    Keeps all original groups, adds r120m, r360m, r720m downsampled versions.
-
-    Args:
-        dt_input: Input DataTree with original structure
-        output_path: Base output path
-        enable_sharding: Enable Zarr v3 sharding
-        spatial_chunk: Spatial chunk size
-        crs: Coordinate Reference System for datasets
-
-    Returns:
-        Dictionary of processed groups
+    Add additional multiscale levels to an existing Zarr group
     """
-    processed_groups = {}
+    ds_levels = (1, 2, 6, 12, 36, 72)
+    ds_group_names = tuple(f"r{10 * x}m" for x in ds_levels)
 
-    # Step 1: Copy all original groups as-is
-    for group_path in dt_input.groups:
-        if group_path == ".":
-            continue
+    # Construct the full path to the group containing resolution levels
+    full_path = f"{group.path}/{path}" if group.path else path
 
-        group_node = dt_input[group_path]
+    # Load the datatree to check which groups exist
+    dt = xr.open_datatree(group.store, engine="zarr")
 
-        # Skip parent groups that have children (only process leaf groups)
-        if hasattr(group_node, "children") and len(group_node.children) > 0:
-            continue
+    for (cur_factor, cur_group_name), (next_factor, next_group_name) in pairwise(
+        zip(ds_levels, ds_group_names, strict=True)
+    ):
+        # Open the current resolution level as a dataset
+        cur_group_path = f"{full_path}/{cur_group_name}"
+        cur_ds = xr.open_dataset(group.store, group=cur_group_path, engine="zarr")
 
-        dataset = group_node.to_dataset()
-
-        # Skip empty groups
-        if not dataset.data_vars:
-            log.info("Skipping empty group: {}", group_path=group_path)
-            continue
-
-        log.info("Copying original group: {}", group_path=group_path)
-
-        output_group_path = f"{output_path}{group_path}"
-
-        # Determine if this is a measurement-related resolution group
-        group_name = group_path.split("/")[-1]
-        is_measurement_group = (
-            group_name.startswith("r")
-            and group_name.endswith("m")
-            and "/measurements/" in group_path
+        scale = next_factor // cur_factor
+        to_downsample: dict[str, xr.DataArray] = {}
+        for var_name, var in cur_ds.data_vars.items():
+            # Check if the variable already exists in the next level
+            next_level_path = f"{path}/{next_group_name}"
+            if next_level_path not in dt or var_name not in dt[next_level_path].data_vars:
+                to_downsample[var_name] = var
+        log.info("downsampling %s into %s", to_downsample, next_group_name)
+        downsampled_ds = create_downsampled_resolution_group(
+            xr.Dataset(data_vars=to_downsample, coords=cur_ds.coords), factor=scale
         )
-
-        if is_measurement_group:
-            # Measurement groups: apply custom encoding
-            encoding = create_measurements_encoding(
-                dataset, spatial_chunk=spatial_chunk, enable_sharding=enable_sharding
-            )
-        else:
-            # Non-measurement groups: preserve original chunking
-            encoding = create_original_encoding(dataset)
-        ds_out = stream_write_dataset(
-            dataset,
-            output_group_path,
-            encoding,
-            enable_sharding=enable_sharding,
-            crs=crs,
+        next_group_path = f"{full_path}/{next_group_name}"
+        downsampled_ds.to_zarr(
+            group.store, group=next_group_path, consolidated=False, mode="a", compute=True
         )
-        processed_groups[group_path] = ds_out
-
-    # Step 2: Create downsampled resolution groups ONLY for measurements
-    # Find all resolution-based groups under /measurements/ and organize by base path
-    resolution_groups = {}
-    base_path = "/measurements/reflectance"
-    for group_path in processed_groups:
-        # Only process groups under /measurements/reflectance
-        if not group_path.startswith(base_path):
-            continue
-
-        group_name = group_path.split("/")[-1]
-        if group_name in ["r10m", "r20m", "r60m"]:
-            resolution_groups[group_name] = processed_groups[group_path]
-
-    # Find the coarsest resolution (r60m > r20m > r10m)
-    source_dataset = None
-    source_resolution = None
-
-    for res in ["r60m", "r20m", "r10m"]:
-        if res in resolution_groups:
-            source_dataset = resolution_groups[res]
-            source_resolution = int(res[1:-1])  # Extract number
-            break
-
-    if not source_dataset or source_resolution is None:
-        log.info("No source resolution found for downsampling, skipping downsampled levels")
-        return processed_groups  # Stop processing if no valid source dataset is found
-
-    log.info(
-        "Creating downsampled versions",
-        source_dataset=source_dataset,
-        source_resolution=source_resolution,
-    )
-
-    # Create r120m
-    try:
-        r120m_path = f"{base_path}/r120m"
-        factor = 120 // source_resolution
-        log.info("Creating r120m with factor {}", factor=factor)
-
-        r120m_dataset = create_downsampled_resolution_group(source_dataset, factor=factor).compute()
-
-        if r120m_dataset and len(r120m_dataset.data_vars) > 0:
-            output_path_120 = f"{output_path}{r120m_path}"
-            log.info("Writing r120m to {}", output_path_120=output_path_120)
-            encoding_120 = create_measurements_encoding(r120m_dataset, spatial_chunk=spatial_chunk)
-            ds_120 = stream_write_dataset(
-                r120m_dataset,
-                output_path_120,
-                encoding_120,
-                enable_sharding=enable_sharding,
-                crs=crs,
-            )
-            processed_groups[r120m_path] = ds_120
-            resolution_groups["r120m"] = ds_120
-
-            # Create r360m from r120m
-            try:
-                r360m_path = f"{base_path}/r360m"
-                log.info("Creating r360m with factor 3")
-
-                r360m_dataset = create_downsampled_resolution_group(
-                    r120m_dataset, factor=3
-                ).compute()
-
-                if r360m_dataset and len(r360m_dataset.data_vars) > 0:
-                    output_path_360 = f"{output_path}{r360m_path}"
-                    log.info("Writing r360m to {}", output_path_360=output_path_360)
-                    encoding_360 = create_measurements_encoding(
-                        r360m_dataset, spatial_chunk=spatial_chunk
-                    )
-                    ds_360 = stream_write_dataset(
-                        r360m_dataset,
-                        output_path_360,
-                        encoding_360,
-                        enable_sharding=enable_sharding,
-                        crs=crs,
-                    )
-                    processed_groups[r360m_path] = ds_360
-                    resolution_groups["r360m"] = ds_360
-
-                    # Create r720m from r360m
-                    try:
-                        r720m_path = f"{base_path}/r720m"
-                        log.info("    Creating r720m with factor 2")
-
-                        r720m_dataset = create_downsampled_resolution_group(
-                            r360m_dataset, factor=2
-                        ).compute()
-
-                        if r720m_dataset and len(r720m_dataset.data_vars) > 0:
-                            output_path_720 = f"{output_path}{r720m_path}"
-
-                            log.info(
-                                "    Writing r720m to {}",
-                                output_path_720=output_path_720,
-                            )
-                            encoding_720 = create_measurements_encoding(
-                                r720m_dataset,
-                                spatial_chunk=spatial_chunk,
-                                enable_sharding=enable_sharding,
-                            )
-                            ds_720 = stream_write_dataset(
-                                r720m_dataset,
-                                output_path_720,
-                                encoding_720,
-                                enable_sharding=enable_sharding,
-                                crs=crs,
-                            )
-                            processed_groups[r720m_path] = ds_720
-                            resolution_groups["r720m"] = ds_720
-                        else:
-                            log.info("    r720m dataset is empty, skipping")
-                    except Exception as e:
-                        log.warning(
-                            "Could not create r720m",
-                            base_path=base_path,
-                            error=str(e),
-                        )
-                else:
-                    log.info("    r360m dataset is empty, skipping")
-            except Exception as e:
-                log.warning("Could not create r360m for {}: {}", base_path=base_path, e=e)
-            # Track r120m for multiscales if created
-
-            log.info("Tracking r120m for multiscales metadata")
-        else:
-            log.info("r120m dataset is empty, skipping")
-    except Exception as e:
-        log.warning("Could not create r120m for {}: {}", base_path=base_path, e=e)
-
-    # Step 3: Add multiscales metadata to parent groups
-    log.info("Adding multiscales metadata to parent groups")
-
-    dt_multiscale = add_multiscales_metadata_to_parent(
-        output_path,
-        base_path,
-        resolution_groups,
-        multiscales_flavor={"ogc_tms", "experimental_multiscales_convention"},
-    )
-    processed_groups[base_path] = dt_multiscale
-
-    return processed_groups
 
 
 def create_measurements_encoding(
@@ -582,47 +407,35 @@ def create_original_encoding(dataset: xr.Dataset) -> dict[str, XarrayDataArrayEn
 
 def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int) -> xr.Dataset:
     """Create a downsampled version of a dataset by given factor."""
-    if not source_dataset or len(source_dataset.data_vars) == 0:
-        return xr.Dataset()
 
-    # Get reference dimensions
-    ref_var = next(iter(source_dataset.data_vars.values()))
-    if ref_var.ndim < 2:
-        return xr.Dataset()
-
-    current_height, current_width = ref_var.shape[-2:]
-    target_height = current_height // factor
-    target_width = current_width // factor
-
-    if target_height < 1 or target_width < 1:
-        return xr.Dataset()
-
-    # Downsample all variables using existing lazy operations
-    lazy_vars = {}
+    # Downsample all variables
+    lazy_vars: dict[str, xr.DataArray] = {}
     for var_name, var_data in source_dataset.data_vars.items():
-        if var_data.ndim < 2:
-            continue
-        var_typ = determine_variable_type(var_name, var_data)
-        if var_typ == "quality_mask":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").max()
-        elif var_typ == "reflectance":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").mean()
-        elif var_typ == "classification":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").reduce(
-                subsample_2
-            )
-        elif var_typ == "probability":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").mean()
-        else:
-            raise ValueError(f"Unknown variable type {var_typ}")
+        if var_data.ndim >= 2:
+            var_typ = determine_variable_type(var_name, var_data)
+            if var_typ == "quality_mask":
+                lazy_downsampled = var_data.coarsen(
+                    {"x": factor, "y": factor}, boundary="trim"
+                ).max()
+            elif var_typ == "reflectance":
+                lazy_downsampled = var_data.coarsen(
+                    {"x": factor, "y": factor}, boundary="trim"
+                ).mean()
+            elif var_typ == "classification":
+                lazy_downsampled = var_data.coarsen(
+                    {"x": factor, "y": factor}, boundary="trim"
+                ).reduce(subsample_2)
+            elif var_typ == "probability":
+                lazy_downsampled = var_data.coarsen(
+                    {"x": factor, "y": factor}, boundary="trim"
+                ).mean()
+            else:
+                raise ValueError(f"Unknown variable type {var_typ}")
 
-        # preserve encoding
-        lazy_downsampled.encoding = var_data.encoding
-        # Ensure that dtype is preserved
-        lazy_vars[var_name] = lazy_downsampled.astype(var_data.dtype)
-
-    if not lazy_vars:
-        return xr.Dataset()
+            # preserve encoding
+            lazy_downsampled.encoding = var_data.encoding
+            # Ensure that dtype is preserved
+            lazy_vars[var_name] = lazy_downsampled.astype(var_data.dtype)
 
     # Create dataset with lazy variables and coordinates
     return xr.Dataset(lazy_vars, attrs=source_dataset.attrs)

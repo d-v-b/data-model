@@ -87,6 +87,7 @@ class TestConvenienceFunction:
     """Test the convenience function."""
 
     @pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
+    @pytest.mark.filterwarnings("ignore:Failed to open Zarr store with consolidated metadata:RuntimeWarning")
     def test_convert_s2_optimized_convenience_function(
         self,
         s2_group_example: Path,

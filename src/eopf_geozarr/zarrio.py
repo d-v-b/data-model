@@ -10,13 +10,14 @@ import numcodecs
 import structlog
 import zarr
 from zarr.core.group import GroupMetadata
+from zarr.core.metadata.v3 import ArrayV3Metadata
 from zarr.core.sync import sync
 from zarr.storage._common import make_store_path
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
-    from zarr.core.metadata.v3 import ArrayV3Metadata
+    from zarr.core.metadata.v2 import ArrayV2Metadata
 
 
 class ChunkEncodingSpec(TypedDict):
@@ -60,7 +61,7 @@ def reencode_array(
     dimension_names: None | tuple[str | None, ...] = None,
     attributes: Mapping[str, object] | None = None,
     chunking: ChunkEncodingSpec | None = None,
-) -> zarr.core.metadata.v3.ArrayV3Metadata:
+) -> ArrayV3Metadata:
     """
     Re-encode a zarr array into a new zarr v3 array.
     """
@@ -88,7 +89,7 @@ def reencode_array(
     else:
         codecs = ({"name": "bytes"}, *new_codecs)  # type: ignore[assignment]
 
-    return zarr.core.metadata.v3.ArrayV3Metadata(
+    return ArrayV3Metadata(
         shape=array.shape,
         data_type=array.metadata.dtype,
         chunk_key_encoding={"name": "default", "configuration": {"separator": "/"}},
@@ -111,7 +112,7 @@ def reencode_group(
     overwrite: bool = False,
     use_consolidated_for_children: bool = False,
     omit_nodes: set[str] | None = None,
-    chunk_reencoder: Callable[[zarr.Array[Any]], ChunkEncodingSpec] | None = None,
+    array_reencoder: Callable[[ArrayV2Metadata], ArrayV3Metadata] | None = None,
 ) -> zarr.Group:
     """
     Re-encode a Zarr group, applying a re-encoding to all sub-groups and sub-arrays.
@@ -166,19 +167,9 @@ def reencode_group(
             continue
         log.info("Re-encoding member %s", name)
         new_path = f"{path}/{name}"
-        member_attrs = member.attrs.asdict()
         if isinstance(member, zarr.Array):
-            if "_ARRAY_DIMENSIONS" in member.attrs:
-                dimension_names = member_attrs.pop("_ARRAY_DIMENSIONS")
-            else:
-                dimension_names = None
-            chunking = None if chunk_reencoder is None else chunk_reencoder(member)
-            new_members[new_path] = reencode_array(
-                member,
-                dimension_names=dimension_names,
-                attributes=member_attrs,
-                chunking=chunking,
-            )
+            new_meta = array_reencoder(array.metadata)
+            new_members[new_path] = new_meta
             chunks_to_encode.append(name)
         else:
             new_members[new_path] = GroupMetadata(

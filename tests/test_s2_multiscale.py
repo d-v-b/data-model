@@ -2,20 +2,20 @@
 Tests for S2 multiscale pyramid creation with xy-aligned sharding.
 """
 
-from pathlib import Path
-from typing import Any
-from unittest.mock import patch
+from typing import TypedDict
 
 import numpy as np
 import pytest
 import xarray as xr
+import zarr
+from pydantic_zarr.experimental.v3 import ArraySpec, GroupSpec
 from structlog.testing import capture_logs
 
 from eopf_geozarr.s2_optimization.s2_multiscale import (
     calculate_aligned_chunk_size,
     calculate_simple_shard_dimensions,
     create_measurements_encoding,
-    create_multiscale_from_datatree,
+    create_multiscale_levels,
 )
 
 
@@ -133,8 +133,10 @@ class TestS2MultiscaleIntegration:
     """Integration tests for S2 multiscale functions."""
 
     @pytest.fixture
-    def simple_datatree(self) -> xr.DataTree:
-        """Create a simple DataTree for integration testing."""
+    def simple_datatree(self) -> zarr.Group:
+        """Create a simple DataTree for integration testing, and save it to an in-memory zarr group"""
+        store = {}
+        group = zarr.create_group(store)
         # Create sample data
         x = np.linspace(0, 1000, 100)
         y = np.linspace(0, 1000, 100)
@@ -155,36 +157,39 @@ class TestS2MultiscaleIntegration:
         # Create DataTree
         dt = xr.DataTree(name="root")
         dt["/measurements/reflectance/r10m"] = xr.DataTree(ds)
+        dt.to_zarr(group.store, compute=True, mode="w", consolidated=False)
 
-        return dt
+        return group
 
-    @patch("eopf_geozarr.s2_optimization.s2_multiscale.stream_write_dataset")
-    def test_create_multiscale_from_datatree(
-        self, mock_write: Any, simple_datatree: xr.DataTree, tmp_path: Path
-    ) -> None:
+    @pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
+    def test_create_multiscale_from_datatree(self, simple_datatree: zarr.Group) -> None:
         """Test multiscale creation from DataTree."""
-        output_path = str(tmp_path / "output.zarr")
 
-        # Mock the write to avoid actual file I/O
-        mock_write.return_value = xr.Dataset({"b02": xr.DataArray([1, 2, 3])})
+        class DatasetMembers(TypedDict):
+            x: ArraySpec
+            y: ArraySpec
+            time: ArraySpec
+            b02: ArraySpec
+
+        class DatasetGroup(GroupSpec):
+            members: DatasetMembers
+
+        class ExpectedMembers(TypedDict):
+            r10m: DatasetGroup
+            r20m: DatasetGroup
+            r60m: DatasetGroup
+            r120m: DatasetGroup
+            r360m: DatasetGroup
+            r720m: DatasetGroup
+
+        class ExpectedGroup(GroupSpec):
+            members: ExpectedMembers
 
         # Capture log output using structlog's testing context manager
-        with capture_logs() as cap_logs:
-            result = create_multiscale_from_datatree(
-                simple_datatree,
-                output_path,
-                enable_sharding=True,
-                spatial_chunk=256,
-            )
+        with capture_logs():
+            create_multiscale_levels(simple_datatree, path="measurements/reflectance")
 
-        # Should process groups
-        assert isinstance(result, dict)
-        # At minimum, should write the original group
-        assert mock_write.call_count >= 1
-
-        # Optionally verify log messages (cap_logs contains all logged events)
-        # With verbose=False, there won't be many logs, but we can check the structure
-        assert isinstance(cap_logs, list)
+        ExpectedGroup.from_zarr(simple_datatree["measurements/reflectance"])
 
 
 if __name__ == "__main__":

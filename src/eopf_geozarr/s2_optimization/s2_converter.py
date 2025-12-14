@@ -15,14 +15,15 @@ from pydantic import TypeAdapter
 from pyproj import CRS
 from zarr.core.sync import sync
 from zarr.storage._common import make_store
-
+from zarr.core.dtype import parse_dtype
+from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from eopf_geozarr.conversion.fs_utils import get_storage_options
 from eopf_geozarr.conversion.geozarr import get_zarr_group
 from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
-from eopf_geozarr.zarrio import ChunkEncodingSpec, reencode_group
-
-from .s2_multiscale import create_multiscale_from_datatree, write_geo_metadata
+from eopf_geozarr.zarrio import ChunkEncodingSpec, reencode_group, convert_compression
+from .s2_multiscale import create_multiscale_levels, write_geo_metadata
+from zarr.core.chunk_grids import _auto_partition
 
 log = structlog.get_logger()
 
@@ -97,73 +98,6 @@ def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS:
                 except Exception:
                     pass
     raise ValueError("No CRS found.")
-
-
-def convert_s2(
-    dt_input: xr.DataTree,
-    output_path: str,
-    validate_output: bool,
-    enable_sharding: bool,
-    spatial_chunk: int,
-) -> xr.DataTree:
-    """
-    Convert S2 dataset to optimized structure.
-
-        Args:
-            dt_input: Input Sentinel-2 DataTree
-            output_path: Output path for optimized dataset
-            validate_output: Whether to validate the output
-            verbose: Enable verbose logging
-
-        Returns:
-            Optimized DataTree
-    """
-    start_time = time.time()
-
-    log.info(
-        "Starting S2 optimized conversion",
-        num_groups=len(dt_input.groups),
-        output_path=output_path,
-    )
-
-    # Validate input is S2
-    if not is_sentinel2_dataset(get_zarr_group(dt_input)):
-        raise ValueError("Input dataset is not a Sentinel-2 product")
-
-    # Step 1: Process data while preserving original structure
-    log.info("Step 1: Processing data with original structure preserved")
-
-    # Step 2: Create multiscale pyramids for each group in the original structure
-    log.info("Step 2: Creating multiscale pyramids (preserving original hierarchy)")
-    datasets = create_multiscale_from_datatree(
-        dt_input,
-        output_path,
-        spatial_chunk=spatial_chunk,
-        enable_sharding=enable_sharding,
-    )
-
-    log.info("Created multiscale pyramids", num_groups=len(datasets))
-
-    # Step 3: Root-level consolidation
-    log.info("Step 3: Final root-level metadata consolidation")
-    simple_root_consolidation(output_path, datasets)
-
-    # Step 4: Validation
-    if validate_output:
-        log.info("Step 4: Validating optimized dataset")
-        validation_results = validate_optimized_dataset(output_path)
-        if not validation_results["is_valid"]:
-            log.warning("Validation issues found", issues=validation_results["issues"])
-
-    # Create result DataTree
-    result_dt = create_result_datatree(output_path)
-
-    total_time = time.time() - start_time
-    log.info("Optimization complete", duration_seconds=round(total_time, 2))
-
-    optimization_summary(dt_input, result_dt, output_path)
-
-    return result_dt
 
 
 class ConvertS2Params(TypedDict):
@@ -248,6 +182,9 @@ def convert_s2_optimized(
 
     # Define a chunk reencoding function based on the requested chunking
     def chunk_reencoder(array: zarr.Array[Any]) -> ChunkEncodingSpec:
+        """
+        Re-encode the chunking for a Zarr V2 array into Zarr V3 format.
+        """
         group_name = str(Path(array.path).parent)
         in_measurements_group = (
             group_name.startswith("r")
@@ -262,6 +199,101 @@ def convert_s2_optimized(
             return {"write_chunks": (1,) * (array.ndim - 2) + (spatial_chunk, spatial_chunk)}
         return {"write_chunks": array.chunks}
 
+    def array_reencoder(
+            key: str, 
+            metadata: ArrayV2Metadata, 
+            *, 
+            spatial_chunk: int, 
+            use_sharding: bool = False) -> ArrayV3Metadata:
+        """
+        Generate Zarr V3 Metadata from a key and a Zarr V2 metadata document.
+        """
+        attributes: dict[str, object] = metadata.attributes # type: ignore[assignment]
+        dimension_names: None | tuple[str, ...] = attributes.pop("_ARRAY_DIMENSIONS", None) # type: ignore[assignment]
+        compressor_converted = convert_compression(metadata.compressor) # type: ignore[assignment]
+
+        # Zarr v2 allows `None` as a fill value, but for Zarr v3 a fill value consistent with the 
+        # array's data type must be provided. We use the zarr-python model of the data type to get 
+        # a fill value here.
+        if metadata.fill_value is None:
+            fill_value = metadata.dtype.default_scalar()
+        else:
+            fill_value = metadata.fill_value
+
+        group_name = str(Path(key).parent)
+        # sentinel-specific logic: if this array is a variable stored in a measurements group
+        # then we will apply particular chunking
+        in_measurements_group = (
+            group_name.startswith("r")
+            and group_name.endswith("m")
+            and "/measurements/" in group_name
+        )
+
+        # get the size of each element of the array, if that's defined for this dtype
+        if hasattr(metadata.dtype, "item_size"):
+            item_size: int = metadata.dtype.item_size # type: ignore[attr-defined]
+        else:
+            item_size = 1
+
+        chunks: tuple[int, ...] = metadata.chunks
+        shards: tuple[int, ...] | None = None
+
+        if in_measurements_group and metadata.ndim > 0:
+            if metadata.ndim == 1:
+                # don't rechunk 1D variables
+                pass
+            else:
+                if not use_sharding:
+                    chunks = (spatial_chunk, spatial_chunk)
+                    shards = None
+                else:
+                    chunks, shards =_auto_partition(
+                        array_shape=metadata.shape,
+                        chunk_shape=spatial_chunk,
+                        shard_shape="auto",
+                        item_size=item_size)
+        if metadata.ndim > 2:
+            # use chunks / shards computed for 2D but padded along leading dimensions with 1
+            pad = (1,) * (metadata.ndim - 2)
+            chunks = pad + chunks
+            if shards is not None:
+                shards = pad + shards
+
+        
+        chunk_grid: dict[str, str | dict[str, object]] = { # type: ignore[assignment]
+            "name": "regular",
+            "configuration": {"chunk_shape": chunks},
+        },
+
+        chunk_key_encoding: dict[str, str | dict[str, object]] = { # type: ignore[assignment]
+            "name": "default", "configuration": {"separator": "/"}}
+
+        if shards is not None:
+            codecs = (
+                {
+                    "name": "sharding_indexed",
+                    "configuration": {
+                        "chunk_shape": chunks,
+                        "index_codecs": ({"name": "bytes"}, {"name": "crc32c"}),
+                        "index_location": "end",
+                        "codecs": ({"name": "bytes"}, *compressor_converted),
+                    },
+                },
+            )
+        else:
+            codecs = ({"name": "bytes"}, *commpressor_converted)  # type: ignore[assignment]
+
+        return ArrayV3Metadata(
+            shape=metadata.shape,
+            data_type=metadata.dtype,
+            chunk_key_encoding=chunk_key_encoding,
+            chunk_grid=chunk_grid,
+            fill_value=fill_value,
+            dimension_names=dimension_names,
+            codecs=codecs,
+            attributes=attributes,
+            )
+
     out_group = reencode_group(
         zg,
         out_store,
@@ -271,13 +303,13 @@ def convert_s2_optimized(
         omit_nodes=omit_nodes,
     )
 
-    if "measurements" not in omit_nodes:
+    if "measurements" in out_group:
         log.info("Adding CRS elements to datasets in measurements")
         for _, subgroup in out_group["measurements"].groups():
             for _, dataset in subgroup.groups():
                 add_crs_and_grid_mapping(dataset, crs=crs)
 
-    if "quality" not in omit_nodes:
+    if "quality" in out_group:
         log.info("Adding CRS elements to quality datasets")
         for _, subgroup in out_group["quality"].groups():
             for _, dataset in subgroup.groups():
@@ -285,22 +317,13 @@ def convert_s2_optimized(
 
     # Step 2: Create multiscale pyramids for each group in the original structure
     log.info("Adding multiscale levels")
-    new_dt_input = xr.open_datatree(
-        out_store, engine="zarr", chunks="auto", decode_timedelta=True, consolidated=False
-    )
-    datasets = create_multiscale_from_datatree(
-        new_dt_input,
-        output_path,
-        spatial_chunk=spatial_chunk,
-        enable_sharding=enable_sharding,
-        crs=crs,
-    )
 
-    log.info("Created multiscale pyramids", num_groups=len(datasets))
+    create_multiscale_levels(out_group, "measurements/reflectance")
 
     # Step 3: Root-level consolidation
     log.info("Step 3: Final root-level metadata consolidation")
-    simple_root_consolidation(output_path, datasets)
+    # Pass empty dict since all groups are already created by reencode_group
+    simple_root_consolidation(output_path, {})
 
     # Step 4: Validation
     if validate_output:

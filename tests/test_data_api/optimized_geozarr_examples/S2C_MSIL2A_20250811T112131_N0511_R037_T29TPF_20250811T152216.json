@@ -4872,243 +4872,12 @@
       "attributes": {},
       "members": {
         "reflectance": {
-          "attributes": {
-            "multiscales": {
-              "layout": [
-                {
-                  "asset": "r10m",
-                  "derived_from": "r10m",
-                  "transform": {
-                    "scale": [
-                      0.0,
-                      0.0
-                    ],
-                    "translation": [
-                      -5.0,
-                      -5.0
-                    ]
-                  }
-                },
-                {
-                  "asset": "r20m",
-                  "derived_from": "r10m",
-                  "transform": {
-                    "scale": [
-                      0.0,
-                      0.0
-                    ],
-                    "translation": [
-                      -5.0,
-                      -5.0
-                    ]
-                  }
-                },
-                {
-                  "asset": "r60m",
-                  "derived_from": "r10m",
-                  "transform": {
-                    "scale": [
-                      0.0,
-                      0.0
-                    ],
-                    "translation": [
-                      -5.0,
-                      -5.0
-                    ]
-                  }
-                },
-                {
-                  "asset": "r120m",
-                  "derived_from": "r10m",
-                  "transform": {
-                    "scale": [
-                      0.0,
-                      0.0
-                    ],
-                    "translation": [
-                      -5.0,
-                      -5.0
-                    ]
-                  }
-                },
-                {
-                  "asset": "r360m",
-                  "derived_from": "r10m",
-                  "transform": {
-                    "scale": [
-                      0.0,
-                      0.0
-                    ],
-                    "translation": [
-                      -5.0,
-                      -5.0
-                    ]
-                  }
-                },
-                {
-                  "asset": "r720m",
-                  "derived_from": "r10m",
-                  "transform": {
-                    "scale": [
-                      0.0,
-                      0.0
-                    ],
-                    "translation": [
-                      -5.0,
-                      -5.0
-                    ]
-                  }
-                }
-              ],
-              "resampling_method": "average",
-              "tile_matrix_limits": {
-                "r10m": {
-                  "maxTileCol": 42,
-                  "maxTileRow": 42,
-                  "minTileCol": 0,
-                  "minTileRow": 0,
-                  "tileMatrix": "r10m"
-                },
-                "r120m": {
-                  "maxTileCol": 3,
-                  "maxTileRow": 3,
-                  "minTileCol": 0,
-                  "minTileRow": 0,
-                  "tileMatrix": "r120m"
-                },
-                "r20m": {
-                  "maxTileCol": 21,
-                  "maxTileRow": 21,
-                  "minTileCol": 0,
-                  "minTileRow": 0,
-                  "tileMatrix": "r20m"
-                },
-                "r360m": {
-                  "maxTileCol": 1,
-                  "maxTileRow": 1,
-                  "minTileCol": 0,
-                  "minTileRow": 0,
-                  "tileMatrix": "r360m"
-                },
-                "r60m": {
-                  "maxTileCol": 7,
-                  "maxTileRow": 7,
-                  "minTileCol": 0,
-                  "minTileRow": 0,
-                  "tileMatrix": "r60m"
-                },
-                "r720m": {
-                  "maxTileCol": 0,
-                  "maxTileRow": 0,
-                  "minTileCol": 0,
-                  "minTileRow": 0,
-                  "tileMatrix": "r720m"
-                }
-              },
-              "tile_matrix_set": {
-                "crs": "http://www.opengis.net/def/crs/EPSG/0/32629",
-                "id": "Native_CRS_32629",
-                "orderedAxes": [
-                  "X",
-                  "Y"
-                ],
-                "supportedCRS": "http://www.opengis.net/def/crs/EPSG/0/32629",
-                "tileMatrices": [
-                  {
-                    "cellSize": 0.0,
-                    "id": "r10m",
-                    "matrixHeight": 2,
-                    "matrixWidth": 2,
-                    "pointOfOrigin": [
-                      0.0,
-                      0.0
-                    ],
-                    "scaleDenominator": 0.0,
-                    "tileHeight": 5490,
-                    "tileWidth": 5490
-                  },
-                  {
-                    "cellSize": 0.0,
-                    "id": "r20m",
-                    "matrixHeight": 1,
-                    "matrixWidth": 1,
-                    "pointOfOrigin": [
-                      0.0,
-                      0.0
-                    ],
-                    "scaleDenominator": 0.0,
-                    "tileHeight": 5490,
-                    "tileWidth": 5490
-                  },
-                  {
-                    "cellSize": 0.0,
-                    "id": "r60m",
-                    "matrixHeight": 1,
-                    "matrixWidth": 1,
-                    "pointOfOrigin": [
-                      0.0,
-                      0.0
-                    ],
-                    "scaleDenominator": 0.0,
-                    "tileHeight": 1830,
-                    "tileWidth": 1830
-                  },
-                  {
-                    "cellSize": 0.0,
-                    "id": "r120m",
-                    "matrixHeight": 1,
-                    "matrixWidth": 1,
-                    "pointOfOrigin": [
-                      0.0,
-                      0.0
-                    ],
-                    "scaleDenominator": 0.0,
-                    "tileHeight": 915,
-                    "tileWidth": 915
-                  },
-                  {
-                    "cellSize": 0.0,
-                    "id": "r360m",
-                    "matrixHeight": 2,
-                    "matrixWidth": 2,
-                    "pointOfOrigin": [
-                      0.0,
-                      0.0
-                    ],
-                    "scaleDenominator": 0.0,
-                    "tileHeight": 256,
-                    "tileWidth": 256
-                  },
-                  {
-                    "cellSize": 0.0,
-                    "id": "r720m",
-                    "matrixHeight": 1,
-                    "matrixWidth": 1,
-                    "pointOfOrigin": [
-                      0.0,
-                      0.0
-                    ],
-                    "scaleDenominator": 0.0,
-                    "tileHeight": 152,
-                    "tileWidth": 152
-                  }
-                ],
-                "title": "Native CRS Tile Matrix Set (EPSG:32629)"
-              }
-            },
-            "zarr_conventions": [
-              {
-                "description": "Multiscale layout of zarr datasets",
-                "name": "multiscales",
-                "schema_url": "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v1/schema.json",
-                "spec_url": "https://github.com/zarr-conventions/multiscales/blob/v1/README.md",
-                "uuid": "d35379db-88df-4056-af3a-620245f8e347"
-              }
-            ]
-          },
+          "attributes": {},
           "members": {
             "r10m": {
-              "attributes": {},
+              "attributes": {
+                "grid_mapping": "spatial_ref"
+              },
               "members": {
                 "b02": {
                   "attributes": {
@@ -5682,8 +5451,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b01 444.2 nm",
                     "proj:bbox": [
                       600000.0,
@@ -5715,8 +5486,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -5730,42 +5501,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -5803,8 +5548,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b02 489.0 nm",
                     "proj:bbox": [
                       600000.0,
@@ -5836,8 +5583,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -5851,42 +5598,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -5924,8 +5645,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b03 560.6 nm",
                     "proj:bbox": [
                       600000.0,
@@ -5957,8 +5680,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -5972,42 +5695,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -6045,8 +5742,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b04 666.5 nm",
                     "proj:bbox": [
                       600000.0,
@@ -6078,8 +5777,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -6093,42 +5792,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -6166,8 +5839,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b05 707.1 nm",
                     "proj:bbox": [
                       600000.0,
@@ -6199,8 +5874,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -6214,42 +5889,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -6287,8 +5936,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b06 741.1 nm",
                     "proj:bbox": [
                       600000.0,
@@ -6320,8 +5971,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -6335,42 +5986,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -6408,8 +6033,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b07 784.7 nm",
                     "proj:bbox": [
                       600000.0,
@@ -6441,8 +6068,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -6456,42 +6083,113 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
+                    }
+                  ],
+                  "data_type": "float64",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    915,
+                    915
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "dtype": "<u2",
+                      "eopf_is_masked": true,
+                      "eopf_target_dtype": "<f8",
+                      "fill_value": 0,
+                      "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "coordinates": "spatial_ref",
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                    "proj:bbox": [
+                      600000.0,
+                      4490220.0,
+                      709800.0,
+                      4600020.0
+                    ],
+                    "proj:epsg": 32629,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      600000.0,
+                      0.0,
+                      -10.0,
+                      4600020.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 29N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32629\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        229,
+                        229
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "endian": "little"
+                      },
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -6529,8 +6227,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b09 947.2 nm",
                     "proj:bbox": [
                       600000.0,
@@ -6562,8 +6262,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -6577,42 +6277,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -6650,8 +6324,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b11 1612.0 nm",
                     "proj:bbox": [
                       600000.0,
@@ -6683,8 +6359,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -6698,42 +6374,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -6771,8 +6421,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b12 2191.3 nm",
                     "proj:bbox": [
                       600000.0,
@@ -6804,8 +6456,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -6819,42 +6471,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -6892,8 +6518,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b8a 865.6 nm",
                     "proj:bbox": [
                       600000.0,
@@ -6925,8 +6553,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915,
-                        915
+                        229,
+                        229
                       ]
                     },
                     "name": "regular"
@@ -6940,42 +6568,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          183,
-                          183
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -7041,13 +6643,11 @@
                   "zarr_format": 3
                 },
                 "x": {
-                  "attributes": {
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
+                  "attributes": {},
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -7064,13 +6664,23 @@
                         "endian": "little"
                       },
                       "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "blocksize": 0,
+                        "clevel": 3,
+                        "cname": "zstd",
+                        "shuffle": "bitshuffle",
+                        "typesize": 8
+                      },
+                      "name": "blosc"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "int64",
                   "dimension_names": [
                     "x"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0,
                   "node_type": "array",
                   "shape": [
                     915
@@ -7079,13 +6689,11 @@
                   "zarr_format": 3
                 },
                 "y": {
-                  "attributes": {
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
+                  "attributes": {},
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        915
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -7102,13 +6710,23 @@
                         "endian": "little"
                       },
                       "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "blocksize": 0,
+                        "clevel": 3,
+                        "cname": "zstd",
+                        "shuffle": "bitshuffle",
+                        "typesize": 8
+                      },
+                      "name": "blosc"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "int64",
                   "dimension_names": [
                     "y"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0,
                   "node_type": "array",
                   "shape": [
                     915
@@ -7830,6 +7448,103 @@
                   "storage_transformers": [],
                   "zarr_format": 3
                 },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "dtype": "<u2",
+                      "eopf_is_masked": true,
+                      "eopf_target_dtype": "<f8",
+                      "fill_value": 0,
+                      "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "coordinates": "spatial_ref",
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                    "proj:bbox": [
+                      600000.0,
+                      4490220.0,
+                      709800.0,
+                      4600020.0
+                    ],
+                    "proj:epsg": 32629,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      600000.0,
+                      0.0,
+                      -10.0,
+                      4600020.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 29N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32629\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        344,
+                        687
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "endian": "little"
+                      },
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
+                    }
+                  ],
+                  "data_type": "float64",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    5490,
+                    5490
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
                 "b11": {
                   "attributes": {
                     "_eopf_attrs": {
@@ -8301,8 +8016,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b01 444.2 nm",
                     "proj:bbox": [
                       600000.0,
@@ -8334,8 +8051,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -8349,42 +8066,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -8422,8 +8113,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b02 489.0 nm",
                     "proj:bbox": [
                       600000.0,
@@ -8455,8 +8148,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -8470,42 +8163,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -8543,8 +8210,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b03 560.6 nm",
                     "proj:bbox": [
                       600000.0,
@@ -8576,8 +8245,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -8591,42 +8260,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -8664,8 +8307,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b04 666.5 nm",
                     "proj:bbox": [
                       600000.0,
@@ -8697,8 +8342,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -8712,42 +8357,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -8785,8 +8404,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b05 707.1 nm",
                     "proj:bbox": [
                       600000.0,
@@ -8818,8 +8439,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -8833,42 +8454,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -8906,8 +8501,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b06 741.1 nm",
                     "proj:bbox": [
                       600000.0,
@@ -8939,8 +8536,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -8954,42 +8551,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -9027,8 +8598,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b07 784.7 nm",
                     "proj:bbox": [
                       600000.0,
@@ -9060,8 +8633,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -9075,42 +8648,113 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
+                    }
+                  ],
+                  "data_type": "float64",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    305,
+                    305
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "dtype": "<u2",
+                      "eopf_is_masked": true,
+                      "eopf_target_dtype": "<f8",
+                      "fill_value": 0,
+                      "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "coordinates": "spatial_ref",
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                    "proj:bbox": [
+                      600000.0,
+                      4490220.0,
+                      709800.0,
+                      4600020.0
+                    ],
+                    "proj:epsg": 32629,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      600000.0,
+                      0.0,
+                      -10.0,
+                      4600020.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 29N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32629\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        153,
+                        153
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "endian": "little"
+                      },
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -9148,8 +8792,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b09 947.2 nm",
                     "proj:bbox": [
                       600000.0,
@@ -9181,8 +8827,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -9196,42 +8842,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -9269,8 +8889,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b11 1612.0 nm",
                     "proj:bbox": [
                       600000.0,
@@ -9302,8 +8924,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -9317,42 +8939,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -9390,8 +8986,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b12 2191.3 nm",
                     "proj:bbox": [
                       600000.0,
@@ -9423,8 +9021,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -9438,42 +9036,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -9511,8 +9083,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b8a 865.6 nm",
                     "proj:bbox": [
                       600000.0,
@@ -9544,8 +9118,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        256,
-                        256
+                        153,
+                        153
                       ]
                     },
                     "name": "regular"
@@ -9559,42 +9133,16 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "chunk_shape": [
-                          256,
-                          256
-                        ],
-                        "codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "configuration": {
-                              "blocksize": 0,
-                              "clevel": 3,
-                              "cname": "zstd",
-                              "shuffle": "shuffle",
-                              "typesize": 8
-                            },
-                            "name": "blosc"
-                          }
-                        ],
-                        "index_codecs": [
-                          {
-                            "configuration": {
-                              "endian": "little"
-                            },
-                            "name": "bytes"
-                          },
-                          {
-                            "name": "crc32c"
-                          }
-                        ],
-                        "index_location": "end"
+                        "endian": "little"
                       },
-                      "name": "sharding_indexed"
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -9660,13 +9208,11 @@
                   "zarr_format": 3
                 },
                 "x": {
-                  "attributes": {
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
+                  "attributes": {},
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        305
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -9683,13 +9229,23 @@
                         "endian": "little"
                       },
                       "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "blocksize": 0,
+                        "clevel": 3,
+                        "cname": "zstd",
+                        "shuffle": "bitshuffle",
+                        "typesize": 8
+                      },
+                      "name": "blosc"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "int64",
                   "dimension_names": [
                     "x"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0,
                   "node_type": "array",
                   "shape": [
                     305
@@ -9698,13 +9254,11 @@
                   "zarr_format": 3
                 },
                 "y": {
-                  "attributes": {
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
+                  "attributes": {},
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        305
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -9721,13 +9275,23 @@
                         "endian": "little"
                       },
                       "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "blocksize": 0,
+                        "clevel": 3,
+                        "cname": "zstd",
+                        "shuffle": "bitshuffle",
+                        "typesize": 8
+                      },
+                      "name": "blosc"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "int64",
                   "dimension_names": [
                     "y"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0,
                   "node_type": "array",
                   "shape": [
                     305
@@ -10449,6 +10013,103 @@
                   "storage_transformers": [],
                   "zarr_format": 3
                 },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "dtype": "<u2",
+                      "eopf_is_masked": true,
+                      "eopf_target_dtype": "<f8",
+                      "fill_value": 0,
+                      "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "coordinates": "spatial_ref",
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                    "proj:bbox": [
+                      600000.0,
+                      4490220.0,
+                      709800.0,
+                      4600020.0
+                    ],
+                    "proj:epsg": 32629,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      600000.0,
+                      0.0,
+                      -10.0,
+                      4600020.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 29N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32629\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        229,
+                        458
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "endian": "little"
+                      },
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
+                    }
+                  ],
+                  "data_type": "float64",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    1830,
+                    1830
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
                 "b09": {
                   "attributes": {
                     "_eopf_attrs": {
@@ -11021,8 +10682,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b01 444.2 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11075,13 +10738,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11119,8 +10779,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b02 489.0 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11173,13 +10835,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11217,8 +10876,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b03 560.6 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11271,13 +10932,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11315,8 +10973,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b04 666.5 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11369,13 +11029,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11413,8 +11070,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b05 707.1 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11467,13 +11126,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11511,8 +11167,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b06 741.1 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11565,13 +11223,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11609,8 +11264,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b07 784.7 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11663,13 +11320,107 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
+                    }
+                  ],
+                  "data_type": "float64",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    152,
+                    152
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "dtype": "<u2",
+                      "eopf_is_masked": true,
+                      "eopf_target_dtype": "<f8",
+                      "fill_value": 0,
+                      "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "coordinates": "spatial_ref",
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "BOA reflectance from MSI acquisition at spectral band b08 834.6 nm",
+                    "proj:bbox": [
+                      600000.0,
+                      4490220.0,
+                      709800.0,
+                      4600020.0
+                    ],
+                    "proj:epsg": 32629,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      600000.0,
+                      0.0,
+                      -10.0,
+                      4600020.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 29N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",-9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32629\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        152,
+                        152
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "endian": "little"
+                      },
+                      "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "checksum": false,
+                        "level": 0
+                      },
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11707,8 +11458,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b09 947.2 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11761,13 +11514,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11805,8 +11555,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b11 1612.0 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11859,13 +11611,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -11903,8 +11652,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b12 2191.3 nm",
                     "proj:bbox": [
                       600000.0,
@@ -11957,13 +11708,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -12001,8 +11749,10 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
+                    "coordinates": "spatial_ref",
                     "dtype": "<u2",
                     "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
                     "long_name": "BOA reflectance from MSI acquisition at spectral band b8a 865.6 nm",
                     "proj:bbox": [
                       600000.0,
@@ -12055,13 +11805,10 @@
                     },
                     {
                       "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
+                        "checksum": false,
+                        "level": 0
                       },
-                      "name": "blosc"
+                      "name": "zstd"
                     }
                   ],
                   "data_type": "float64",
@@ -12127,13 +11874,11 @@
                   "zarr_format": 3
                 },
                 "x": {
-                  "attributes": {
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
+                  "attributes": {},
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        152
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -12150,13 +11895,23 @@
                         "endian": "little"
                       },
                       "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "blocksize": 0,
+                        "clevel": 3,
+                        "cname": "zstd",
+                        "shuffle": "bitshuffle",
+                        "typesize": 8
+                      },
+                      "name": "blosc"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "int64",
                   "dimension_names": [
                     "x"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0,
                   "node_type": "array",
                   "shape": [
                     152
@@ -12165,13 +11920,11 @@
                   "zarr_format": 3
                 },
                 "y": {
-                  "attributes": {
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
+                  "attributes": {},
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        152
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -12188,13 +11941,23 @@
                         "endian": "little"
                       },
                       "name": "bytes"
+                    },
+                    {
+                      "configuration": {
+                        "blocksize": 0,
+                        "clevel": 3,
+                        "cname": "zstd",
+                        "shuffle": "bitshuffle",
+                        "typesize": 8
+                      },
+                      "name": "blosc"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "int64",
                   "dimension_names": [
                     "y"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0,
                   "node_type": "array",
                   "shape": [
                     152
