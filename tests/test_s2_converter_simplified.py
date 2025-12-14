@@ -45,7 +45,8 @@ def mock_s2_dataset() -> xr.DataTree:
 
     return dt
 
-
+@pytest.mark.filterwarnings("ignore:Object at .*:zarr.errors.ZarrUserWarning")
+@pytest.mark.filterwarnings("ignore:Consolidated metadata is currently .*:zarr.errors.ZarrUserWarning")
 def test_simple_root_consolidation_success(tmp_path: Path) -> None:
     """
     Test that simple_root_consolidation produces consolidated metadata at the root, and for the
@@ -83,10 +84,11 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
         assert atmos_zmeta["consolidated_metadata"] is None
 
 
+@pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
 class TestConvenienceFunction:
     """Test the convenience function."""
 
-    @pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
+    @pytest.mark.filterwarnings("ignore:.*:xarray.coding.common.SerializationWarning")
     @pytest.mark.filterwarnings("ignore:Failed to open Zarr store with consolidated metadata:RuntimeWarning")
     def test_convert_s2_optimized_convenience_function(
         self,
@@ -96,7 +98,7 @@ class TestConvenienceFunction:
         """Test the convenience function with real S2 data."""
         # Open the S2 example as a DataTree
         dt_input = xr.open_datatree(
-            s2_group_example, engine="zarr", decode_timedelta=True, consolidated=False
+            s2_group_example, engine="zarr", consolidated=False, decode_timedelta=True,
         )
         output_path = str(tmp_path / "test_output.zarr")
 
@@ -118,7 +120,7 @@ class TestConvenienceFunction:
         assert isinstance(result, xr.DataTree)
 
         # Verify basic structure - output should have multiscale groups
-        output_dt = xr.open_datatree(output_path, engine="zarr", decode_timedelta=True)
+        output_dt = xr.open_datatree(output_path, engine="zarr")
         assert len(output_dt.groups) > 0
 
 

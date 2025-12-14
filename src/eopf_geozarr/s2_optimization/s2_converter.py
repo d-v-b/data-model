@@ -5,6 +5,7 @@ Main S2 optimization converter.
 from __future__ import annotations
 
 import time
+from functools import partial
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -13,20 +14,34 @@ import xarray as xr
 import zarr
 from pydantic import TypeAdapter
 from pyproj import CRS
+from xarray.coding.times import _netcdf_to_numpy_timeunit
+from zarr.core.chunk_grids import _auto_partition
+from zarr.core.dtype.npy.time import TimeDelta64
+from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.core.sync import sync
 from zarr.storage._common import make_store
-from zarr.core.dtype import parse_dtype
-from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
+
 from eopf_geozarr.conversion.fs_utils import get_storage_options
 from eopf_geozarr.conversion.geozarr import get_zarr_group
 from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
-from eopf_geozarr.zarrio import ChunkEncodingSpec, reencode_group, convert_compression
+from eopf_geozarr.zarrio import convert_compression, reencode_group
+
 from .s2_multiscale import create_multiscale_levels, write_geo_metadata
-from zarr.core.chunk_grids import _auto_partition
 
 log = structlog.get_logger()
 
+TIME_UNITS = frozenset(
+    [
+        "days",
+        "hours",
+        "minutes",
+        "seconds",
+        "milliseconds",
+        "microseconds",
+        "nanoseconds",
+    ]
+)
 
 def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS:
     """
@@ -132,6 +147,119 @@ def add_crs_and_grid_mapping(group: zarr.Group, crs: CRS) -> None:
     group.attrs.update({"grid_mapping": "spatial_ref"})
 
 
+def array_reencoder(
+        key: str,
+        metadata: ArrayV2Metadata,
+        *,
+        spatial_chunk: int,
+        enable_sharding: bool = False) -> ArrayV3Metadata:
+    """
+    Generate Zarr V3 Metadata from a key and a Zarr V2 metadata document.
+    """
+    attributes: dict[str, object] = metadata.attributes.copy() # type: ignore[assignment]
+    # handle xarray datetime/timedelta encoding
+    # If the array has time-related units, ensure the dtype attribute matches the actual dtype
+    if attributes.get("units") in TIME_UNITS:
+        numpy_time_unit = _netcdf_to_numpy_timeunit(attributes["units"])  # type: ignore[assignment]
+        # Check if this is a timedelta or datetime based on:
+        # 1. The zarr dtype (if it's a native time type like TimeDelta64)
+        # 2. The existing dtype attribute (for int64-encoded times)
+        # 3. The standard_name attribute (e.g., "forecast_period" indicates timedelta)
+        existing_dtype_attr = str(attributes.get("dtype", ""))
+        standard_name = str(attributes.get("standard_name", ""))
+        is_timedelta = (
+            isinstance(metadata.dtype, TimeDelta64)
+            or "timedelta" in existing_dtype_attr
+            or standard_name == "forecast_period"  # CF convention for time since forecast
+        )
+
+        if is_timedelta:
+            # This is a timedelta array - set or correct the dtype attribute
+            # Note: xarray/pandas only support timedelta64 with s/ms/us/ns, not m/h/D
+            # Use 's' as the safest option
+            attributes["dtype"] = "timedelta64[ns]"
+        else:
+            # This is a datetime array - set or correct the dtype attribute
+            attributes["dtype"] = f"datetime64[{numpy_time_unit}]"
+
+    dimension_names: None | tuple[str, ...] = attributes.pop("_ARRAY_DIMENSIONS", None) # type: ignore[assignment]
+    compressor_converted = convert_compression(metadata.compressor) # type: ignore[assignment]
+    chunk_key_encoding: dict[str, str | dict[str, object]] = {
+        "name": "default",
+        "configuration": {"separator": "/"}}
+
+    # Zarr v2 allows `None` as a fill value, but for Zarr v3 a fill value consistent with the 
+    # array's data type must be provided. We use the zarr-python model of the data type to get 
+    # a fill value here.
+    if metadata.fill_value is None:
+        fill_value = metadata.dtype.default_scalar()
+    else:
+        fill_value = metadata.fill_value
+
+    group_name = str(Path(key).parent)
+    # sentinel-specific logic: if this array is a variable stored in a measurements group
+    # then we will apply particular chunking
+    in_measurements_group = (
+        group_name.startswith("r")
+        and group_name.endswith("m")
+        and "/measurements/" in group_name
+    )
+
+    # get the size of each element of the array, if that's defined for this dtype
+    if hasattr(metadata.dtype, "item_size"):
+        item_size: int = metadata.dtype.item_size
+    else:
+        item_size = 1
+
+    chunk_shape: tuple[int, ...] = metadata.chunks
+    subchunk_shape: tuple[int, ...] | None = None
+    chunk_grid: dict[str, str | dict[str, object]]
+
+    if in_measurements_group and metadata.ndim > 0:
+        if metadata.ndim == 1:
+            # don't rechunk 1D variables
+            pass
+        else:
+            if not enable_sharding:
+                chunk_shape = (spatial_chunk, spatial_chunk)
+                subchunk_shape = None
+            else:
+                # Generate 2D chunking / sharding, because partitioning along
+                # other dimensions will be set to 1
+                chunk_shape, subchunk_shape =_auto_partition(
+                    array_shape=metadata.shape[-2:],
+                    chunk_shape=(spatial_chunk,) * 2,
+                    shard_shape="auto",
+                    item_size=item_size)
+
+    chunk_grid = {"name": "regular", "configuration": {"chunk_shape": chunk_shape}}
+    if enable_sharding:
+        codecs = (
+            {
+                "name": "sharding_indexed",
+                "configuration": {
+                    "chunk_shape": subchunk_shape,
+                    "index_codecs": ({"name": "bytes"}, {"name": "crc32c"}),
+                    "index_location": "end",
+                    "codecs": ({"name": "bytes"}, *compressor_converted),
+                },
+            },
+        )
+    else:
+        codecs = ({"name": "bytes"}, *compressor_converted)  # type: ignore[assignment]
+
+    return ArrayV3Metadata(
+        shape=metadata.shape,
+        data_type=metadata.dtype,
+        chunk_key_encoding=chunk_key_encoding,
+        chunk_grid=chunk_grid,
+        fill_value=fill_value,
+        dimension_names=dimension_names,
+        codecs=codecs,
+        attributes=attributes,
+        )
+
+
 def convert_s2_optimized(
     dt_input: xr.DataTree,
     *,
@@ -180,126 +308,14 @@ def convert_s2_optimized(
 
     log.info("Re-encoding source data to Zarr V3")
 
-    # Define a chunk reencoding function based on the requested chunking
-    def chunk_reencoder(array: zarr.Array[Any]) -> ChunkEncodingSpec:
-        """
-        Re-encode the chunking for a Zarr V2 array into Zarr V3 format.
-        """
-        group_name = str(Path(array.path).parent)
-        in_measurements_group = (
-            group_name.startswith("r")
-            and group_name.endswith("m")
-            and "/measurements/" in group_name
-        )
-        if in_measurements_group and array.ndim > 0:
-            if array.ndim == 1:
-                return {"write_chunks": (spatial_chunk,)}
-            if array.ndim == 2:
-                return {"write_chunks": (spatial_chunk, spatial_chunk)}
-            return {"write_chunks": (1,) * (array.ndim - 2) + (spatial_chunk, spatial_chunk)}
-        return {"write_chunks": array.chunks}
-
-    def array_reencoder(
-            key: str, 
-            metadata: ArrayV2Metadata, 
-            *, 
-            spatial_chunk: int, 
-            use_sharding: bool = False) -> ArrayV3Metadata:
-        """
-        Generate Zarr V3 Metadata from a key and a Zarr V2 metadata document.
-        """
-        attributes: dict[str, object] = metadata.attributes # type: ignore[assignment]
-        dimension_names: None | tuple[str, ...] = attributes.pop("_ARRAY_DIMENSIONS", None) # type: ignore[assignment]
-        compressor_converted = convert_compression(metadata.compressor) # type: ignore[assignment]
-
-        # Zarr v2 allows `None` as a fill value, but for Zarr v3 a fill value consistent with the 
-        # array's data type must be provided. We use the zarr-python model of the data type to get 
-        # a fill value here.
-        if metadata.fill_value is None:
-            fill_value = metadata.dtype.default_scalar()
-        else:
-            fill_value = metadata.fill_value
-
-        group_name = str(Path(key).parent)
-        # sentinel-specific logic: if this array is a variable stored in a measurements group
-        # then we will apply particular chunking
-        in_measurements_group = (
-            group_name.startswith("r")
-            and group_name.endswith("m")
-            and "/measurements/" in group_name
-        )
-
-        # get the size of each element of the array, if that's defined for this dtype
-        if hasattr(metadata.dtype, "item_size"):
-            item_size: int = metadata.dtype.item_size # type: ignore[attr-defined]
-        else:
-            item_size = 1
-
-        chunks: tuple[int, ...] = metadata.chunks
-        shards: tuple[int, ...] | None = None
-
-        if in_measurements_group and metadata.ndim > 0:
-            if metadata.ndim == 1:
-                # don't rechunk 1D variables
-                pass
-            else:
-                if not use_sharding:
-                    chunks = (spatial_chunk, spatial_chunk)
-                    shards = None
-                else:
-                    chunks, shards =_auto_partition(
-                        array_shape=metadata.shape,
-                        chunk_shape=spatial_chunk,
-                        shard_shape="auto",
-                        item_size=item_size)
-        if metadata.ndim > 2:
-            # use chunks / shards computed for 2D but padded along leading dimensions with 1
-            pad = (1,) * (metadata.ndim - 2)
-            chunks = pad + chunks
-            if shards is not None:
-                shards = pad + shards
-
-        
-        chunk_grid: dict[str, str | dict[str, object]] = { # type: ignore[assignment]
-            "name": "regular",
-            "configuration": {"chunk_shape": chunks},
-        },
-
-        chunk_key_encoding: dict[str, str | dict[str, object]] = { # type: ignore[assignment]
-            "name": "default", "configuration": {"separator": "/"}}
-
-        if shards is not None:
-            codecs = (
-                {
-                    "name": "sharding_indexed",
-                    "configuration": {
-                        "chunk_shape": chunks,
-                        "index_codecs": ({"name": "bytes"}, {"name": "crc32c"}),
-                        "index_location": "end",
-                        "codecs": ({"name": "bytes"}, *compressor_converted),
-                    },
-                },
-            )
-        else:
-            codecs = ({"name": "bytes"}, *commpressor_converted)  # type: ignore[assignment]
-
-        return ArrayV3Metadata(
-            shape=metadata.shape,
-            data_type=metadata.dtype,
-            chunk_key_encoding=chunk_key_encoding,
-            chunk_grid=chunk_grid,
-            fill_value=fill_value,
-            dimension_names=dimension_names,
-            codecs=codecs,
-            attributes=attributes,
-            )
+    _array_reencoder = partial(array_reencoder, spatial_chunk=spatial_chunk, enable_sharding=enable_sharding)
 
     out_group = reencode_group(
         zg,
         out_store,
         path="",
         overwrite=True,
-        chunk_reencoder=chunk_reencoder,
+        array_reencoder=_array_reencoder,
         omit_nodes=omit_nodes,
     )
 
@@ -432,8 +448,7 @@ def create_result_datatree(output_path: str) -> xr.DataTree:
             output_path,
             engine="zarr",
             chunks="auto",
-            storage_options=storage_options,
-            decode_timedelta=True,
+            storage_options=storage_options
         )
     except Exception as e:
         log.warning("Could not open result DataTree", error=str(e))

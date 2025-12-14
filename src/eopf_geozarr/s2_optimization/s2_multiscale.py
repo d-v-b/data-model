@@ -90,8 +90,9 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
             if next_level_path not in dt or var_name not in dt[next_level_path].data_vars:
                 to_downsample[var_name] = var
         log.info("downsampling %s into %s", to_downsample, next_group_name)
+        # Don't pass coords here - let the downsampled variables determine their own coordinates
         downsampled_ds = create_downsampled_resolution_group(
-            xr.Dataset(data_vars=to_downsample, coords=cur_ds.coords), factor=scale
+            xr.Dataset(data_vars=to_downsample), factor=scale
         )
         next_group_path = f"{full_path}/{next_group_name}"
         downsampled_ds.to_zarr(
@@ -432,13 +433,53 @@ def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int)
             else:
                 raise ValueError(f"Unknown variable type {var_typ}")
 
-            # preserve encoding
-            lazy_downsampled.encoding = var_data.encoding
-            # Ensure that dtype is preserved
-            lazy_vars[var_name] = lazy_downsampled.astype(var_data.dtype)
+            # Preserve encoding from source variable, but ensure fill_value is set
+            encoding = var_data.encoding.copy()
+
+            # Remove 'fill_value' (with underscore) if it exists, we only want '_FillValue'
+            encoding.pop('fill_value', None)
+
+            # Ensure _FillValue is set to avoid SerializationWarning
+            # when xarray encodes float data to integer using scale/offset
+            if '_FillValue' not in encoding:
+                # Use the same fill value logic as the source or a sensible default
+                if 'dtype' in encoding:
+                    target_dtype = np.dtype(encoding['dtype'])
+                    if np.issubdtype(target_dtype, np.unsignedinteger):
+                        encoding['_FillValue'] = np.iinfo(target_dtype).max
+                    elif np.issubdtype(target_dtype, np.signedinteger):
+                        encoding['_FillValue'] = np.iinfo(target_dtype).min
+                    else:
+                        encoding['_FillValue'] = np.nan
+                else:
+                    encoding['_FillValue'] = np.nan
+
+            # Ensure that dtype is preserved by casting
+            lazy_downsampled_casted = lazy_downsampled.astype(var_data.dtype)
+            # Re-apply encoding after astype (which creates a new DataArray)
+            lazy_downsampled_casted.encoding = encoding
+            lazy_vars[var_name] = lazy_downsampled_casted
 
     # Create dataset with lazy variables and coordinates
-    return xr.Dataset(lazy_vars, attrs=source_dataset.attrs)
+    result_ds = xr.Dataset(lazy_vars, attrs=source_dataset.attrs)
+
+    # Re-apply encoding to all data variables to ensure it's properly set
+    # (xr.Dataset creation sometimes doesn't preserve encoding correctly)
+    for var_name in lazy_vars:
+        if var_name in result_ds.data_vars:
+            result_ds[var_name].encoding = lazy_vars[var_name].encoding
+
+    # Clear dtype encoding for all coordinate variables since coordinates become float
+    # after downsampling (e.g., x=[0.5, 2.5, ...])
+    for coord_name in result_ds.coords:
+        # The coordinates inherit encoding from the source through coarsen()
+        # We need to remove dtype to avoid SerializationWarning
+        encoding = result_ds[coord_name].encoding.copy()
+        encoding.pop('dtype', None)
+        encoding.pop('_FillValue', None)
+        result_ds[coord_name].encoding = encoding
+
+    return result_ds
 
 
 def subsample_2(a: xr.DataArray, axis: tuple[int, ...] | None = None) -> xr.DataArray:
@@ -564,7 +605,6 @@ def stream_write_dataset(
             engine="zarr",
             chunks={},
             decode_coords="all",
-            decode_timedelta=True,
             consolidated=False,
         )
 

@@ -54,44 +54,26 @@ def convert_compression(
 
     raise ValueError(f"Only blosc -> blosc or None -> () is supported. Got {compressor=}")
 
-
-def reencode_array(
-    array: zarr.Array,
-    *,
-    dimension_names: None | tuple[str | None, ...] = None,
-    attributes: Mapping[str, object] | None = None,
-    chunking: ChunkEncodingSpec | None = None,
+def default_array_reencoder(key: str,
+    metadata: ArrayV2Metadata,
 ) -> ArrayV3Metadata:
     """
     Re-encode a zarr array into a new zarr v3 array.
     """
 
-    new_codecs = convert_compression(array.metadata.compressor)
-    if array.fill_value is None:
-        fill_value = array.metadata.dtype.default_scalar()
+    new_codecs = convert_compression(metadata.compressor)
+    if metadata.fill_value is None:
+        fill_value = metadata.dtype.default_scalar()
     else:
-        fill_value = array.fill_value
-    attributes = array.attrs.asdict() if attributes is None else attributes
-    chunk_grid_shape = chunking["write_chunks"] if chunking is not None else array.chunks
-
-    if chunking is not None and "read_chunks" in chunking:
-        codecs = (
-            {
-                "name": "sharding_indexed",
-                "configuration": {
-                    "chunk_shape": chunking["read_chunks"],
-                    "index_codecs": ({"name": "bytes"}, {"name": "crc32c"}),
-                    "index_location": "end",
-                    "codecs": ({"name": "bytes"}, *new_codecs),
-                },
-            },
-        )
-    else:
-        codecs = ({"name": "bytes"}, *new_codecs)  # type: ignore[assignment]
+        fill_value = metadata.fill_value
+    attributes = metadata.attributes.copy()
+    dimension_names = attributes.pop("_ARRAY_DIMENSIONS", None)
+    chunk_grid_shape = metadata.chunks
+    codecs = ({"name": "bytes"}, *new_codecs)  # type: ignore[assignment]
 
     return ArrayV3Metadata(
-        shape=array.shape,
-        data_type=array.metadata.dtype,
+        shape=metadata.shape,
+        data_type=metadata.dtype,
         chunk_key_encoding={"name": "default", "configuration": {"separator": "/"}},
         chunk_grid={
             "name": "regular",
@@ -103,7 +85,6 @@ def reencode_array(
         attributes=attributes,
     )
 
-
 def reencode_group(
     group: zarr.Group,
     store: zarr.storage.StoreLike,
@@ -112,7 +93,7 @@ def reencode_group(
     overwrite: bool = False,
     use_consolidated_for_children: bool = False,
     omit_nodes: set[str] | None = None,
-    array_reencoder: Callable[[ArrayV2Metadata], ArrayV3Metadata] | None = None,
+    array_reencoder: Callable[[str, ArrayV2Metadata], ArrayV3Metadata] = default_array_reencoder,
 ) -> zarr.Group:
     """
     Re-encode a Zarr group, applying a re-encoding to all sub-groups and sub-arrays.
@@ -168,7 +149,7 @@ def reencode_group(
         log.info("Re-encoding member %s", name)
         new_path = f"{path}/{name}"
         if isinstance(member, zarr.Array):
-            new_meta = array_reencoder(array.metadata)
+            new_meta = array_reencoder(member.path, member.metadata)
             new_members[new_path] = new_meta
             chunks_to_encode.append(name)
         else:
