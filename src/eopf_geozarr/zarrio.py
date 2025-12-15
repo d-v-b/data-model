@@ -26,10 +26,18 @@ class ChunkEncodingSpec(TypedDict):
 
 
 def convert_compression(
-    compressor: Any,
+    compressor: numcodecs.abc.Codec | dict[str, object], *, compression_level: int | None = None
 ) -> tuple[dict[str, Any], ...]:
     """
     Convert the compression parameters for a Zarr V2 array into a tuple of Zarr V3 codecs.
+
+    Parameters
+    ----------
+    compressor : numcodecs.abc.Codec | dict[str, object]
+        The compressor of the zarr v3 array
+    compression_level: int | None = None
+        The new compression level to use.
+        Only applies to the specific case of blosc -> blosc compression.
     """
 
     if compressor is None:
@@ -41,11 +49,12 @@ def convert_compression(
     else:
         old_config = compressor
     if old_config["id"] == "blosc":
+        new_level = old_config["clevel"] if compression_level is None else compression_level
         new_codec = {
             "name": "blosc",
             "configuration": {
                 "cname": old_config["cname"],
-                "clevel": old_config["clevel"],
+                "clevel": new_level,
                 "blocksize": old_config["blocksize"],
                 "shuffle": SHUFFLE[old_config["shuffle"]],
             },

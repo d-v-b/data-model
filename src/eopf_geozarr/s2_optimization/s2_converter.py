@@ -149,7 +149,12 @@ def add_crs_and_grid_mapping(group: zarr.Group, crs: CRS) -> None:
 
 
 def array_reencoder(
-    key: str, metadata: ArrayV2Metadata, *, spatial_chunk: int, enable_sharding: bool = False
+    key: str,
+    metadata: ArrayV2Metadata,
+    *,
+    spatial_chunk: int,
+    enable_sharding: bool = False,
+    compression_level: int | None = None,
 ) -> ArrayV3Metadata:
     """
     Generate Zarr V3 Metadata from a key and a Zarr V2 metadata document.
@@ -181,7 +186,9 @@ def array_reencoder(
             attributes["dtype"] = f"datetime64[{numpy_time_unit}]"
 
     dimension_names: None | tuple[str, ...] = attributes.pop("_ARRAY_DIMENSIONS", None)  # type: ignore[assignment]
-    compressor_converted = convert_compression(metadata.compressor)
+    compressor_converted = convert_compression(
+        metadata.compressor, compression_level=compression_level
+    )
     chunk_key_encoding: dict[str, str | dict[str, object]] = {
         "name": "default",
         "configuration": {"separator": "/"},
@@ -198,8 +205,11 @@ def array_reencoder(
     group_name = str(Path(key).parent)
     # sentinel-specific logic: if this array is a variable stored in a measurements group
     # then we will apply particular chunking
+    # Check if the group name contains measurements and the last component is a resolution (r10m, r20m, etc.)
     in_measurements_group = (
-        group_name.startswith("r") and group_name.endswith("m") and "/measurements/" in group_name
+        "measurements" in group_name
+        and Path(group_name).name.startswith("r")
+        and Path(group_name).name.endswith("m")
     )
 
     # get the size of each element of the array, if that's defined for this dtype
@@ -217,7 +227,13 @@ def array_reencoder(
             # don't rechunk 1D variables
             pass
         else:
-            if not enable_sharding:
+            # Check if array is too small for the requested chunk size
+            # If any spatial dimension is smaller than spatial_chunk, don't use sharding
+            array_too_small_for_sharding = enable_sharding and (
+                metadata.shape[-2] < spatial_chunk or metadata.shape[-1] < spatial_chunk
+            )
+
+            if not enable_sharding or array_too_small_for_sharding:
                 chunk_shape = (spatial_chunk, spatial_chunk)
                 subchunk_shape = None
             else:
@@ -231,7 +247,7 @@ def array_reencoder(
                 )
 
     chunk_grid = {"name": "regular", "configuration": {"chunk_shape": chunk_shape}}
-    if enable_sharding:
+    if enable_sharding and subchunk_shape is not None:
         codecs = (
             {
                 "name": "sharding_indexed",
@@ -306,8 +322,12 @@ def convert_s2_optimized(
 
     log.info("Re-encoding source data to Zarr V3")
 
+    # Create a partial function by specifying parameters for our array encoder
     _array_reencoder = partial(
-        array_reencoder, spatial_chunk=spatial_chunk, enable_sharding=enable_sharding
+        array_reencoder,
+        spatial_chunk=spatial_chunk,
+        enable_sharding=enable_sharding,
+        compression_level=compression_level,
     )
 
     out_group = reencode_group(

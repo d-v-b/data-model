@@ -90,12 +90,15 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
             next_level_path = f"{path}/{next_group_name}"
             if next_level_path not in dt or var_name not in dt[next_level_path].data_vars:
                 to_downsample[var_name] = var
-        log.info("downsampling %s into %s", tuple(to_downsample.keys()), next_group_name)
+        log.info("downsampling %s into %s", tuple(sorted(to_downsample.keys())), next_group_name)
         # Don't pass coords here - let the downsampled variables determine their own coordinates
         downsampled_ds = create_downsampled_resolution_group(
             xr.Dataset(data_vars=to_downsample), factor=scale
         )
         next_group_path = f"{full_path}/{next_group_name}"
+        if cur_group_name == "r360m":
+            pass
+            # breakpoint()
         downsampled_ds.to_zarr(
             group.store, group=next_group_path, consolidated=False, mode="a", compute=True
         )
@@ -115,10 +118,14 @@ def update_encoding(
         new_encoding["chunks"] = tuple(
             min(s, c) for s, c in zip(array.shape, new_encoding["chunks"], strict=True)
         )
-    if "shards" in new_encoding and new_encoding["shards"] is not None:
-        new_encoding["shards"] = tuple(
-            min(s, c) for s, c in zip(array.shape, new_encoding["shards"], strict=True)
-        )
+    # If the encoding declares sharding, but the shape of the array falls below the requested shard shape,
+    # then we discard the sharding request, because it will not generally be possible to ensure that the
+    # chunk shape tiles the shards correctly in this case.
+    if new_encoding.get("shards") is not None and any(
+        shape < shard
+        for shard, shape in zip(new_encoding["shards"], array.shape, strict=True)  # type: ignore [arg-type]
+    ):
+        new_encoding["shards"] = None
     if "preferred_chunks" in new_encoding:
         new_encoding["preferred_chunks"] = {
             k: min(array.shape[array.dims.index(k)], v)
