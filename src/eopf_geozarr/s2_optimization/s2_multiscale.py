@@ -101,6 +101,32 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
         )
 
 
+def update_encoding(
+    array: xr.DataArray, encoding: XarrayDataArrayEncoding
+) -> XarrayDataArrayEncoding:
+    """
+    Update an xarray encoding of a variable against a dataarray. Used when ensuring that a downsampled
+    dataarray has an encoding consistent with both the source array and also its newly reduced shape.
+    Shape-related quantities like chunks and shards need to be shrunk to match the shape of the array.
+    All other elements of the encoding are preserved
+    """
+    new_encoding: XarrayDataArrayEncoding = {**encoding}
+    if "chunks" in new_encoding:
+        new_encoding["chunks"] = tuple(
+            min(s, c) for s, c in zip(array.shape, new_encoding["chunks"], strict=True)
+        )
+    if "shards" in new_encoding and new_encoding["shards"] is not None:
+        new_encoding["shards"] = tuple(
+            min(s, c) for s, c in zip(array.shape, new_encoding["shards"], strict=True)
+        )
+    if "preferred_chunks" in new_encoding:
+        new_encoding["preferred_chunks"] = {
+            k: min(array.shape[array.dims.index(k)], v)
+            for k, v in new_encoding["preferred_chunks"].items()
+        }
+    return new_encoding
+
+
 def create_measurements_encoding(
     dataset: xr.Dataset, *, spatial_chunk: int, enable_sharding: bool = True
 ) -> dict[str, XarrayDataArrayEncoding]:
@@ -411,32 +437,35 @@ def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int)
 
     # Downsample all variables
     lazy_vars: dict[str, xr.DataArray] = {}
-    for var_name, var_data in source_dataset.data_vars.items():
-        if var_data.ndim >= 2:
-            var_typ = determine_variable_type(var_name, var_data)
+    for data_var_name, data_var in source_dataset.data_vars.items():
+        if data_var.ndim >= 2:
+            var_typ = determine_variable_type(data_var_name, data_var)
             if var_typ == "quality_mask":
-                lazy_downsampled = var_data.coarsen(
+                lazy_downsampled = data_var.coarsen(
                     {"x": factor, "y": factor}, boundary="trim"
                 ).max()
             elif var_typ == "reflectance":
-                lazy_downsampled = var_data.coarsen(
+                lazy_downsampled = data_var.coarsen(
                     {"x": factor, "y": factor}, boundary="trim"
                 ).mean()
             elif var_typ == "classification":
-                lazy_downsampled = var_data.coarsen(
+                lazy_downsampled = data_var.coarsen(
                     {"x": factor, "y": factor}, boundary="trim"
                 ).reduce(subsample_2)
             elif var_typ == "probability":
-                lazy_downsampled = var_data.coarsen(
+                lazy_downsampled = data_var.coarsen(
                     {"x": factor, "y": factor}, boundary="trim"
                 ).mean()
             else:
                 raise ValueError(f"Unknown variable type {var_typ}")
 
-            # Ensure that dtype and encoding are preserved
-            lazy_downsampled = lazy_downsampled.astype(var_data.dtype)
-            lazy_downsampled.encoding = var_data.encoding
-            lazy_vars[var_name] = lazy_downsampled
+            lazy_downsampled = lazy_downsampled.astype(data_var.dtype)
+            lazy_downsampled.encoding = update_encoding(lazy_downsampled, data_var.encoding)
+            for coord_name, coord in lazy_downsampled.coords.items():
+                lazy_downsampled.coords[coord_name].encoding = update_encoding(
+                    coord, data_var.coords[coord_name].encoding
+                )
+            lazy_vars[data_var_name] = lazy_downsampled
 
     # Create dataset with lazy variables and coordinates
     return xr.Dataset(lazy_vars, attrs=source_dataset.attrs)
