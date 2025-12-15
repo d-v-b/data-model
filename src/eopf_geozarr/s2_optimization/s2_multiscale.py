@@ -96,9 +96,6 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
             xr.Dataset(data_vars=to_downsample), factor=scale
         )
         next_group_path = f"{full_path}/{next_group_name}"
-        if cur_group_name == "r360m":
-            pass
-            # breakpoint()
         downsampled_ds.to_zarr(
             group.store, group=next_group_path, consolidated=False, mode="a", compute=True
         )
