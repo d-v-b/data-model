@@ -436,6 +436,14 @@ def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int)
             # Ensure that dtype and encoding are preserved
             lazy_downsampled = lazy_downsampled.astype(var_data.dtype)
             lazy_downsampled.encoding = var_data.encoding
+            updated_chunks = {
+                lazy_downsampled.dims[idx]: min(v, lazy_downsampled.shape[idx])
+                for idx, v in enumerate(lazy_downsampled.encoding["chunks"])
+            }
+            lazy_downsampled.encoding["chunks"] = tuple(
+                updated_chunks[dim] for dim in lazy_downsampled.dims
+            )
+            lazy_downsampled.encoding["preferred_chunks"] = lazy_downsampled
             lazy_vars[var_name] = lazy_downsampled
 
     # Create dataset with lazy variables and coordinates
