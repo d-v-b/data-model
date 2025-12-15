@@ -54,7 +54,9 @@ def convert_compression(
 
     raise ValueError(f"Only blosc -> blosc or None -> () is supported. Got {compressor=}")
 
-def default_array_reencoder(key: str,
+
+def default_array_reencoder(
+    key: str,
     metadata: ArrayV2Metadata,
 ) -> ArrayV3Metadata:
     """
@@ -69,7 +71,7 @@ def default_array_reencoder(key: str,
     attributes = metadata.attributes.copy()
     dimension_names = attributes.pop("_ARRAY_DIMENSIONS", None)
     chunk_grid_shape = metadata.chunks
-    codecs = ({"name": "bytes"}, *new_codecs)  # type: ignore[assignment]
+    codecs = ({"name": "bytes"}, *new_codecs)
 
     return ArrayV3Metadata(
         shape=metadata.shape,
@@ -84,6 +86,7 @@ def default_array_reencoder(key: str,
         codecs=codecs,
         attributes=attributes,
     )
+
 
 def reencode_group(
     group: zarr.Group,

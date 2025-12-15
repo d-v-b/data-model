@@ -45,8 +45,11 @@ def mock_s2_dataset() -> xr.DataTree:
 
     return dt
 
+
 @pytest.mark.filterwarnings("ignore:Object at .*:zarr.errors.ZarrUserWarning")
-@pytest.mark.filterwarnings("ignore:Consolidated metadata is currently .*:zarr.errors.ZarrUserWarning")
+@pytest.mark.filterwarnings(
+    "ignore:Consolidated metadata is currently .*:zarr.errors.ZarrUserWarning"
+)
 def test_simple_root_consolidation_success(tmp_path: Path) -> None:
     """
     Test that simple_root_consolidation produces consolidated metadata at the root, and for the
@@ -89,7 +92,9 @@ class TestConvenienceFunction:
     """Test the convenience function."""
 
     @pytest.mark.filterwarnings("ignore:.*:xarray.coding.common.SerializationWarning")
-    @pytest.mark.filterwarnings("ignore:Failed to open Zarr store with consolidated metadata:RuntimeWarning")
+    @pytest.mark.filterwarnings(
+        "ignore:Failed to open Zarr store with consolidated metadata:RuntimeWarning"
+    )
     def test_convert_s2_optimized_convenience_function(
         self,
         s2_group_example: Path,
@@ -98,7 +103,10 @@ class TestConvenienceFunction:
         """Test the convenience function with real S2 data."""
         # Open the S2 example as a DataTree
         dt_input = xr.open_datatree(
-            s2_group_example, engine="zarr", consolidated=False, decode_timedelta=True,
+            s2_group_example,
+            engine="zarr",
+            consolidated=False,
+            decode_timedelta=True,
         )
         output_path = str(tmp_path / "test_output.zarr")
 

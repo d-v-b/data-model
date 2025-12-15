@@ -43,6 +43,7 @@ TIME_UNITS = frozenset(
     ]
 )
 
+
 def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS:
     """
     Initialize CRS from dataset by checking data variables.
@@ -148,19 +149,16 @@ def add_crs_and_grid_mapping(group: zarr.Group, crs: CRS) -> None:
 
 
 def array_reencoder(
-        key: str,
-        metadata: ArrayV2Metadata,
-        *,
-        spatial_chunk: int,
-        enable_sharding: bool = False) -> ArrayV3Metadata:
+    key: str, metadata: ArrayV2Metadata, *, spatial_chunk: int, enable_sharding: bool = False
+) -> ArrayV3Metadata:
     """
     Generate Zarr V3 Metadata from a key and a Zarr V2 metadata document.
     """
-    attributes: dict[str, object] = metadata.attributes.copy() # type: ignore[assignment]
+    attributes: dict[str, object] = metadata.attributes.copy()
     # handle xarray datetime/timedelta encoding
     # If the array has time-related units, ensure the dtype attribute matches the actual dtype
     if attributes.get("units") in TIME_UNITS:
-        numpy_time_unit = _netcdf_to_numpy_timeunit(attributes["units"])  # type: ignore[assignment]
+        numpy_time_unit = _netcdf_to_numpy_timeunit(attributes["units"])
         # Check if this is a timedelta or datetime based on:
         # 1. The zarr dtype (if it's a native time type like TimeDelta64)
         # 2. The existing dtype attribute (for int64-encoded times)
@@ -182,14 +180,15 @@ def array_reencoder(
             # This is a datetime array - set or correct the dtype attribute
             attributes["dtype"] = f"datetime64[{numpy_time_unit}]"
 
-    dimension_names: None | tuple[str, ...] = attributes.pop("_ARRAY_DIMENSIONS", None) # type: ignore[assignment]
-    compressor_converted = convert_compression(metadata.compressor) # type: ignore[assignment]
+    dimension_names: None | tuple[str, ...] = attributes.pop("_ARRAY_DIMENSIONS", None)  # type: ignore[assignment]
+    compressor_converted = convert_compression(metadata.compressor)
     chunk_key_encoding: dict[str, str | dict[str, object]] = {
         "name": "default",
-        "configuration": {"separator": "/"}}
+        "configuration": {"separator": "/"},
+    }
 
-    # Zarr v2 allows `None` as a fill value, but for Zarr v3 a fill value consistent with the 
-    # array's data type must be provided. We use the zarr-python model of the data type to get 
+    # Zarr v2 allows `None` as a fill value, but for Zarr v3 a fill value consistent with the
+    # array's data type must be provided. We use the zarr-python model of the data type to get
     # a fill value here.
     if metadata.fill_value is None:
         fill_value = metadata.dtype.default_scalar()
@@ -200,9 +199,7 @@ def array_reencoder(
     # sentinel-specific logic: if this array is a variable stored in a measurements group
     # then we will apply particular chunking
     in_measurements_group = (
-        group_name.startswith("r")
-        and group_name.endswith("m")
-        and "/measurements/" in group_name
+        group_name.startswith("r") and group_name.endswith("m") and "/measurements/" in group_name
     )
 
     # get the size of each element of the array, if that's defined for this dtype
@@ -226,11 +223,12 @@ def array_reencoder(
             else:
                 # Generate 2D chunking / sharding, because partitioning along
                 # other dimensions will be set to 1
-                chunk_shape, subchunk_shape =_auto_partition(
+                chunk_shape, subchunk_shape = _auto_partition(
                     array_shape=metadata.shape[-2:],
                     chunk_shape=(spatial_chunk,) * 2,
                     shard_shape="auto",
-                    item_size=item_size)
+                    item_size=item_size,
+                )
 
     chunk_grid = {"name": "regular", "configuration": {"chunk_shape": chunk_shape}}
     if enable_sharding:
@@ -257,7 +255,7 @@ def array_reencoder(
         dimension_names=dimension_names,
         codecs=codecs,
         attributes=attributes,
-        )
+    )
 
 
 def convert_s2_optimized(
@@ -308,7 +306,9 @@ def convert_s2_optimized(
 
     log.info("Re-encoding source data to Zarr V3")
 
-    _array_reencoder = partial(array_reencoder, spatial_chunk=spatial_chunk, enable_sharding=enable_sharding)
+    _array_reencoder = partial(
+        array_reencoder, spatial_chunk=spatial_chunk, enable_sharding=enable_sharding
+    )
 
     out_group = reencode_group(
         zg,
@@ -445,10 +445,7 @@ def create_result_datatree(output_path: str) -> xr.DataTree:
     try:
         storage_options = get_storage_options(output_path)
         return xr.open_datatree(
-            output_path,
-            engine="zarr",
-            chunks="auto",
-            storage_options=storage_options
+            output_path, engine="zarr", chunks="auto", storage_options=storage_options
         )
     except Exception as e:
         log.warning("Could not open result DataTree", error=str(e))

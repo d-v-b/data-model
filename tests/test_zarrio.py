@@ -8,7 +8,6 @@ import zarr
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
 from eopf_geozarr.zarrio import (
-    ChunkEncodingSpec,
     convert_compression,
     default_array_reencoder,
     reencode_group,
@@ -55,6 +54,7 @@ def test_convert_compression_fails() -> None:
     source = {"id": "gzip"}
     with pytest.raises(ValueError, match=r"Only blosc -> blosc or None -> ()"):
         convert_compression(source)
+
 
 def test_reencode_array_fill_value_none() -> None:
     """
@@ -232,8 +232,11 @@ def test_reencode_group_with_chunk_reencoder() -> None:
     Test that custom chunk_reencoder function is applied
     """
     group_v2 = zarr.create_group({}, zarr_format=2)
-    old_node = group_v2.create_array("data", shape=(100,), chunks=(10,), dtype="float32", attributes={"foo": 10})
+    old_node = group_v2.create_array(
+        "data", shape=(100,), chunks=(10,), dtype="float32", attributes={"foo": 10}
+    )
     new_chunks = (25,)
+
     def custom_array_encoder(key: str, metadata: ArrayV2Metadata) -> ArrayV3Metadata:
         return ArrayV3Metadata(
             shape=metadata.shape,
@@ -243,8 +246,8 @@ def test_reencode_group_with_chunk_reencoder() -> None:
             chunk_key_encoding={"name": "default", "configuration": {"separator": "/"}},
             codecs=({"name": "bytes"},),
             dimension_names=None,
-            attributes=metadata.attributes
-            )
+            attributes=metadata.attributes,
+        )
 
     group_v3 = reencode_group(group_v2, {}, "", array_reencoder=custom_array_encoder)
 
@@ -252,6 +255,6 @@ def test_reencode_group_with_chunk_reencoder() -> None:
     assert new_node.metadata.chunk_grid.chunk_shape == new_chunks
     assert new_node.attrs.asdict() == old_node.attrs.asdict()
 
-if __name__ == '__main__':
-    pytest.main([__file__])
 
+if __name__ == "__main__":
+    pytest.main([__file__])
