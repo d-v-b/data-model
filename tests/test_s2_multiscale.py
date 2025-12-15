@@ -14,6 +14,7 @@ from structlog.testing import capture_logs
 from eopf_geozarr.s2_optimization.s2_multiscale import (
     calculate_aligned_chunk_size,
     calculate_simple_shard_dimensions,
+    create_downsampled_resolution_group,
     create_measurements_encoding,
     create_multiscale_levels,
 )
@@ -53,6 +54,24 @@ def sample_dataset() -> xr.Dataset:
 
 class TestS2MultiscaleFunctions:
     """Test suite for S2 multiscale functions."""
+
+    def test_create_downsampled_resolution_group_quality_mask(self) -> None:
+        """Quality-mask downsampling should not crash and should preserve dtype."""
+        x = np.arange(8)
+        y = np.arange(6)
+        quality = xr.DataArray(
+            np.random.randint(0, 2, (6, 8), dtype=np.uint8),
+            dims=["y", "x"],
+            coords={"y": y, "x": x},
+            name="quality_clouds",
+        )
+        ds = xr.Dataset({"quality_clouds": quality})
+
+        out = create_downsampled_resolution_group(ds, factor=2)
+
+        assert "quality_clouds" in out.data_vars
+        assert out["quality_clouds"].dtype == np.uint8
+        assert out["quality_clouds"].shape == (3, 4)
 
     def test_calculate_simple_shard_dimensions(self) -> None:
         """Test simplified shard dimensions calculation."""
