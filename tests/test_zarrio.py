@@ -256,5 +256,22 @@ def test_reencode_group_with_chunk_reencoder() -> None:
     assert new_node.attrs.asdict() == old_node.attrs.asdict()
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+def test_reencode_group_omit_nodes_normalizes_leading_slash() -> None:
+    group_v2 = zarr.create_group({}, zarr_format=2)
+    group_v2.create_array("data", shape=(5,), dtype="int32")
+
+    group_v3 = reencode_group(group_v2, {}, "", omit_nodes=["/data"])
+
+    assert "data" not in group_v3
+
+
+def test_reencode_group_omit_nodes_is_prefix_safe() -> None:
+    group_v2 = zarr.create_group({}, zarr_format=2)
+    group_v2.create_array("foobar", shape=(5,), dtype="int32")
+    group_v2.create_group("foo").create_array("child", shape=(5,), dtype="int32")
+
+    group_v3 = reencode_group(group_v2, {}, "", omit_nodes=["foo"])
+
+    assert "foo" not in group_v3
+    assert "foo/child" not in group_v3
+    assert "foobar" in group_v3

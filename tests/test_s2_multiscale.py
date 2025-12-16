@@ -1,15 +1,13 @@
 """
 Tests for S2 multiscale pyramid creation with xy-aligned sharding.
 """
-
-from typing import TypedDict
-
 import numpy as np
 import pytest
 import xarray as xr
 import zarr
 from pydantic_zarr.experimental.v3 import ArraySpec, GroupSpec
 from structlog.testing import capture_logs
+from typing_extensions import TypedDict
 
 from eopf_geozarr.s2_optimization.s2_multiscale import (
     calculate_aligned_chunk_size,
