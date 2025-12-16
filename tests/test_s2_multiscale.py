@@ -26,30 +26,47 @@ def sample_dataset() -> xr.Dataset:
     x = np.linspace(0, 1000, 100)
     y = np.linspace(0, 1000, 100)
     time = np.array(["2023-01-01", "2023-01-02"], dtype="datetime64[ns]")
+    data_var_names = ["b02", "b05", "scl"]
+    data_vars: dict[str, xr.DataArray] = {}
+    for name in data_var_names:
+        # Create sample variables with different dimensions
+        data_vars[name] = xr.DataArray(
+            np.random.randint(0, 4000, (2, 100, 100)),
+            dims=["time", "y", "x"],
+            coords={"time": time, "y": y, "x": x},
+            name=name,
+        )
+    return xr.Dataset(data_vars=data_vars)
 
-    # Create sample variables with different dimensions
+
+@pytest.fixture
+def simple_datatree() -> zarr.Group:
+    """Create a simple DataTree for integration testing, and save it to an in-memory zarr group"""
+    store = {}
+    group = zarr.create_group(store)
+    # Create sample data
+    x = np.linspace(0, 1000, 100)
+    y = np.linspace(0, 1000, 100)
+    time = np.array(["2023-01-01"], dtype="datetime64[ns]")
+
+    # Create sample band
     b02 = xr.DataArray(
-        np.random.randint(0, 4000, (2, 100, 100)),
+        np.random.randint(0, 4000, (1, 100, 100)),
         dims=["time", "y", "x"],
         coords={"time": time, "y": y, "x": x},
         name="b02",
+        attrs={"long_name": "Blue band", "units": "digital_number"},
     )
 
-    b05 = xr.DataArray(
-        np.random.randint(0, 4000, (2, 100, 100)),
-        dims=["time", "y", "x"],
-        coords={"time": time, "y": y, "x": x},
-        name="b05",
-    )
+    # Create dataset
+    ds = xr.Dataset({"b02": b02})
 
-    scl = xr.DataArray(
-        np.random.randint(0, 11, (2, 100, 100)),
-        dims=["time", "y", "x"],
-        coords={"time": time, "y": y, "x": x},
-        name="scl",
-    )
+    # Create DataTree
+    dt = xr.DataTree(name="root")
+    dt["/measurements/reflectance/r10m"] = xr.DataTree(ds)
+    dt.to_zarr(group.store, compute=True, mode="w", consolidated=False)
 
-    return xr.Dataset({"b02": b02, "b05": b05, "scl": scl})
+    return group
 
 
 class TestS2MultiscaleFunctions:
@@ -148,68 +165,45 @@ class TestS2MultiscaleFunctions:
         assert 1000 % chunk_size == 0
 
 
-class TestS2MultiscaleIntegration:
-    """Integration tests for S2 multiscale functions."""
+@pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
+def test_create_multiscale_from_datatree(simple_datatree: zarr.Group) -> None:
+    """Test multiscale creation from DataTree."""
 
-    @pytest.fixture
-    def simple_datatree(self) -> zarr.Group:
-        """Create a simple DataTree for integration testing, and save it to an in-memory zarr group"""
-        store = {}
-        group = zarr.create_group(store)
-        # Create sample data
-        x = np.linspace(0, 1000, 100)
-        y = np.linspace(0, 1000, 100)
-        time = np.array(["2023-01-01"], dtype="datetime64[ns]")
+    class DatasetMembers(TypedDict):
+        x: ArraySpec
+        y: ArraySpec
+        time: ArraySpec
+        b02: ArraySpec
 
-        # Create sample band
-        b02 = xr.DataArray(
-            np.random.randint(0, 4000, (1, 100, 100)),
-            dims=["time", "y", "x"],
-            coords={"time": time, "y": y, "x": x},
-            name="b02",
-            attrs={"long_name": "Blue band", "units": "digital_number"},
-        )
+    class DatasetGroup(GroupSpec):
+        members: DatasetMembers
 
-        # Create dataset
-        ds = xr.Dataset({"b02": b02})
+    class ExpectedMembers(TypedDict):
+        r10m: DatasetGroup
+        r20m: DatasetGroup
+        r60m: DatasetGroup
+        r120m: DatasetGroup
+        r360m: DatasetGroup
+        r720m: DatasetGroup
 
-        # Create DataTree
-        dt = xr.DataTree(name="root")
-        dt["/measurements/reflectance/r10m"] = xr.DataTree(ds)
-        dt.to_zarr(group.store, compute=True, mode="w", consolidated=False)
+    class ExpectedGroup(GroupSpec):
+        members: ExpectedMembers
 
-        return group
+    # Capture log output using structlog's testing context manager
+    with capture_logs():
+        create_multiscale_levels(simple_datatree, path="measurements/reflectance")
 
-    @pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
-    def test_create_multiscale_from_datatree(self, simple_datatree: zarr.Group) -> None:
-        """Test multiscale creation from DataTree."""
-
-        class DatasetMembers(TypedDict):
-            x: ArraySpec
-            y: ArraySpec
-            time: ArraySpec
-            b02: ArraySpec
-
-        class DatasetGroup(GroupSpec):
-            members: DatasetMembers
-
-        class ExpectedMembers(TypedDict):
-            r10m: DatasetGroup
-            r20m: DatasetGroup
-            r60m: DatasetGroup
-            r120m: DatasetGroup
-            r360m: DatasetGroup
-            r720m: DatasetGroup
-
-        class ExpectedGroup(GroupSpec):
-            members: ExpectedMembers
-
-        # Capture log output using structlog's testing context manager
-        with capture_logs():
-            create_multiscale_levels(simple_datatree, path="measurements/reflectance")
-
-        ExpectedGroup.from_zarr(simple_datatree["measurements/reflectance"])
+    ExpectedGroup.from_zarr(simple_datatree["measurements/reflectance"])
 
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+@pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
+def test_create_multiscale_skips_existing_arrays(simple_datatree: zarr.Group) -> None:
+    """Test that the multiscale creation routine does not overwrite an existing low res array"""
+    # insert a new group containing an empty version of the existing datasets
+    simple_datatree.create_group("measurements/reflectance/r20m")
+    simple_datatree.create_array(
+        "measurements/reflectance/r20m/b02", shape=(1,), dtype="uint8", dimension_names=("x",)
+    )
+
+    create_multiscale_levels(simple_datatree, path="measurements/reflectance")
+    assert simple_datatree["measurements/reflectance/r20m/b02"].shape == (1,)
