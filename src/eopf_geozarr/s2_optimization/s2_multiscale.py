@@ -73,9 +73,6 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
     # Construct the full path to the group containing resolution levels
     full_path = f"{group.path}/{path}" if group.path else path
 
-    # Load the datatree to check which groups exist
-    dt = xr.open_datatree(group.store, engine="zarr")
-
     for (cur_factor, cur_group_name), (next_factor, next_group_name) in pairwise(
         zip(ds_levels, ds_group_names, strict=True)
     ):
@@ -88,7 +85,7 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
         for var_name, var in cur_ds.data_vars.items():
             # Check if the variable already exists in the next level
             next_level_path = f"{path}/{next_group_name}"
-            if next_level_path not in dt or var_name not in dt[next_level_path].data_vars:
+            if f"{next_level_path}/{var_name}" not in group:
                 to_downsample[var_name] = var
         log.info("downsampling %s into %s", tuple(sorted(to_downsample.keys())), next_group_name)
         # Don't pass coords here - let the downsampled variables determine their own coordinates
