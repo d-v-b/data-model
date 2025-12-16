@@ -4,6 +4,8 @@ This module contains zarr-specific IO routines
 
 from __future__ import annotations
 
+import math
+from itertools import product
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 import numcodecs
@@ -15,7 +17,7 @@ from zarr.core.sync import sync
 from zarr.storage._common import make_store_path
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Iterator, Mapping
 
     from zarr.core.metadata.v2 import ArrayV2Metadata
 
@@ -23,6 +25,69 @@ if TYPE_CHECKING:
 class ChunkEncodingSpec(TypedDict):
     write_chunks: tuple[int, ...]
     read_chunks: NotRequired[tuple[int, ...]]
+
+
+def _normalize_node_path(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return ""
+    # reencode_group member names are relative (no leading slash)
+    value = value.lstrip("/")
+    while "//" in value:
+        value = value.replace("//", "/")
+    return value.rstrip("/")
+
+
+def _normalize_omit_nodes(values: set[str] | None) -> set[str]:
+    if not values:
+        return set()
+    normalized = {_normalize_node_path(v) for v in values}
+    normalized.discard("")
+    return normalized
+
+
+def _is_omitted(name: str, omit_nodes: set[str]) -> bool:
+    # Omit either the exact node, or any descendant below it.
+    return any(name == v or name.startswith(v + "/") for v in omit_nodes)
+
+
+def _iter_chunk_regions(
+    shape: tuple[int, ...],
+    chunk_shape: tuple[int, ...],
+) -> Iterator[tuple[slice, ...]] | None:
+    if len(shape) != len(chunk_shape):
+        return None
+    if any(dim_size <= 0 for dim_size in shape):
+        return None
+
+    starts_per_dim = [
+        range(0, dim_size, max(1, chunk_size))
+        for dim_size, chunk_size in zip(shape, chunk_shape, strict=True)
+    ]
+
+    def _gen() -> Iterator[tuple[slice, ...]]:
+        for starts in product(*starts_per_dim):
+            yield tuple(
+                slice(start, min(start + max(1, chunk), dim))
+                for start, chunk, dim in zip(starts, chunk_shape, shape, strict=True)
+            )
+
+    return _gen()
+
+
+def _dtype_itemsize(dtype: object) -> int:
+    itemsize = getattr(dtype, "itemsize", None)
+    if isinstance(itemsize, int) and itemsize > 0:
+        return itemsize
+    return 1
+
+
+def _estimate_nbytes(shape: tuple[int, ...], dtype: object) -> int:
+    try:
+        n = int(math.prod(shape))
+    except Exception:
+        return 0
+    return n * _dtype_itemsize(dtype)
 
 
 def convert_compression(
@@ -120,16 +185,14 @@ def reencode_group(
         The path in the new store to use
     overwrite : bool, default = False
         Whether to overwrite contents of the new store
-    omit_nodes : set[str], default = {}
-        The names of groups or arrays to omit from re-encoding.
-    chunk_reencoder : Callable[[zarr.Array[Any], ChunkEncodingSpec]] | None, default = None
-        A function that takes a Zarr array object and returns a ChunkEncodingSpec, which is a dict
-        that defines a new chunk encoding. Use this parameter to define per-array chunk encoding
-        logic.
+    omit_nodes : set[str] | None
+        Relative group/array paths to omit (e.g., "measurements/reflectance").
+        Exact matches omit that node; prefix matches omit the whole subtree.
+    array_reencoder : Callable[[str, ArrayV2Metadata], ArrayV3Metadata]
+        Maps a v2 array metadata document to v3 metadata for the destination array.
 
     """
-    if omit_nodes is None:
-        omit_nodes = set()
+    omit_nodes = _normalize_omit_nodes(omit_nodes)
 
     log = structlog.get_logger()
 
@@ -142,19 +205,21 @@ def reencode_group(
     )
 
     log.info("Begin re-encoding Zarr group %s", group)
+    root_attrs = group.attrs.asdict()
+
     new_members: dict[str, ArrayV3Metadata | GroupMetadata] = {
-        path: GroupMetadata(zarr_format=3, attributes=group.attrs.asdict())
+        path: GroupMetadata(zarr_format=3, attributes=root_attrs)
     }
-    chunks_to_encode: list[str] = []
+    arrays_to_copy: list[str] = []
     for name in omit_nodes:
-        if not any(k.startswith(name) for k in members):
+        if not any(k == name or k.startswith(name + "/") for k in members):
             log.warning(
                 "The name %s was provided in omit_nodes but no such array or group exists.", name
             )
     for name, member in members.items():
-        if any(name.startswith(v) for v in omit_nodes):
+        if _is_omitted(name, omit_nodes):
             log.info(
-                "Skipping node %s because it is contained in a subgroup declared in the omit_groups parameter",
+                "Skipping node %s because it is contained in a subtree declared in omit_nodes",
                 name,
             )
             continue
@@ -163,7 +228,7 @@ def reencode_group(
         if isinstance(member, zarr.Array):
             new_meta = array_reencoder(member.path, member.metadata)
             new_members[new_path] = new_meta
-            chunks_to_encode.append(name)
+            arrays_to_copy.append(name)
         else:
             new_members[new_path] = GroupMetadata(
                 zarr_format=3,
@@ -172,12 +237,34 @@ def reencode_group(
     log.info("Creating new Zarr hierarchy structure at %s", f"{store}/{path}")
     tree = dict(zarr.create_hierarchy(store=store, nodes=new_members, overwrite=overwrite))
     new_group: zarr.Group = tree[path]
-    for name in chunks_to_encode:
-        log.info("Re-encoding chunks for array %s", name)
+    for name in arrays_to_copy:
+        log.info("Copying array data %s", name)
         old_array = group[name]
         new_array = new_group[name]
 
-        new_array[...] = old_array[...]
+        if new_array.ndim == 0:
+            new_array[...] = old_array[...]
+            continue
+
+        old_chunk_shape = tuple(getattr(old_array.metadata, "chunks", ()))
+        new_chunk_shape = tuple(new_array.metadata.chunk_grid.chunk_shape)
+        # If chunking differs, writing by destination chunk regions can re-read source chunks.
+        # Prefer eager copy for smaller arrays to minimize IO; fall back to chunk-by-chunk when
+        # the array is too large to comfortably materialize.
+        eager_copy_max_bytes = 256 * 1024 * 1024
+        if old_chunk_shape != new_chunk_shape:
+            estimated = _estimate_nbytes(tuple(new_array.shape), getattr(old_array, "dtype", None))
+            if estimated and estimated <= eager_copy_max_bytes:
+                new_array[...] = old_array[...]
+                continue
+
+        # Iterate using the destination chunk grid to bound peak memory.
+        regions_iter = _iter_chunk_regions(tuple(new_array.shape), new_chunk_shape)
+        if regions_iter is None:
+            new_array[...] = old_array[...]
+        else:
+            for region in regions_iter:
+                new_array[region] = old_array[region]
 
     # return the root group
     return tree[path]

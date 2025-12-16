@@ -163,7 +163,7 @@ def array_reencoder(
     # handle xarray datetime/timedelta encoding
     # If the array has time-related units, ensure the dtype attribute matches the actual dtype
     if attributes.get("units") in TIME_UNITS:
-        numpy_time_unit = _netcdf_to_numpy_timeunit(attributes["units"])
+        numpy_time_unit = _netcdf_to_numpy_timeunit(str(attributes["units"]))
         # Check if this is a timedelta or datetime based on:
         # 1. The zarr dtype (if it's a native time type like TimeDelta64)
         # 2. The existing dtype attribute (for int64-encoded times)
@@ -227,6 +227,12 @@ def array_reencoder(
             # don't rechunk 1D variables
             pass
         else:
+            prefix_shape = tuple(metadata.chunks[:-2])
+            inner_spatial = (
+                min(spatial_chunk, metadata.shape[-2]),
+                min(spatial_chunk, metadata.shape[-1]),
+            )
+
             # Check if array is too small for the requested chunk size
             # If any spatial dimension is smaller than spatial_chunk, don't use sharding
             array_too_small_for_sharding = enable_sharding and (
@@ -234,17 +240,23 @@ def array_reencoder(
             )
 
             if not enable_sharding or array_too_small_for_sharding:
-                chunk_shape = (spatial_chunk, spatial_chunk)
+                chunk_shape = (*prefix_shape, *inner_spatial)
                 subchunk_shape = None
             else:
                 # Generate 2D chunking / sharding, because partitioning along
                 # other dimensions will be set to 1
-                chunk_shape, subchunk_shape = _auto_partition(
+                shard_spatial, subchunk_spatial = _auto_partition(
                     array_shape=metadata.shape[-2:],
-                    chunk_shape=(spatial_chunk,) * 2,
+                    chunk_shape=inner_spatial,
                     shard_shape="auto",
                     item_size=item_size,
                 )
+                if shard_spatial is None:
+                    chunk_shape = (*prefix_shape, *inner_spatial)
+                    subchunk_shape = None
+                else:
+                    chunk_shape = (*prefix_shape, *shard_spatial)
+                    subchunk_shape = (*prefix_shape, *subchunk_spatial)
 
     chunk_grid = {"name": "regular", "configuration": {"chunk_shape": chunk_shape}}
     if enable_sharding and subchunk_shape is not None:

@@ -79,14 +79,25 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
         # Open the current resolution level as a dataset
         cur_group_path = f"{full_path}/{cur_group_name}"
         cur_ds = xr.open_dataset(group.store, group=cur_group_path, engine="zarr")
-
         scale = next_factor // cur_factor
         to_downsample: dict[str, xr.DataArray] = {}
         for var_name, var in cur_ds.data_vars.items():
             # Check if the variable already exists in the next level
             next_level_path = f"{path}/{next_group_name}"
-            if f"{next_level_path}/{var_name}" not in group:
+            next_var_key = f"{next_level_path}/{var_name}"
+            if next_var_key not in group:
                 to_downsample[var_name] = var
+
+        if not to_downsample:
+            next_level_key = f"{path}/{next_group_name}"
+            if next_level_key not in group:
+                log.info(
+                    "Stopping at %s: next level missing and nothing to create",
+                    next_group_name,
+                )
+                break
+            log.info("Skipping %s: all variables already exist", next_group_name)
+            continue
         log.info("downsampling %s into %s", tuple(sorted(to_downsample.keys())), next_group_name)
         # Don't pass coords here - let the downsampled variables determine their own coordinates
         downsampled_ds = create_downsampled_resolution_group(
@@ -251,7 +262,7 @@ def add_multiscales_metadata_to_parent(
     base_path: str,
     res_groups: Mapping[str, xr.Dataset],
     multiscales_flavor: set[MultiscalesFlavor] | None = None,
-) -> xr.DataTree:
+) -> xr.DataTree | None:
     """Add GeoZarr-compliant multiscales metadata to parent group."""
     # Sort by resolution (finest to coarsest)
     if multiscales_flavor is None:
