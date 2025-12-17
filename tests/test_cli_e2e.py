@@ -54,7 +54,7 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     # Uncomment this section to write out the expected structure from the observed structure
     # This is useful when the expected structure needs to be updated
     # expected_structure_path.write_text(
-    #    json.dumps(observed_structure_json, indent=2, sort_keys=True)
+    #   json.dumps(observed_structure_json, indent=2, sort_keys=True)
     # )
 
     expected_structure_json = tuplify_json(json.loads(expected_structure_path.read_text()))
