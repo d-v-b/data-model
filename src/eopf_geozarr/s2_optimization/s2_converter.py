@@ -291,20 +291,35 @@ def convert_s2_optimized(
     validate_output: bool,
     omit_nodes: set[str] | None = None,
     max_retries: int = 3,
+    allow_json_nan: bool = False,
 ) -> xr.DataTree:
     """
     Convenience function for S2 optimization.
 
-    Args:
-        dt_input: Input Sentinel-2 DataTree
-        output_path: Output path
-        enable_sharding: Enable Zarr v3 sharding
-        spatial_chunk: Spatial chunk size
-        compression_level: Compression level 1-9
-        validate_output: Whether to validate the output
-        max_retries: Maximum number of retries for network operations
+    Parameters
+    ----------
+    dt_input : xr.DataTree
+        Input Sentinel-2 DataTree
+    output_path : str
+        Output path
+    enable_sharding : bool
+        Enable Zarr v3 sharding
+    spatial_chunk : int
+        Spatial chunk size
+    compression_level : int
+        Compression level 1-9
+    validate_output : bool
+        Whether to validate the output
+    omit_nodes : set[str] | None, optional
+        Set of node paths to omit from conversion, by default None
+    max_retries : int, default=3
+        Maximum number of retries for network operations
+    allow_json_nan : bool, default=False
+        Whether to allow NaN values in JSON output
 
-    Returns:
+    Returns
+    -------
+    xr.DataTree
         Optimized DataTree
     """
 
@@ -344,6 +359,7 @@ def convert_s2_optimized(
         overwrite=True,
         array_reencoder=_array_reencoder,
         omit_nodes=omit_nodes,
+        allow_json_nan=allow_json_nan,
     )
     if "measurements" in out_group:
         log.info("Adding CRS elements to datasets in measurements")
