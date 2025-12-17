@@ -12,6 +12,7 @@ from pydantic_zarr.experimental.v3 import ArraySpec, GroupSpec
 from structlog.testing import capture_logs
 
 from eopf_geozarr.s2_optimization.s2_multiscale import (
+    auto_chunks,
     calculate_aligned_chunk_size,
     calculate_simple_shard_dimensions,
     create_downsampled_resolution_group,
@@ -163,6 +164,23 @@ class TestS2MultiscaleFunctions:
         chunk_size = calculate_aligned_chunk_size(1000, 256)
         # Should return a value that divides evenly into 1000
         assert 1000 % chunk_size == 0
+
+
+@pytest.mark.parametrize("ndim", [0, 1, 2, 3, 4])
+@pytest.mark.parametrize("target_chunk_size", [10, 12])
+def test_auto_chunks(ndim: int, target_chunk_size: int) -> None:
+    shape = (11,) * ndim
+    chunks = auto_chunks(shape, target_chunk_size)
+
+    if ndim == 0:
+        assert chunks == ()
+    if ndim == 1:
+        assert chunks == (min(shape[0], target_chunk_size),)
+    if ndim >= 2:
+        assert chunks == ((1,) * (ndim - 2)) + (
+            calculate_aligned_chunk_size(shape[-2], target_chunk_size),
+            calculate_aligned_chunk_size(shape[-1], target_chunk_size),
+        )
 
 
 @pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")

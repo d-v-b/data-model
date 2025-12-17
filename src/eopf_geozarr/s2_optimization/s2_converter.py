@@ -7,15 +7,13 @@ from __future__ import annotations
 import time
 from functools import partial
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Final, Literal, TypedDict
 
 import structlog
 import xarray as xr
 import zarr
 from pydantic import TypeAdapter
 from pyproj import CRS
-from xarray.coding.times import _netcdf_to_numpy_timeunit
-from zarr.core.chunk_grids import _auto_partition
 from zarr.core.dtype.npy.time import TimeDelta64
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.core.sync import sync
@@ -27,21 +25,52 @@ from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
 from eopf_geozarr.zarrio import convert_compression, reencode_group
 
-from .s2_multiscale import create_multiscale_levels, write_geo_metadata
+from .s2_multiscale import (
+    auto_chunks,
+    calculate_simple_shard_dimensions,
+    create_multiscale_levels,
+    write_geo_metadata,
+)
 
 log = structlog.get_logger()
 
-TIME_UNITS = frozenset(
-    [
-        "days",
-        "hours",
-        "minutes",
-        "seconds",
-        "milliseconds",
-        "microseconds",
-        "nanoseconds",
-    ]
+TimeUnit = Literal[
+    "days",
+    "hours",
+    "minutes",
+    "seconds",
+    "milliseconds",
+    "microseconds",
+    "nanoseconds",
+]
+
+TimeAbbreviation = Literal["D", "h", "m", "s", "ms", "us", "ns"]
+
+TIME_UNIT: Final[tuple[str, ...]] = (
+    "days",
+    "hours",
+    "minutes",
+    "seconds",
+    "milliseconds",
+    "microseconds",
+    "nanoseconds",
 )
+
+TIME_ABBREVIATION: Final[tuple[str, ...]] = ("D", "h", "m", "s", "ms", "us", "ns")
+
+_NETCDF_TO_NUMPY_TIME_UNITS: dict[TimeUnit, TimeAbbreviation] = {
+    "days": "D",
+    "hours": "h",
+    "minutes": "m",
+    "seconds": "s",
+    "milliseconds": "ms",
+    "microseconds": "us",
+    "nanoseconds": "ns",
+}
+
+
+def _netcdf_unit_to_numpy_time_unit(unit: TimeUnit) -> TimeAbbreviation:
+    return _NETCDF_TO_NUMPY_TIME_UNITS[unit]
 
 
 def initialize_crs_from_dataset(dt_input: xr.DataTree) -> CRS:
@@ -162,8 +191,8 @@ def array_reencoder(
     attributes: dict[str, object] = metadata.attributes.copy()
     # handle xarray datetime/timedelta encoding
     # If the array has time-related units, ensure the dtype attribute matches the actual dtype
-    if attributes.get("units") in TIME_UNITS:
-        numpy_time_unit = _netcdf_to_numpy_timeunit(attributes["units"])
+    if attributes.get("units") in TIME_UNIT:
+        numpy_time_unit = _netcdf_unit_to_numpy_time_unit(attributes["units"])  # type: ignore[arg-type]
         # Check if this is a timedelta or datetime based on:
         # 1. The zarr dtype (if it's a native time type like TimeDelta64)
         # 2. The existing dtype attribute (for int64-encoded times)
@@ -212,39 +241,18 @@ def array_reencoder(
         and Path(group_name).name.endswith("m")
     )
 
-    # get the size of each element of the array, if that's defined for this dtype
-    if hasattr(metadata.dtype, "item_size"):
-        item_size: int = metadata.dtype.item_size
-    else:
-        item_size = 1
-
     chunk_shape: tuple[int, ...] = metadata.chunks
+
+    if in_measurements_group:
+        chunk_shape = auto_chunks(metadata.shape, spatial_chunk)
+
     subchunk_shape: tuple[int, ...] | None = None
+
+    if in_measurements_group and metadata.ndim >= 2 and enable_sharding:
+        subchunk_shape = chunk_shape
+        chunk_shape = calculate_simple_shard_dimensions(metadata.shape, chunk_shape)
+
     chunk_grid: dict[str, str | dict[str, object]]
-
-    if in_measurements_group and metadata.ndim > 0:
-        if metadata.ndim == 1:
-            # don't rechunk 1D variables
-            pass
-        else:
-            # Check if array is too small for the requested chunk size
-            # If any spatial dimension is smaller than spatial_chunk, don't use sharding
-            array_too_small_for_sharding = enable_sharding and (
-                metadata.shape[-2] < spatial_chunk or metadata.shape[-1] < spatial_chunk
-            )
-
-            if not enable_sharding or array_too_small_for_sharding:
-                chunk_shape = (spatial_chunk, spatial_chunk)
-                subchunk_shape = None
-            else:
-                # Generate 2D chunking / sharding, because partitioning along
-                # other dimensions will be set to 1
-                chunk_shape, subchunk_shape = _auto_partition(
-                    array_shape=metadata.shape[-2:],
-                    chunk_shape=(spatial_chunk,) * 2,
-                    shard_shape="auto",
-                    item_size=item_size,
-                )
 
     chunk_grid = {"name": "regular", "configuration": {"chunk_shape": chunk_shape}}
     if enable_sharding and subchunk_shape is not None:
@@ -261,7 +269,6 @@ def array_reencoder(
         )
     else:
         codecs = ({"name": "bytes"}, *compressor_converted)  # type: ignore[assignment]
-
     return ArrayV3Metadata(
         shape=metadata.shape,
         data_type=metadata.dtype,
@@ -338,7 +345,6 @@ def convert_s2_optimized(
         array_reencoder=_array_reencoder,
         omit_nodes=omit_nodes,
     )
-
     if "measurements" in out_group:
         log.info("Adding CRS elements to datasets in measurements")
         for _, subgroup in out_group["measurements"].groups():

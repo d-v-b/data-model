@@ -104,7 +104,7 @@ def update_encoding(
     """
     Update an xarray encoding of a variable against a dataarray. Used when ensuring that a downsampled
     dataarray has an encoding consistent with both the source array and also its newly reduced shape.
-    Shape-related quantities like chunks and shards need to be shrunk to match the shape of the array.
+    Shape-related quantities like chunks and shards need to be adjusted to match the shape of the array.
     All other elements of the encoding are preserved
     """
     new_encoding: XarrayDataArrayEncoding = {**encoding}
@@ -112,20 +112,57 @@ def update_encoding(
         new_encoding["chunks"] = tuple(
             min(s, c) for s, c in zip(array.shape, new_encoding["chunks"], strict=True)
         )
-    # If the encoding declares sharding, but the shape of the array falls below the requested shard shape,
-    # then we discard the sharding request, because it will not generally be possible to ensure that the
-    # chunk shape tiles the shards correctly in this case.
-    if new_encoding.get("shards") is not None and any(
-        shape < shard
-        for shard, shape in zip(new_encoding["shards"], array.shape, strict=True)  # type: ignore [arg-type]
-    ):
-        new_encoding["shards"] = None
+        if new_encoding.get("shards") is not None:
+            # new shards are the largest multiple of the new chunks that fits inside the new shape
+            new_shards = tuple(
+                (shape // chunk) * chunk
+                for chunk, shape in zip(new_encoding["chunks"], array.shape, strict=True)
+            )
+            # calculate the number of inner chunks within the shard
+            num_subchunks = np.prod(
+                tuple(
+                    shard // chunk
+                    for shard, chunk in zip(new_shards, new_encoding["chunks"], strict=True)
+                )
+            )
+            # If we would generate shards with a single chunk, there is no longer value in sharding, and we should
+            # use regular chunking
+            if num_subchunks == 1:
+                new_encoding["shards"] = None
+            else:
+                new_encoding["shards"] = new_shards
     if "preferred_chunks" in new_encoding:
         new_encoding["preferred_chunks"] = {
             k: min(array.shape[array.dims.index(k)], v)
             for k, v in new_encoding["preferred_chunks"].items()
         }
     return new_encoding
+
+
+def auto_chunks(shape: tuple[int, ...], target_chunk_size: int) -> tuple[int, ...]:
+    """
+    Compute a chunk size from a shape and a target chunk size. This logic is application-specific.
+    For 0D data, the empty tuple is returned.
+    For 1D data, the minimum of the length of the data and the target chunk size is returned.
+    For 2D, 3D, etc, a chunk edge length is computed based on each of the last two dimensions, and
+    all other dimensions have chunks set to 1.
+    """
+    ndim = len(shape)
+
+    if ndim == 0:
+        return ()
+
+    if ndim == 1:
+        return (min(target_chunk_size, shape[0]),)
+
+    height, width = shape[-2:]
+
+    spatial_chunk_aligned = min(
+        target_chunk_size,
+        calculate_aligned_chunk_size(width, target_chunk_size),
+        calculate_aligned_chunk_size(height, target_chunk_size),
+    )
+    return ((1,) * (ndim - 2)) + (spatial_chunk_aligned, spatial_chunk_aligned)
 
 
 def create_measurements_encoding(
@@ -267,30 +304,13 @@ def add_multiscales_metadata_to_parent(
 
     all_resolutions = sorted(set(res_groups.keys()), key=lambda x: res_order.get(x, 999))
 
-    if len(all_resolutions) < 2:
-        log.info(
-            "Skipping {} - only one resolution available",
-            base_path=base_path,
-        )
-        return None
-
     # Get CRS and bounds from first available dataset (load from output path)
     first_res = all_resolutions[0]
     first_dataset = res_groups[first_res]
 
     # Get CRS and bounds
-    native_crs = first_dataset.rio.crs if hasattr(first_dataset, "rio") else None
-    if native_crs is None:
-        log.info("No CRS found, skipping multiscales metadata", base_path=base_path)
-        return None
-
-    native_bounds = first_dataset.rio.bounds() if hasattr(first_dataset, "rio") else None
-    if native_bounds is None:
-        log.info(
-            "No bounds found, skipping multiscales metadata",
-            base_path=base_path,
-        )
-        return None
+    native_crs = first_dataset.rio.crs
+    native_bounds = first_dataset.rio.bounds()
 
     # Create overview_levels structure with string-based level names
     overview_levels: list[OverviewLevelJSON] = []
@@ -332,10 +352,6 @@ def add_multiscales_metadata_to_parent(
                 "chunks": dataset.data_vars[first_var.name].chunks,
             }
         )
-
-    if len(overview_levels) < 2:
-        log.info("    Could not create overview levels for {}", base_path=base_path)
-        return None
 
     multiscales: dict[str, Any] = {"multiscales": {}}
     layout: list[zcm.ScaleLevel] | MISSING = MISSING
@@ -391,6 +407,7 @@ def add_multiscales_metadata_to_parent(
     dt_multiscale = xr.DataTree()
     for res in all_resolutions:
         dt_multiscale[res] = xr.DataTree()
+
     dt_multiscale.attrs.update(multiscale_attrs.model_dump())
     dt_multiscale.to_zarr(
         parent_group_path,
