@@ -165,7 +165,7 @@
                     "angle"
                   ],
                   "eopf_is_masked": true,
-                  "fill_value": NaN
+                  "fill_value": "NaN"
                 },
                 "unit": "deg"
               },
@@ -225,7 +225,7 @@
                     "angle"
                   ],
                   "eopf_is_masked": true,
-                  "fill_value": NaN
+                  "fill_value": "NaN"
                 },
                 "unit": "deg"
               },
@@ -290,7 +290,7 @@
                     "x"
                   ],
                   "eopf_is_masked": true,
-                  "fill_value": NaN
+                  "fill_value": "NaN"
                 }
               },
               "chunk_grid": {
@@ -361,7 +361,7 @@
                     "x"
                   ],
                   "eopf_is_masked": true,
-                  "fill_value": NaN
+                  "fill_value": "NaN"
                 }
               },
               "chunk_grid": {
@@ -2552,7 +2552,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Total Aerosol Optical Depth at 1240nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -2653,7 +2653,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Total Aerosol Optical Depth at 469nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -2754,7 +2754,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Total Aerosol Optical Depth at 550nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -2855,7 +2855,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Total Aerosol Optical Depth at 670nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -2956,7 +2956,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Total Aerosol Optical Depth at 865nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -3057,7 +3057,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Black Carbon Aerosol Optical Depth at 550nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -3158,7 +3158,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Dust Aerosol Optical Depth at 550nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -3430,7 +3430,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Organic Matter Aerosol Optical Depth at 550nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -3531,7 +3531,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Sea Salt Aerosol Optical Depth at 550nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -3667,7 +3667,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Sulphate Aerosol Optical Depth at 550nm",
                       "standard_name": "unknown",
                       "units": "~"
@@ -3871,7 +3871,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Geopotential",
                       "standard_name": "geopotential",
                       "units": "m**2 s**-2"
@@ -4124,7 +4124,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Mean sea level pressure",
                       "standard_name": "air_pressure_at_mean_sea_level",
                       "units": "Pa"
@@ -4259,7 +4259,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Relative humidity",
                       "standard_name": "relative_humidity",
                       "units": "%"
@@ -4428,7 +4428,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Total column ozone",
                       "standard_name": "atmosphere_mass_content_of_ozone",
                       "units": "kg m**-2"
@@ -4529,7 +4529,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "Total column vertically-integrated water vapour",
                       "standard_name": "lwe_thickness_of_atmosphere_mass_content_of_water_vapor",
                       "units": "kg m**-2"
@@ -4665,7 +4665,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "10 metre U wind component",
                       "standard_name": "unknown",
                       "units": "m s**-1"
@@ -4766,7 +4766,7 @@
                         "longitude"
                       ],
                       "eopf_is_masked": true,
-                      "fill_value": NaN,
+                      "fill_value": "NaN",
                       "long_name": "10 metre V wind component",
                       "standard_name": "unknown",
                       "units": "m s**-1"
