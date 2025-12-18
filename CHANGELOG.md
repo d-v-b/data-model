@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-12-18
+
+### Added
+- Spatial Zarr Convention models and metadata support (#100)
+
+### Changed
+- Updated multiscales metadata handling for improved compatibility
+- Set up VCS versioning based on git tags for automatic version management
+- Improved linting configuration by dropping isort and black in favor of stronger linting
+
+### Fixed
+- Prevented crash in quality-mask downsampling for Sentinel-2 processing
+- Fixed S3 path test issues
+- Improved runtime imports for better performance
+
 ## [0.3.0] - 2025-11-04
 
 ### Added
