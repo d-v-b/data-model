@@ -21,11 +21,13 @@ from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
     create_native_crs_tile_matrix_set,
 )
+from eopf_geozarr.data_api.geozarr.geoproj import ProjConventionMetadata
 from eopf_geozarr.data_api.geozarr.multiscales import tms, zcm
 from eopf_geozarr.data_api.geozarr.multiscales.geozarr import (
     MultiscaleGroupAttrs,
     MultiscaleMeta,
 )
+from eopf_geozarr.data_api.geozarr.spatial import SpatialConventionMetadata
 from eopf_geozarr.data_api.geozarr.types import (
     XARRAY_ENCODING_KEYS,
     XarrayDataArrayEncoding,
@@ -309,14 +311,36 @@ def add_multiscales_metadata_to_parent(
     first_dataset = res_groups[first_res]
 
     # Get CRS and bounds
-    native_crs = first_dataset.rio.crs
-    native_bounds = first_dataset.rio.bounds()
+    native_crs = first_dataset.rio.crs if hasattr(first_dataset, "rio") else None
+    if native_crs is None:
+        log.info("No CRS found, skipping multiscales metadata", base_path=base_path)
+        return None
 
-    # Create overview_levels structure with string-based level names
+    native_bounds = None
+    if hasattr(first_dataset, "rio"):
+        try:
+            native_bounds = first_dataset.rio.bounds()
+        except (AttributeError, TypeError):
+            # Try alternative method or construct from coordinates
+            try:
+                x_coords = first_dataset.x.values
+                y_coords = first_dataset.y.values
+                native_bounds = (x_coords.min(), y_coords.min(), x_coords.max(), y_coords.max())
+            except Exception:
+                pass
+
+    if native_bounds is None:
+        log.info(
+            "No bounds found, skipping multiscales metadata",
+            base_path=base_path,
+        )
+        return None
+
+    # Create overview_levels structure following the multiscales v1.0 specification
     overview_levels: list[OverviewLevelJSON] = []
     for res_name in all_resolutions:
-        # res_meters = res_order[res_name]
-        res_meters = float(get_grid_spacing(res_groups[res_name], ("y",))[0])
+        # Use resolution order for consistent scale calculations
+        res_meters = res_order[res_name]
 
         dataset = res_groups[res_name]
 
@@ -327,31 +351,96 @@ def add_multiscales_metadata_to_parent(
         first_var = next(iter(dataset.data_vars.values()))
         height, width = first_var.shape[-2:]
 
+        # Calculate spatial transform (affine transformation)
+        transform = None
+        if hasattr(dataset, "rio") and hasattr(dataset.rio, "transform"):
+            try:
+                # Try to get transform as property first
+                rio_transform = dataset.rio.transform
+                if callable(rio_transform):
+                    rio_transform = rio_transform()
+                transform = tuple(rio_transform)[:6]  # Get 6 coefficients
+                log.info("Got transform from rio accessor", transform=transform, level=res_name)
+            except (AttributeError, TypeError) as e:
+                log.warning(
+                    "Could not get transform from rio accessor", error=str(e), level=res_name
+                )
+
+        if transform is None or all(t == 0 for t in transform):
+            # Fallback: construct from grid spacing and bounds
+            if "x" in dataset.coords and "y" in dataset.coords:
+                # Use coordinate arrays to calculate spacing
+                x_coords = dataset.coords["x"].values
+                y_coords = dataset.coords["y"].values
+
+                if len(x_coords) > 1 and len(y_coords) > 1:
+                    pixel_size_x = float(np.abs(x_coords[1] - x_coords[0]))
+                    pixel_size_y = float(np.abs(y_coords[1] - y_coords[0]))
+                    x_min = float(x_coords.min())
+                    y_max = float(y_coords.max())
+                    transform = (pixel_size_x, 0.0, x_min, 0.0, -pixel_size_y, y_max)
+                    log.info(
+                        "Calculated transform from coordinates",
+                        transform=transform,
+                        pixel_size_x=pixel_size_x,
+                        pixel_size_y=pixel_size_y,
+                        level=res_name,
+                    )
+                else:
+                    log.warning(
+                        "Insufficient coordinate points for transform calculation",
+                        x_len=len(x_coords),
+                        y_len=len(y_coords),
+                        level=res_name,
+                    )
+            else:
+                log.warning(
+                    "Missing x/y coordinates for transform calculation",
+                    coords=list(dataset.coords.keys()),
+                    level=res_name,
+                )
+
         # Calculate zoom level (higher resolution = higher zoom)
         tile_width = 256
         zoom_for_width = max(0, int(np.ceil(np.log2(width / tile_width))))
         zoom_for_height = max(0, int(np.ceil(np.log2(height / tile_width))))
         zoom = max(zoom_for_width, zoom_for_height)
 
-        # Calculate scale factor relative to finest resolution
+        # Calculate relative scale and translation vs first resolution
         finest_res_meters = res_order[all_resolutions[0]]
-        scale_factor = res_meters // finest_res_meters
+        relative_scale = res_meters / finest_res_meters
+        relative_translation = (res_meters - finest_res_meters) / 2
 
-        # calculate translation relative to finest resolution
-        trans_meters = (res_meters - finest_res_meters) / 2
+        # Get chunks in the correct format
+        var_chunks = dataset.data_vars[first_var.name].chunks
+        if var_chunks is not None:
+            chunks = tuple(tuple(int(c) for c in chunk_dim) for chunk_dim in var_chunks)
+        else:
+            chunks = None
+            log.warning(
+                "Could not determine chunking information for overview level; 'chunks' will be set to None",
+                level=res_name,
+                variable=str(first_var.name),
+            )
 
-        overview_levels.append(
-            {
-                "level": res_name,  # Use string-based level name
-                "zoom": zoom,
-                "width": width,
-                "height": height,
-                "translation_relative": trans_meters,
-                "scale_absolute": res_meters,
-                "scale_relative": scale_factor,
-                "chunks": dataset.data_vars[first_var.name].chunks,
-            }
-        )
+        layout_entry: OverviewLevelJSON = {
+            "level": res_name,  # Use string-based level name
+            "zoom": zoom,
+            "width": width,
+            "height": height,
+            "translation_relative": relative_translation,
+            "scale_absolute": res_meters,
+            "scale_relative": relative_scale,
+            "spatial_transform": None,
+            "chunks": chunks,
+            "spatial_shape": (height, width),
+        }
+
+        # Only add spatial_transform if we have valid transform data
+        if transform is not None and not all(t == 0 for t in transform):
+            layout_entry["spatial_transform"] = transform
+
+        overview_levels.append(layout_entry)
 
     multiscales: dict[str, Any] = {"multiscales": {}}
     layout: list[zcm.ScaleLevel] | MISSING = MISSING
@@ -381,19 +470,50 @@ def add_multiscales_metadata_to_parent(
         )
     if "experimental_multiscales_convention" in multiscales_flavor:
         layout = []
-        for overview_level in overview_levels:
-            layout.append(
-                zcm.ScaleLevel(
-                    asset=str(overview_level["level"]),
-                    derived_from=str(all_resolutions[0]),
-                    transform=zcm.Transform(
-                        scale=(overview_level["scale_relative"],) * 2,
-                        translation=(overview_level["translation_relative"],) * 2,
-                    ),
+
+        # Define the correct derivation chain
+        derivation_chain = {
+            "r10m": None,  # base resolution
+            "r20m": "r10m",
+            "r60m": "r10m",
+            "r120m": "r60m",
+            "r360m": "r120m",
+            "r720m": "r360m",
+        }
+
+        for i, overview_level in enumerate(overview_levels):
+            # Create scale level with required fields
+            asset = str(overview_level["level"])
+
+            # Build complete dict for ScaleLevel initialization
+            scale_level_data: dict[str, Any] = {"asset": asset}
+
+            if i > 0:  # Not the first (base) resolution
+                derived_from = derivation_chain.get(asset, str(all_resolutions[0]))
+                multiscale_transform = zcm.Transform(
+                    scale=(overview_level["scale_relative"],) * 2,
+                    translation=(overview_level["translation_relative"],) * 2,
                 )
-            )
+                scale_level_data["derived_from"] = derived_from
+                scale_level_data["transform"] = multiscale_transform
+
+            # Add spatial properties
+            scale_level_data["spatial:shape"] = overview_level["spatial_shape"]
+            if "spatial_transform" in overview_level:
+                spatial_transform = overview_level["spatial_transform"]
+                # Only add spatial_transform if we have valid transform data (not all zeros)
+                if spatial_transform is not None and not all(t == 0 for t in spatial_transform):
+                    scale_level_data["spatial:transform"] = spatial_transform
+
+            scale_level = zcm.ScaleLevel(**scale_level_data)
+            layout.append(scale_level)
+    # Create convention metadata for all three conventions
     multiscale_attrs = MultiscaleGroupAttrs(
-        zarr_conventions=(zcm.MultiscaleConventionMetadata(),),
+        zarr_conventions=(
+            zcm.MultiscaleConventionMetadata(),
+            SpatialConventionMetadata(),
+            ProjConventionMetadata(),
+        ),
         multiscales=MultiscaleMeta(
             layout=layout,
             resampling_method="average",
@@ -408,7 +528,22 @@ def add_multiscales_metadata_to_parent(
     for res in all_resolutions:
         dt_multiscale[res] = xr.DataTree()
 
+    # Add multiscale attributes
     dt_multiscale.attrs.update(multiscale_attrs.model_dump())
+
+    # Add spatial and proj attributes at group level following specifications
+    if native_crs and native_bounds:
+        # Add spatial convention attributes
+        dt_multiscale.attrs["spatial:dimensions"] = ["y", "x"]  # Required field
+        dt_multiscale.attrs["spatial:bbox"] = list(native_bounds)  # [xmin, ymin, xmax, ymax]
+        dt_multiscale.attrs["spatial:registration"] = "pixel"  # Default registration type
+
+        # Add proj convention attributes
+        if hasattr(native_crs, "to_epsg") and native_crs.to_epsg():
+            dt_multiscale.attrs["proj:code"] = f"EPSG:{native_crs.to_epsg()}"
+        elif hasattr(native_crs, "to_wkt"):
+            dt_multiscale.attrs["proj:wkt2"] = native_crs.to_wkt()
+
     dt_multiscale.to_zarr(
         parent_group_path,
         mode="a",
@@ -671,8 +806,70 @@ def write_geo_metadata(
     dataset.rio.write_crs(crs, grid_mapping_name=grid_mapping_var_name, inplace=True)
     dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
 
-    for var in dataset.data_vars.values():
-        var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
+    if crs is not None:
+        # Write CRS using rioxarray
+        # NOTE: for now rioxarray only supports writing grid mapping using CF conventions
+        dataset.rio.write_crs(crs, grid_mapping_name=grid_mapping_var_name, inplace=True)
+        dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
+        dataset.attrs["grid_mapping"] = grid_mapping_var_name
+
+        for var in dataset.data_vars.values():
+            var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
+            var.attrs["grid_mapping"] = grid_mapping_var_name
+
+        # Also add proj: and spatial: zarr conventions at dataset level
+        # TODO : Remove once rioxarray supports writing these conventions directly
+        # https://github.com/corteva/rioxarray/pull/883
+
+        # Add spatial convention attributes
+        dataset.attrs["spatial:dimensions"] = ["y", "x"]  # Required field
+        dataset.attrs["spatial:registration"] = "pixel"  # Default registration type
+
+        # Calculate and add spatial bbox if coordinates are available
+        if "x" in dataset.coords and "y" in dataset.coords:
+            x_coords = dataset.coords["x"].values
+            y_coords = dataset.coords["y"].values
+            x_min, x_max = float(x_coords.min()), float(x_coords.max())
+            y_min, y_max = float(y_coords.min()), float(y_coords.max())
+            dataset.attrs["spatial:bbox"] = [x_min, y_min, x_max, y_max]
+
+            # Calculate spatial transform (affine transformation)
+            spatial_transform = None
+            if hasattr(dataset, "rio") and hasattr(dataset.rio, "transform"):
+                try:
+                    rio_transform = dataset.rio.transform
+                    if callable(rio_transform):
+                        rio_transform = rio_transform()
+                    spatial_transform = list(rio_transform)[:6]
+                except (AttributeError, TypeError):
+                    # Fallback: construct from coordinate spacing
+                    pixel_size_x = float(get_grid_spacing(dataset, ("x",))[0])
+                    pixel_size_y = float(get_grid_spacing(dataset, ("y",))[0])
+                    spatial_transform = [
+                        pixel_size_x,
+                        0.0,
+                        x_min,
+                        0.0,
+                        -pixel_size_y,
+                        y_max,
+                    ]
+
+            # Only add spatial:transform if we have valid transform data (not all zeros)
+            if spatial_transform is not None and not all(t == 0 for t in spatial_transform):
+                dataset.attrs["spatial:transform"] = spatial_transform
+
+            # Add spatial shape if data variables exist
+            if dataset.data_vars:
+                first_var = next(iter(dataset.data_vars.values()))
+                if first_var.ndim >= 2:
+                    height, width = first_var.shape[-2:]
+                    dataset.attrs["spatial:shape"] = [height, width]
+
+        # Add proj convention attributes
+        if hasattr(crs, "to_epsg") and crs.to_epsg():
+            dataset.attrs["proj:code"] = f"EPSG:{crs.to_epsg()}"
+        elif hasattr(crs, "to_wkt"):
+            dataset.attrs["proj:wkt2"] = crs.to_wkt()
 
 
 def rechunk_dataset_for_encoding(

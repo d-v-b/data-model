@@ -112,6 +112,7 @@ class Multiscales(BaseModel):
 
 
 class MultiscalesJSON(TypedDict):
+    version: NotRequired[str]
     layout: tuple[ScaleLevelJSON, ...]
     resampling_method: NotRequired[str]
 
