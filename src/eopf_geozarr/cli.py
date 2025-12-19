@@ -1161,6 +1161,11 @@ def add_s2_optimization_commands(subparsers: argparse._SubParsersAction) -> None
     s2_parser.add_argument("--skip-validation", action="store_true", help="Skip output validation")
     s2_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     s2_parser.add_argument(
+        "--allow-json-nan",
+        action="store_true",
+        help="Allow invalid float values (nan, inf) in output JSON",
+    )
+    s2_parser.add_argument(
         "--dask-cluster",
         action="store_true",
         help="Start a local dask cluster for parallel processing and progress bars",
@@ -1198,6 +1203,7 @@ def convert_s2_optimized_command(args: argparse.Namespace) -> None:
             omit_nodes=omit_nodes,
             compression_level=args.compression_level,
             validate_output=not args.skip_validation,
+            allow_json_nan=args.allow_json_nan,
         )
 
         log.info("✅ S2 optimization completed", output_path=args.output_path)

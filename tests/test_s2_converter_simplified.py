@@ -16,6 +16,7 @@ from eopf_geozarr.s2_optimization.s2_converter import (
     convert_s2_optimized,
     simple_root_consolidation,
 )
+from eopf_geozarr.s2_optimization.s2_multiscale import auto_chunks
 
 
 @pytest.fixture
@@ -147,8 +148,8 @@ class TestConvenienceFunction:
         reencoded_array = reflectance_group["r10m/b03"]
         downsampled_array = reflectance_group["r720m/b03"]
 
-        # For re-encoded arrays, chunks should match spatial_chunk
-        assert reencoded_array.chunks == (spatial_chunk, spatial_chunk)
+        # For re-encoded arrays, chunks should match output of auto_chunks
+        assert reencoded_array.chunks == auto_chunks(reencoded_array.shape, spatial_chunk)
 
         # For downsampled arrays, chunks should be min(spatial_chunk, array_shape)
         # because the array might be smaller than the chunk size

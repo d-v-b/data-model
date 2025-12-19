@@ -4,6 +4,7 @@ This module contains zarr-specific IO routines
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 import numcodecs
@@ -97,6 +98,36 @@ def default_array_reencoder(
     )
 
 
+def replace_json_invalid_floats(obj: object) -> object:
+    """
+    Recursively replace NaN and Infinity float values in a JSON-like object
+    with their string representations, to make them JSON-compliant.
+
+    Parameters
+    ----------
+    obj : object
+        The JSON-like object to process
+
+    Returns
+    -------
+    object
+        The processed object with NaN and Infinity replaced
+    """
+    if isinstance(obj, float):
+        if obj != obj:  # NaN check
+            return "NaN"
+        if obj == float("inf"):
+            return "Infinity"
+        if obj == float("-inf"):
+            return "-Infinity"
+        return obj
+    if isinstance(obj, dict):
+        return {k: replace_json_invalid_floats(v) for k, v in obj.items()}
+    if isinstance(obj, list | tuple):
+        return [replace_json_invalid_floats(item) for item in obj]
+    return obj
+
+
 def reencode_group(
     group: zarr.Group,
     store: zarr.storage.StoreLike,
@@ -106,6 +137,7 @@ def reencode_group(
     use_consolidated_for_children: bool = False,
     omit_nodes: set[str] | None = None,
     array_reencoder: Callable[[str, ArrayV2Metadata], ArrayV3Metadata] = default_array_reencoder,
+    allow_json_nan: bool = False,
 ) -> zarr.Group:
     """
     Re-encode a Zarr group, applying a re-encoding to all sub-groups and sub-arrays.
@@ -126,7 +158,9 @@ def reencode_group(
         A function that takes a Zarr array object and returns a ChunkEncodingSpec, which is a dict
         that defines a new chunk encoding. Use this parameter to define per-array chunk encoding
         logic.
-
+    allow_json_nan : bool, default = False
+        Whether to allow NaN and Infinity values in JSON metadata. If False, float("NaN") will be
+        encoded as the string "Nan", float("Inf") as "Infinity", and float("-Inf") as "-Infinity".
     """
     if omit_nodes is None:
         omit_nodes = set()
@@ -160,8 +194,17 @@ def reencode_group(
             continue
         log.info("Re-encoding member %s", name)
         new_path = f"{path}/{name}"
+        source_meta = member.metadata
+
+        if not allow_json_nan:
+            log.info("Replacing any nan and inf float values with string equivalents")
+            # replace any invalid floats with string encodings using the
+            # zarr v3 fill value encoding for floats
+            new_attrs = replace_json_invalid_floats(source_meta.attributes)
+            source_meta = replace(source_meta, attributes=new_attrs)
+
         if isinstance(member, zarr.Array):
-            new_meta = array_reencoder(member.path, member.metadata)
+            new_meta = array_reencoder(member.path, source_meta)
             new_members[new_path] = new_meta
             chunks_to_encode.append(name)
         else:

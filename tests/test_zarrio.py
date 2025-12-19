@@ -11,6 +11,7 @@ from eopf_geozarr.zarrio import (
     convert_compression,
     default_array_reencoder,
     reencode_group,
+    replace_json_invalid_floats,
 )
 
 
@@ -254,6 +255,25 @@ def test_reencode_group_with_chunk_reencoder() -> None:
     new_node = group_v3["data"]
     assert new_node.metadata.chunk_grid.chunk_shape == new_chunks
     assert new_node.attrs.asdict() == old_node.attrs.asdict()
+
+
+def test_replace_json_invalid_floats() -> None:
+    data: dict[str, object] = {
+        "nan": float("nan"),
+        "nested_nan": {"nan": float("nan")},
+        "nan_in_list": [float("nan")],
+        "inf": float("inf"),
+        "-inf": float("-inf"),
+    }
+    expected = {
+        "nan": "NaN",
+        "nested_nan": {"nan": "NaN"},
+        "nan_in_list": ["NaN"],
+        "inf": "Infinity",
+        "-inf": "-Infinity",
+    }
+    observed = replace_json_invalid_floats(data)
+    assert observed == expected
 
 
 if __name__ == "__main__":
