@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from eopf_geozarr.data_api.geozarr.projjson import (
     Axis,
     BBox,
+    BoundCRS,
     CompoundCRS,
     CoordinateMetadata,
     CoordinateSystem,
@@ -23,9 +24,12 @@ from eopf_geozarr.data_api.geozarr.projjson import (
     GeodeticCRS,
     GeodeticReferenceFrame,
     Id,
+    PrimeMeridian,
     ProjectedCRS,
     SingleOperation,
+    TemporalCRS,
     Unit,
+    VerticalCRS,
 )
 
 
@@ -700,21 +704,8 @@ class TestRoundTripSerialization:
         if original_op.parameters:
             assert len(round_trip_op.parameters) == len(original_op.parameters)
 
-    def test_all_examples_round_trip(self, all_projjson_examples: list[dict[str, Any]]) -> None:
+    def test_all_examples_round_trip(self, projjson_example: dict[str, object]) -> None:
         """Test that all PROJ JSON examples can be round-tripped without error."""
-        from eopf_geozarr.data_api.geozarr.projjson import (
-            BoundCRS,
-            CompoundCRS,
-            CoordinateMetadata,
-            DatumEnsemble,
-            Ellipsoid,
-            GeodeticCRS,
-            PrimeMeridian,
-            ProjectedCRS,
-            SingleOperation,
-            TemporalCRS,
-            VerticalCRS,
-        )
 
         # Map types to model classes
         type_mapping = {
@@ -733,44 +724,24 @@ class TestRoundTripSerialization:
             "CoordinateMetadata": CoordinateMetadata,
         }
 
-        successful_round_trips = 0
-        total_examples = len(all_projjson_examples)
+        # Get the model class based on type
+        obj_type = projjson_example.get("type")
 
-        for example in all_projjson_examples:
-            try:
-                # Get the model class based on type
-                obj_type = example.get("type")
-                if obj_type not in type_mapping:
-                    continue  # Skip unknown types
+        model_class = type_mapping[obj_type]
 
-                model_class = type_mapping[obj_type]
+        # Create model from JSON
+        original_model = model_class(**projjson_example)
 
-                # Create model from JSON
-                original_model = model_class(**example)
+        # Serialize back to dict
+        serialized = original_model.model_dump(exclude_none=True)
 
-                # Serialize back to dict
-                serialized = original_model.model_dump(exclude_none=True)
+        # Create model from serialized data
+        round_trip_model = model_class(**serialized)
 
-                # Create model from serialized data
-                round_trip_model = model_class(**serialized)
-
-                # Basic verification that the round-trip worked
-                assert round_trip_model.type == original_model.type
-                if hasattr(original_model, "name") and original_model.name:
-                    assert round_trip_model.name == original_model.name
-
-                successful_round_trips += 1
-
-            except Exception as e:
-                # For debugging, print which example failed
-                print(
-                    f"Failed to round-trip example with type {example.get('type', 'unknown')}: {e}"
-                )
-                raise  # Re-raise to fail the test
-
-        # Ensure we successfully round-tripped at least some examples
-        assert successful_round_trips > 0, "No examples were successfully round-tripped"
-        print(f"Successfully round-tripped {successful_round_trips}/{total_examples} examples")
+        # Basic verification that the round-trip worked
+        assert round_trip_model.type == original_model.type
+        if hasattr(original_model, "name") and original_model.name:
+            assert round_trip_model.name == original_model.name
 
 
 if __name__ == "__main__":

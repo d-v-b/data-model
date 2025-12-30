@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from pydantic_zarr.core import tuplify_json
 
 from eopf_geozarr.data_api.geozarr.geoproj import GeoProj, Proj, ProjConventionMetadata
-from tests.test_data_api.conftest import GEOPROJ_EXAMPLES, view_json_diff
+from tests.test_data_api.conftest import view_json_diff
 
 
 class TestProjConventionMetadata:
@@ -171,11 +171,9 @@ class TestBackwardsCompatibility:
         assert proj_instance.model_dump() == geoproj_instance.model_dump()
 
 
-@pytest.mark.parametrize("json_example", GEOPROJ_EXAMPLES.items(), ids=lambda v: v[0])
-def test_geoproj_roundtrip(json_example: tuple[str, dict[str, object]]) -> None:
+def test_geoproj_roundtrip(geoproj_example: dict[str, object]) -> None:
     """Test roundtrip serialization with existing examples (backwards compatibility)."""
-    _, value = json_example
-    value_tup = tuplify_json(value)
+    value_tup = tuplify_json(geoproj_example)
     attrs_json = value_tup["attributes"]
     model = GeoProj(**attrs_json)
     observed = model.model_dump()
@@ -183,11 +181,9 @@ def test_geoproj_roundtrip(json_example: tuple[str, dict[str, object]]) -> None:
     assert jsondiff.diff(expected, observed) == {}, view_json_diff(expected, observed)
 
 
-@pytest.mark.parametrize("json_example", GEOPROJ_EXAMPLES.items(), ids=lambda v: v[0])
-def test_proj_roundtrip(json_example: tuple[str, dict[str, object]]) -> None:
+def test_proj_roundtrip(geoproj_example: dict[str, object]) -> None:
     """Test roundtrip serialization with existing examples using new Proj class."""
-    _, value = json_example
-    value_tup = tuplify_json(value)
+    value_tup = tuplify_json(geoproj_example)
     attrs_json = value_tup["attributes"]
     model = Proj(**attrs_json)
     observed = model.model_dump()
