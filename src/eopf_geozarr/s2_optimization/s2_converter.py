@@ -29,6 +29,7 @@ from .s2_multiscale import (
     auto_chunks,
     calculate_simple_shard_dimensions,
     create_multiscale_levels,
+    create_multiscales_metadata,
     write_geo_metadata,
 )
 
@@ -373,12 +374,13 @@ def convert_s2_optimized(
             for _, dataset in subgroup.groups():
                 add_crs_and_grid_mapping(dataset, crs=crs)
 
-    # Step 2: Create multiscale pyramids for each group in the original structure
+    # Create multiscale pyramids for each group in the original structure
     log.info("Adding multiscale levels")
 
+    # Create multiscale metadata
     create_multiscale_levels(out_group, "measurements/reflectance")
+    create_multiscales_metadata(out_group["measurements/reflectance"])
 
-    # Step 3: Root-level consolidation
     log.info("Step 3: Final root-level metadata consolidation")
     # Pass empty dict since all groups are already created by reencode_group
     simple_root_consolidation(output_path, {})

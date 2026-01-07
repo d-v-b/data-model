@@ -18,6 +18,7 @@ from eopf_geozarr.s2_optimization.s2_multiscale import (
     create_downsampled_resolution_group,
     create_measurements_encoding,
     create_multiscale_levels,
+    create_multiscales_metadata,
 )
 
 
@@ -59,8 +60,32 @@ def simple_datatree() -> zarr.Group:
         attrs={"long_name": "Blue band", "units": "digital_number"},
     )
 
+    spatial_ref = xr.DataArray(
+        [0],
+        dims=["spatial_ref"],
+        attrs={
+            "crs_wkt": 'PROJCS["WGS 84 / UTM zone 32N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",9],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32632"]]',
+            "false_easting": 500000.0,
+            "false_northing": 0.0,
+            "geographic_crs_name": "WGS 84",
+            "grid_mapping_name": "transverse_mercator",
+            "horizontal_datum_name": "World Geodetic System 1984",
+            "inverse_flattening": 298.257223563,
+            "latitude_of_projection_origin": 0.0,
+            "longitude_of_central_meridian": 9.0,
+            "longitude_of_prime_meridian": 0.0,
+            "prime_meridian_name": "Greenwich",
+            "projected_crs_name": "WGS 84 / UTM zone 32N",
+            "reference_ellipsoid_name": "WGS 84",
+            "scale_factor_at_central_meridian": 0.9996,
+            "semi_major_axis": 6378137.0,
+            "semi_minor_axis": 6356752.314245179,
+            "spatial_ref": 'PROJCS["WGS 84 / UTM zone 32N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",9],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["metre",1],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32632"]]',
+        },
+    )
+
     # Create dataset
-    ds = xr.Dataset({"b02": b02})
+    ds = xr.Dataset({"b02": b02, "spatial_ref": spatial_ref})
 
     # Create DataTree
     dt = xr.DataTree(name="root")
@@ -212,6 +237,22 @@ def test_create_multiscale_from_datatree(simple_datatree: zarr.Group) -> None:
         create_multiscale_levels(simple_datatree, path="measurements/reflectance")
 
     ExpectedGroup.from_zarr(simple_datatree["measurements/reflectance"])
+
+
+@pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
+@pytest.mark.filterwarnings("ignore:.*:UserWarning")
+def test_create_multiscale_metadata(simple_datatree: zarr.Group) -> None:
+    """
+    Test that multiscales metadata is created after downsampling.
+
+    This test is weak right now but should be made stronger.
+    """
+    create_multiscale_levels(simple_datatree, path="measurements/reflectance")
+    create_multiscales_metadata(simple_datatree["measurements/reflectance"])
+    # create a new group to ensure that we get fresh attributes
+    new_group = zarr.open_group(simple_datatree.store, path=simple_datatree.path)
+    observed_attrs = new_group["measurements/reflectance"].attrs.asdict()
+    assert "multiscales" in observed_attrs
 
 
 @pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")

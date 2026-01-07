@@ -69,15 +69,13 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
     """
     Add additional multiscale levels to an existing Zarr group
     """
-    ds_levels = (1, 2, 6, 12, 36, 72)
-    ds_group_names = tuple(f"r{10 * x}m" for x in ds_levels)
-
+    ds_levels = (2, 6, 12, 36, 72)
     # Construct the full path to the group containing resolution levels
     full_path = f"{group.path}/{path}" if group.path else path
 
-    for (cur_factor, cur_group_name), (next_factor, next_group_name) in pairwise(
-        zip(ds_levels, ds_group_names, strict=True)
-    ):
+    for cur_factor, next_factor in pairwise((1, *ds_levels)):
+        cur_group_name = f"r{10 * cur_factor}m"
+        next_group_name = f"r{10 * next_factor}m"
         # Open the current resolution level as a dataset
         cur_group_path = f"{full_path}/{cur_group_name}"
         cur_ds = xr.open_dataset(group.store, group=cur_group_path, engine="zarr")
@@ -285,12 +283,10 @@ def calculate_simple_shard_dimensions(
     return tuple(shard_dims)
 
 
-def add_multiscales_metadata_to_parent(
-    output_path: str,
-    base_path: str,
-    res_groups: Mapping[str, xr.Dataset],
+def create_multiscales_metadata(
+    out_group: zarr.Group,
     multiscales_flavor: set[MultiscalesFlavor] | None = None,
-) -> xr.DataTree:
+) -> None:
     """Add GeoZarr-compliant multiscales metadata to parent group."""
     # Sort by resolution (finest to coarsest)
     if multiscales_flavor is None:
@@ -303,49 +299,30 @@ def add_multiscales_metadata_to_parent(
         "r360m": 360,
         "r720m": 720,
     }
-
-    all_resolutions = sorted(set(res_groups.keys()), key=lambda x: res_order.get(x, 999))
-
-    # Get CRS and bounds from first available dataset (load from output path)
-    first_res = all_resolutions[0]
-    first_dataset = res_groups[first_res]
+    res_groups = tuple(out_group[k] for k in res_order)
+    first_dataset = xr.open_zarr(out_group.store, group=next(iter(res_groups)).path)
 
     # Get CRS and bounds
     native_crs = first_dataset.rio.crs if hasattr(first_dataset, "rio") else None
     if native_crs is None:
-        log.info("No CRS found, skipping multiscales metadata", base_path=base_path)
-        return None
+        raise ValueError("Cannot determine native CRS for multiscales metadata")
 
-    native_bounds = None
-    if hasattr(first_dataset, "rio"):
-        try:
-            native_bounds = first_dataset.rio.bounds()
-        except (AttributeError, TypeError):
-            # Try alternative method or construct from coordinates
-            try:
-                x_coords = first_dataset.x.values
-                y_coords = first_dataset.y.values
-                native_bounds = (x_coords.min(), y_coords.min(), x_coords.max(), y_coords.max())
-            except Exception:
-                pass
-
-    if native_bounds is None:
-        log.info(
-            "No bounds found, skipping multiscales metadata",
-            base_path=base_path,
-        )
-        return None
+    try:
+        native_bounds = first_dataset.rio.bounds()
+    except (AttributeError, TypeError):
+        # Try alternative method or construct from coordinates
+        x_coords = first_dataset.x.values
+        y_coords = first_dataset.y.values
+        native_bounds = (x_coords.min(), y_coords.min(), x_coords.max(), y_coords.max())
 
     # Create overview_levels structure following the multiscales v1.0 specification
     overview_levels: list[OverviewLevelJSON] = []
-    for res_name in all_resolutions:
+    for res_group in res_groups:
+        res_name = res_group.basename
         # Use resolution order for consistent scale calculations
         res_meters = res_order[res_name]
 
-        dataset = res_groups[res_name]
-
-        if dataset is None:
-            continue
+        dataset = xr.open_zarr(res_group.store, group=res_group.path)
 
         # Get first data variable to extract dimensions
         first_var = next(iter(dataset.data_vars.values()))
@@ -407,7 +384,7 @@ def add_multiscales_metadata_to_parent(
         zoom = max(zoom_for_width, zoom_for_height)
 
         # Calculate relative scale and translation vs first resolution
-        finest_res_meters = res_order[all_resolutions[0]]
+        finest_res_meters = res_order[res_groups[0].basename]
         relative_scale = res_meters / finest_res_meters
         relative_translation = (res_meters - finest_res_meters) / 2
 
@@ -489,7 +466,7 @@ def add_multiscales_metadata_to_parent(
             scale_level_data: dict[str, Any] = {"asset": asset}
 
             if i > 0:  # Not the first (base) resolution
-                derived_from = derivation_chain.get(asset, str(all_resolutions[0]))
+                derived_from = derivation_chain.get(asset, str(res_groups[0].basename))
                 multiscale_transform = zcm.Transform(
                     scale=(overview_level["scale_relative"],) * 2,
                     translation=(overview_level["translation_relative"],) * 2,
@@ -507,6 +484,7 @@ def add_multiscales_metadata_to_parent(
 
             scale_level = zcm.ScaleLevel(**scale_level_data)
             layout.append(scale_level)
+
     # Create convention metadata for all three conventions
     multiscale_attrs = MultiscaleGroupAttrs(
         zarr_conventions=(
@@ -522,38 +500,24 @@ def add_multiscales_metadata_to_parent(
         ),
     )
 
-    # Create parent group path
-    parent_group_path = f"{output_path}{base_path}"
-    dt_multiscale = xr.DataTree()
-    for res in all_resolutions:
-        dt_multiscale[res] = xr.DataTree()
-
     # Add multiscale attributes
-    dt_multiscale.attrs.update(multiscale_attrs.model_dump())
-
+    out_group.attrs.update(multiscale_attrs.model_dump())
     # Add spatial and proj attributes at group level following specifications
     if native_crs and native_bounds:
         # Add spatial convention attributes
-        dt_multiscale.attrs["spatial:dimensions"] = ["y", "x"]  # Required field
-        dt_multiscale.attrs["spatial:bbox"] = list(native_bounds)  # [xmin, ymin, xmax, ymax]
-        dt_multiscale.attrs["spatial:registration"] = "pixel"  # Default registration type
+        spatial_attrs: dict[str, object] = {
+            "spatial:dimensions": ("y", "x"),
+            "spatial:bbox": tuple(native_bounds),
+            "spatial:registration": "pixel",
+        }
 
         # Add proj convention attributes
         if hasattr(native_crs, "to_epsg") and native_crs.to_epsg():
-            dt_multiscale.attrs["proj:code"] = f"EPSG:{native_crs.to_epsg()}"
+            spatial_attrs["proj:code"] = f"EPSG:{native_crs.to_epsg()}"
         elif hasattr(native_crs, "to_wkt"):
-            dt_multiscale.attrs["proj:wkt2"] = native_crs.to_wkt()
+            spatial_attrs["proj:wkt2"] = native_crs.to_wkt()
 
-    dt_multiscale.to_zarr(
-        parent_group_path,
-        mode="a",
-        consolidated=False,
-        zarr_format=3,
-    )
-
-    log.info("Added %s multiscale levels to %s", len(overview_levels), base_path)
-
-    return dt_multiscale
+        out_group.attrs.update(spatial_attrs)
 
 
 def create_original_encoding(dataset: xr.Dataset) -> dict[str, XarrayDataArrayEncoding]:
