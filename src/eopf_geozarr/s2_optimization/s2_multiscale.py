@@ -82,20 +82,46 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
 
         scale = next_factor // cur_factor
         to_downsample: dict[str, xr.DataArray] = {}
-        for var_name, var in cur_ds.data_vars.items():
-            # Check if the variable already exists in the next level
+        to_copy: dict[str, xr.DataArray] = {}
+
+        # Iterate over all variables (data_vars and coords)
+        for var_name in list(cur_ds.data_vars) + list(cur_ds.coords):
+            # Convert to string for type safety
+            var_name_str = str(var_name)
+            var = cur_ds[var_name]
             next_level_path = f"{path}/{next_group_name}"
-            if f"{next_level_path}/{var_name}" not in group:
-                to_downsample[var_name] = var
+
+            # Skip if already exists in next level
+            if f"{next_level_path}/{var_name_str}" in group:
+                continue
+
+            # Decide whether to downsample or copy
+            # Spatial data variables (2D+) should be downsampled
+            if var_name in cur_ds.data_vars and var.ndim >= 2:
+                to_downsample[var_name_str] = var
+            # Everything else (coordinates, 0D/1D variables like spatial_ref) should be copied
+            else:
+                to_copy[var_name_str] = var
+
         log.info("downsampling %s into %s", tuple(sorted(to_downsample.keys())), next_group_name)
-        # Don't pass coords here - let the downsampled variables determine their own coordinates
-        downsampled_ds = create_downsampled_resolution_group(
-            xr.Dataset(data_vars=to_downsample), factor=scale
-        )
-        next_group_path = f"{full_path}/{next_group_name}"
-        downsampled_ds.to_zarr(
-            group.store, group=next_group_path, consolidated=False, mode="a", compute=True
-        )
+        if to_copy:
+            log.info("copying %s into %s", tuple(sorted(to_copy.keys())), next_group_name)
+
+        # Only process if there's something to downsample or copy
+        if to_downsample or to_copy:
+            # Create downsampled dataset with data variables to downsample
+            downsampled_ds = create_downsampled_resolution_group(
+                xr.Dataset(data_vars=to_downsample), factor=scale
+            )
+
+            # Add variables to copy (like spatial_ref)
+            for var_name, var in to_copy.items():
+                if var_name not in downsampled_ds.coords:
+                    downsampled_ds = downsampled_ds.assign_coords({var_name: var})
+            next_group_path = f"{full_path}/{next_group_name}"
+            downsampled_ds.to_zarr(
+                group.store, group=next_group_path, consolidated=False, mode="a", compute=True
+            )
 
 
 def update_encoding(

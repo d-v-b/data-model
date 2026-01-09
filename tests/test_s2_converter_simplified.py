@@ -89,12 +89,14 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
         assert atmos_zmeta["consolidated_metadata"] is None
 
 
+@pytest.mark.filterwarnings("ignore:.*Expected 'MISSING' sentinel:UserWarning")
 @pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
 @pytest.mark.filterwarnings("ignore:.*:xarray.coding.common.SerializationWarning")
 @pytest.mark.filterwarnings(
     "ignore:Failed to open Zarr store with consolidated metadata:RuntimeWarning"
 )
 @pytest.mark.filterwarnings("ignore:.*:zarr.errors.ZarrUserWarning")
+@pytest.mark.filterwarnings("ignore:Pydantic serializer warnings:UserWarning")
 class TestConvenienceFunction:
     """Test the convenience function."""
 

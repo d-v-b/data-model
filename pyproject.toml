@@ -173,6 +173,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 filterwarnings = "error"
+log_level = "WARNING"
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
 testpaths = ["tests"]

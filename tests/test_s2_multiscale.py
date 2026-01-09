@@ -217,6 +217,7 @@ def test_create_multiscale_from_datatree(simple_datatree: zarr.Group) -> None:
         y: ArraySpec
         time: ArraySpec
         b02: ArraySpec
+        spatial_ref: ArraySpec
 
     class DatasetGroup(GroupSpec):
         members: DatasetMembers
@@ -258,11 +259,31 @@ def test_create_multiscale_metadata(simple_datatree: zarr.Group) -> None:
 @pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
 def test_create_multiscale_skips_existing_arrays(simple_datatree: zarr.Group) -> None:
     """Test that the multiscale creation routine does not overwrite an existing low res array"""
-    # insert a new group containing an empty version of the existing datasets
-    simple_datatree.create_group("measurements/reflectance/r20m")
-    simple_datatree.create_array(
-        "measurements/reflectance/r20m/b02", shape=(1,), dtype="uint8", dimension_names=("x",)
+    # Create a complete r20m dataset with pre-existing array and coordinates
+    # r10m has shape (1, 100, 100), so r20m should have shape (1, 50, 50) after 2x downsampling
+    x_20m = np.linspace(0, 1000, 50)
+    y_20m = np.linspace(0, 1000, 50)
+    time = np.array(["2023-01-01"], dtype="datetime64[ns]")
+
+    b02_20m = xr.DataArray(
+        np.zeros((1, 50, 50), dtype="uint8"),  # Pre-existing data (all zeros)
+        dims=["time", "y", "x"],
+        coords={"time": time, "y": y_20m, "x": x_20m},
+        name="b02",
+    )
+
+    # Create the pre-existing dataset
+    ds_20m = xr.Dataset({"b02": b02_20m})
+    ds_20m.to_zarr(
+        simple_datatree.store,
+        group="measurements/reflectance/r20m",
+        mode="a",
+        consolidated=False,
     )
 
     create_multiscale_levels(simple_datatree, path="measurements/reflectance")
-    assert simple_datatree["measurements/reflectance/r20m/b02"].shape == (1,)
+
+    # Verify that the pre-existing array was not overwritten (should still be all zeros)
+    result_b02 = simple_datatree["measurements/reflectance/r20m/b02"][:]
+    assert result_b02.shape == (1, 50, 50)
+    assert np.all(result_b02 == 0), "Pre-existing array should not have been overwritten"
