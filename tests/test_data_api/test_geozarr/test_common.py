@@ -83,7 +83,9 @@ def test_multiscales_round_trip(s2_optimized_geozarr_group_example: zarr.Group) 
     source_untyped = GroupSpec_V3.from_zarr(s2_optimized_geozarr_group_example)
     flat = source_untyped.to_flat()
     meta = flat["/measurements/reflectance"].attributes["multiscales"]
-    assert TMSMultiscales(**meta).model_dump() == tuplify_json(meta)
+    # pull out the multiscales keys, ignore extra
+    submodel = {k: meta[k] for k in TMSMultiscales.__annotations__}
+    assert TMSMultiscales(**submodel).model_dump() == tuplify_json(submodel)
 
 
 def test_projattrs_crs_required() -> None:
