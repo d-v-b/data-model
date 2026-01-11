@@ -164,8 +164,7 @@ def test_cli_convert_real_sentinel2_data(s2_group_example: Path, tmp_path: Path)
     expected_structure_json = tuplify_json(
         json.loads(
             (
-                Path("tests/_test_data/optimized_geozarr_examples/")
-                / (s2_group_example.stem + ".json")
+                Path("tests/_test_data/geozarr_examples/") / (s2_group_example.stem + ".json")
             ).read_text()
         )
     )
