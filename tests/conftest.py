@@ -15,6 +15,9 @@ s2_example_json_paths = tuple(pathlib.Path("tests/_test_data/s2_examples").glob(
 projjson_example_paths = tuple(pathlib.Path("tests/_test_data/projjson_examples").glob("*.json"))
 geoproj_example_paths = tuple(pathlib.Path("tests/_test_data/geoproj_examples").glob("*.json"))
 geozarr_example_paths = tuple(pathlib.Path("tests/_test_data/geozarr_examples").glob("*.json"))
+zcm_multiscales_example_paths = tuple(
+    pathlib.Path("tests/_test_data/zcm_multiscales_examples").glob("*.json")
+)
 optimized_geozarr_example_paths = tuple(
     pathlib.Path("tests/_test_data/optimized_geozarr_examples").glob("*.json")
 )
@@ -99,6 +102,12 @@ def s2_optimized_geozarr_group_example(request: pytest.FixtureRequest) -> zarr.G
     source_path: pathlib.Path = request.param
     store = {}
     return GroupSpecV3(**read_json(source_path)).to_zarr(store, path="")
+
+
+@pytest.fixture(params=zcm_multiscales_example_paths, ids=get_stem)
+def zcm_multiscales_example(request: pytest.FixtureRequest) -> dict[str, object]:
+    source_path: pathlib.Path = request.param
+    return read_json(source_path)
 
 
 @pytest.fixture(params=projjson_example_paths, ids=get_stem)
