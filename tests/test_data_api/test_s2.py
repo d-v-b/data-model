@@ -10,16 +10,12 @@ Note: Documentation code examples are tested separately via pytest-examples
 from the markdown files in docs/models/sentinel2.md
 """
 
-import pytest
-
 from eopf_geozarr.data_api.s2 import Sentinel2Root
-from tests.test_data_api.conftest import S2_EXAMPLES
 
 
-@pytest.mark.parametrize("example", S2_EXAMPLES)
-def test_sentinel2_roundtrip(example: dict[str, object]) -> None:
+def test_sentinel2_roundtrip(s2_json_example: dict[str, object]) -> None:
     """Test that we can round-trip JSON data without loss"""
-    model1 = Sentinel2Root(**example)
+    model1 = Sentinel2Root(**s2_json_example)
     dumped = model1.model_dump()
     model2 = Sentinel2Root(**dumped)
     assert model1.model_dump() == model2.model_dump()

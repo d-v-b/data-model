@@ -9,22 +9,12 @@ from eopf_geozarr.data_api.geozarr.multiscales.zcm import (
     ScaleLevelJSON,
 )
 
-from .conftest import ZCM_MULTISCALES_EXAMPLES
 
-
-def test_json_examples_exist() -> None:
-    """
-    Test that we have multiscales JSON examples to test against
-    """
-    assert len(ZCM_MULTISCALES_EXAMPLES) > 0
-
-
-@pytest.mark.parametrize("json_example", ZCM_MULTISCALES_EXAMPLES.items(), ids=lambda v: v[0])
-def test_multiscales_rt(json_example: tuple[str, dict[str, object]]) -> None:
+def test_multiscales_rt(zcm_multiscales_example: dict[str, object]) -> None:
     """
     Test that the multiscales metadata round-trips input JSON
     """
-    _, value = json_example
+    value = zcm_multiscales_example
     value_tup = tuplify_json(value)
     attrs_json = value_tup["attributes"]
     model = MultiscalesAttrs(**attrs_json)
