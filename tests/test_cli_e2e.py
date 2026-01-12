@@ -47,7 +47,7 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     # don't care about that here, so we convert all lists to tuples before creating the GroupSpec
     observed_structure = GroupSpec(**tuplify_json(observed_structure_json))
     observed_structure_flat = observed_structure.to_flat()
-    expected_structure_path = Path("tests/test_data_api/optimized_geozarr_examples/") / (
+    expected_structure_path = Path("tests/_test_data/optimized_geozarr_examples/") / (
         s2_group_example.stem + ".json"
     )
 
@@ -164,7 +164,7 @@ def test_cli_convert_real_sentinel2_data(s2_group_example: Path, tmp_path: Path)
     expected_structure_json = tuplify_json(
         json.loads(
             (
-                Path("tests/test_data_api/geozarr_examples/") / (s2_group_example.stem + ".json")
+                Path("tests/_test_data/geozarr_examples/") / (s2_group_example.stem + ".json")
             ).read_text()
         )
     )

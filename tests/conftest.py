@@ -5,10 +5,33 @@ import pathlib
 
 import pytest
 import xarray as xr
-from pydantic_zarr.v2 import GroupSpec
+import zarr
+from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
+from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
 
-s1_example_json_paths = tuple(pathlib.Path("tests/test_data_api/s1_examples").glob("*.json"))
-s2_example_json_paths = tuple(pathlib.Path("tests/test_data_api/s2_examples").glob("*.json"))
+# Paths to example data / metadata
+s1_example_json_paths = tuple(pathlib.Path("tests/_test_data/s1_examples").glob("*.json"))
+s2_example_json_paths = tuple(pathlib.Path("tests/_test_data/s2_examples").glob("*.json"))
+projjson_example_paths = tuple(pathlib.Path("tests/_test_data/projjson_examples").glob("*.json"))
+geoproj_example_paths = tuple(pathlib.Path("tests/_test_data/geoproj_examples").glob("*.json"))
+geozarr_example_paths = tuple(pathlib.Path("tests/_test_data/geozarr_examples").glob("*.json"))
+zcm_multiscales_example_paths = tuple(
+    pathlib.Path("tests/_test_data/zcm_multiscales_examples").glob("*.json")
+)
+optimized_geozarr_example_paths = tuple(
+    pathlib.Path("tests/_test_data/optimized_geozarr_examples").glob("*.json")
+)
+
+
+def read_json(path: pathlib.Path) -> dict[str, object]:
+    """
+    Read the contents of path as JSON
+    """
+    return json.loads(path.read_text())
+
+
+def get_stem(p: pathlib.Path) -> str:
+    return p.stem
 
 
 def create_group_from_json(source_path: pathlib.Path, out_path: pathlib.Path) -> pathlib.Path:
@@ -16,31 +39,126 @@ def create_group_from_json(source_path: pathlib.Path, out_path: pathlib.Path) ->
     Create a Zarr V2 group from a JSON model
     """
     out_dir = out_path / (source_path.stem + ".zarr")
-    g = GroupSpec(**json.loads(source_path.read_text()))
+    g = GroupSpecV2(**read_json(source_path))
     g.to_zarr(out_dir, path="")
     return out_dir
 
 
-@pytest.fixture(params=s1_example_json_paths, ids=lambda p: p.stem)
+@pytest.fixture(params=s1_example_json_paths, ids=get_stem)
 def s1_group_example(
     request: pytest.FixtureRequest, tmp_path: pathlib.Path
 ) -> tuple[pathlib.Path, ...]:
     """
-    A pytest fixture that returns the path to a Zarr group with the same layout as a sentinel 1
+    A fixture that returns the path to a Zarr group with the same layout as a sentinel 1
     product
     """
     return create_group_from_json(request.param, tmp_path)
 
 
-@pytest.fixture(params=s2_example_json_paths, ids=lambda p: p.stem)
+@pytest.fixture(params=s2_example_json_paths, ids=get_stem)
 def s2_group_example(
     request: pytest.FixtureRequest, tmp_path: pathlib.Path
 ) -> tuple[pathlib.Path, ...]:
     """
-    A pytest fixture that returns the path to a Zarr group with the same layout as a sentinel 2
+    A fixture that returns the path to a Zarr group with the same layout as a sentinel 2
     product
     """
     return create_group_from_json(request.param, tmp_path)
+
+
+@pytest.fixture(params=s1_example_json_paths, ids=get_stem)
+def s1_json_example(request: pytest.FixtureRequest) -> dict[str, object]:
+    """
+    A fixture that returns the JSON model of a Sentinel 1 Zarr group
+    """
+    source_path: pathlib.Path = request.param
+    return read_json(source_path)
+
+
+@pytest.fixture(params=s2_example_json_paths, ids=get_stem)
+def s2_json_example(request: pytest.FixtureRequest) -> dict[str, object]:
+    """
+    A fixture that returns the JSON model of a Sentinel 2 Zarr group
+    """
+    source_path: pathlib.Path = request.param
+    return read_json(source_path)
+
+
+@pytest.fixture(params=geozarr_example_paths, ids=get_stem)
+def s2_geozarr_group_example(request: pytest.FixtureRequest) -> zarr.Group:
+    """
+    Return a memory-backed Zarr V3 Group based on a sentinel 2 product converted to geozarr
+    """
+    source_path: pathlib.Path = request.param
+    store = {}
+    return GroupSpecV3(**read_json(source_path)).to_zarr(store, path="")
+
+
+@pytest.fixture(params=optimized_geozarr_example_paths, ids=get_stem)
+def s2_optimized_geozarr_group_example(request: pytest.FixtureRequest) -> zarr.Group:
+    """
+    Return a memory-backed Zarr V3 Group based on a sentinel 2 product converted to geozarr
+    """
+    source_path: pathlib.Path = request.param
+    store = {}
+    return GroupSpecV3(**read_json(source_path)).to_zarr(store, path="")
+
+
+@pytest.fixture(params=zcm_multiscales_example_paths, ids=get_stem)
+def zcm_multiscales_example(request: pytest.FixtureRequest) -> dict[str, object]:
+    source_path: pathlib.Path = request.param
+    return read_json(source_path)
+
+
+@pytest.fixture(params=projjson_example_paths, ids=get_stem)
+def projjson_example(request: pytest.FixtureRequest) -> dict[str, object]:
+    source_path: pathlib.Path = request.param
+    return read_json(source_path)
+
+
+@pytest.fixture
+def bound_crs_json() -> dict[str, object]:
+    return read_json(pathlib.Path("tests/_test_data/projjson_examples/bound_crs.json"))
+
+
+@pytest.fixture
+def compound_crs_json() -> dict[str, object]:
+    return read_json(pathlib.Path("tests/_test_data/projjson_examples/compound_crs.json"))
+
+
+@pytest.fixture
+def datum_ensemble_json() -> dict[str, object]:
+    return read_json(pathlib.Path("tests/_test_data/projjson_examples/datum_ensemble.json"))
+
+
+@pytest.fixture
+def explicit_prime_meridian_json() -> dict[str, object]:
+    return read_json(
+        pathlib.Path("tests/_test_data/projjson_examples/explicit_prime_meridian.json")
+    )
+
+
+@pytest.fixture
+def implicit_prime_meridian_json() -> dict[str, object]:
+    return read_json(
+        pathlib.Path("tests/_test_data/projjson_examples/implicit_prime_meridian.json")
+    )
+
+
+@pytest.fixture
+def projected_crs_json() -> dict[str, object]:
+    return read_json(pathlib.Path("tests/_test_data/projjson_examples/projected_crs.json"))
+
+
+@pytest.fixture
+def transformation_json() -> dict[str, object]:
+    return read_json(pathlib.Path("tests/_test_data/projjson_examples/transformation.json"))
+
+
+@pytest.fixture(params=geoproj_example_paths, ids=get_stem)
+def geoproj_example(request: pytest.FixtureRequest) -> dict[str, object]:
+    source_path: pathlib.Path = request.param
+    return read_json(source_path)
 
 
 def _verify_basic_structure(output_path: pathlib.Path, groups: list[str]) -> None:

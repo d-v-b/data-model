@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -16,8 +16,14 @@ from eopf_geozarr.data_api.geozarr.common import (
     check_standard_name,
     get_cf_standard_names,
 )
+from eopf_geozarr.data_api.geozarr.multiscales.tms import (
+    Multiscales as TMSMultiscales,
+)
 from eopf_geozarr.data_api.geozarr.v2 import DataArray as DataArray_V2
 from eopf_geozarr.data_api.geozarr.v2 import DataArray as DataArray_V3
+
+if TYPE_CHECKING:
+    import zarr
 
 
 @pytest.mark.parametrize(
@@ -70,18 +76,16 @@ def test_check_standard_name_invalid() -> None:
         check_standard_name("invalid_standard_name")
 
 
-def test_multiscales_round_trip(example_group) -> None:
+def test_multiscales_round_trip(s2_optimized_geozarr_group_example: zarr.Group) -> None:
     """
     Ensure that we can round-trip multiscale metadata through the `Multiscales` model.
     """
-    from eopf_geozarr.data_api.geozarr.multiscales.tms import (
-        Multiscales as TMSMultiscales,
-    )
-
-    source_untyped = GroupSpec_V3.from_zarr(example_group)
+    source_untyped = GroupSpec_V3.from_zarr(s2_optimized_geozarr_group_example)
     flat = source_untyped.to_flat()
-    meta = flat["/measurements/reflectance/r60m"].attributes["multiscales"]
-    assert TMSMultiscales(**meta).model_dump() == tuplify_json(meta)
+    meta = flat["/measurements/reflectance"].attributes["multiscales"]
+    # pull out the multiscales keys, ignore extra
+    submodel = {k: meta[k] for k in TMSMultiscales.__annotations__}
+    assert TMSMultiscales(**submodel).model_dump() == tuplify_json(submodel)
 
 
 def test_projattrs_crs_required() -> None:
