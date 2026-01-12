@@ -2,13 +2,14 @@
 Tests for S2 multiscale pyramid creation with xy-aligned sharding.
 """
 
+import json
+import pathlib
 from pathlib import Path
-from typing import Any
-from unittest.mock import patch
 
 import numpy as np
 import pytest
 import xarray as xr
+import zarr
 from structlog.testing import capture_logs
 
 from eopf_geozarr.s2_optimization.s2_multiscale import (
@@ -148,63 +149,60 @@ class TestS2MultiscaleFunctions:
         assert 1000 % chunk_size == 0
 
 
-class TestS2MultiscaleIntegration:
-    """Integration tests for S2 multiscale functions."""
+@pytest.fixture
+def simple_datatree() -> xr.DataTree:
+    """Create a simple DataTree for integration testing."""
+    # Create sample data
+    x = np.linspace(0, 1000, 100)
+    y = np.linspace(0, 1000, 100)
+    time = np.array(["2023-01-01"], dtype="datetime64[ns]")
 
-    @pytest.fixture
-    def simple_datatree(self) -> xr.DataTree:
-        """Create a simple DataTree for integration testing."""
-        # Create sample data
-        x = np.linspace(0, 1000, 100)
-        y = np.linspace(0, 1000, 100)
-        time = np.array(["2023-01-01"], dtype="datetime64[ns]")
+    # Create sample band
+    b02 = xr.DataArray(
+        np.random.randint(0, 4000, (1, 100, 100)),
+        dims=["time", "y", "x"],
+        coords={"time": time, "y": y, "x": x},
+        name="b02",
+        attrs={"long_name": "Blue band", "units": "digital_number"},
+    )
 
-        # Create sample band
-        b02 = xr.DataArray(
-            np.random.randint(0, 4000, (1, 100, 100)),
-            dims=["time", "y", "x"],
-            coords={"time": time, "y": y, "x": x},
-            name="b02",
-            attrs={"long_name": "Blue band", "units": "digital_number"},
+    # Create dataset
+    ds = xr.Dataset({"b02": b02})
+
+    # Create DataTree
+    dt = xr.DataTree(name="root")
+    dt["/measurements/reflectance/r10m"] = xr.DataTree(ds)
+
+    return dt
+
+
+s2_example_paths = Path("./tests/test_data_api/s2_examples").glob("*.json")
+
+from pydantic_zarr.v2 import GroupSpec
+
+
+@pytest.fixture(params=s2_example_paths, ids=lambda v: v.stem)
+def s2_example_group(request: pytest.FixtureRequest) -> zarr.Group:
+    return GroupSpec(**json.loads(request.param.read_bytes())).to_zarr({}, "")
+
+
+@pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
+@pytest.mark.filterwarnings("ignore:.*:FutureWarning")
+@pytest.mark.filterwarnings("ignore:.*:UserWarning")
+def test_create_multiscale_from_datatree(
+    s2_example_group: zarr.Group,
+    tmp_path: pathlib.Path,
+) -> None:
+    """Test multiscale creation from DataTree."""
+    output_path = str(tmp_path / "output.zarr")
+    output_group = zarr.create_group(output_path)
+    dt_input = xr.open_datatree(s2_example_group.store, engine="zarr", chunks="auto")
+
+    # Capture log output using structlog's testing context manager
+    with capture_logs():
+        result = create_multiscale_from_datatree(
+            dt_input,
+            output_group=output_group,
+            enable_sharding=True,
+            spatial_chunk=256,
         )
-
-        # Create dataset
-        ds = xr.Dataset({"b02": b02})
-
-        # Create DataTree
-        dt = xr.DataTree(name="root")
-        dt["/measurements/reflectance/r10m"] = xr.DataTree(ds)
-
-        return dt
-
-    @patch("eopf_geozarr.s2_optimization.s2_multiscale.stream_write_dataset")
-    def test_create_multiscale_from_datatree(
-        self, mock_write: Any, simple_datatree: xr.DataTree, tmp_path: Path
-    ) -> None:
-        """Test multiscale creation from DataTree."""
-        output_path = str(tmp_path / "output.zarr")
-
-        # Mock the write to avoid actual file I/O
-        mock_write.return_value = xr.Dataset({"b02": xr.DataArray([1, 2, 3])})
-
-        # Capture log output using structlog's testing context manager
-        with capture_logs() as cap_logs:
-            result = create_multiscale_from_datatree(
-                simple_datatree,
-                output_path,
-                enable_sharding=True,
-                spatial_chunk=256,
-            )
-
-        # Should process groups
-        assert isinstance(result, dict)
-        # At minimum, should write the original group
-        assert mock_write.call_count >= 1
-
-        # Optionally verify log messages (cap_logs contains all logged events)
-        # With verbose=False, there won't be many logs, but we can check the structure
-        assert isinstance(cap_logs, list)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])

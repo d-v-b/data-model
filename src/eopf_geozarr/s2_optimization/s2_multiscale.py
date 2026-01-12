@@ -10,12 +10,12 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import structlog
 import xarray as xr
+import zarr
 from dask import delayed
 from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
 from pyproj import CRS
 
-from eopf_geozarr.conversion import fs_utils
 from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
     create_native_crs_tile_matrix_set,
@@ -28,6 +28,7 @@ from eopf_geozarr.data_api.geozarr.multiscales.geozarr import (
 )
 from eopf_geozarr.data_api.geozarr.spatial import SpatialConventionMetadata
 from eopf_geozarr.data_api.geozarr.types import (
+    CF_SCALE_OFFSET_KEYS,
     XARRAY_ENCODING_KEYS,
     XarrayDataArrayEncoding,
 )
@@ -63,7 +64,7 @@ def get_grid_spacing(ds: xr.DataArray, coords: tuple[Hashable, ...]) -> tuple[fl
 
 def create_multiscale_from_datatree(
     dt_input: xr.DataTree,
-    output_path: str,
+    output_group: zarr.Group,
     enable_sharding: bool,
     spatial_chunk: int,
     crs: CRS | None = None,
@@ -104,8 +105,6 @@ def create_multiscale_from_datatree(
 
         log.info("Copying original group: {}", group_path=group_path)
 
-        output_group_path = f"{output_path}{group_path}"
-
         # Determine if this is a measurement-related resolution group
         group_name = group_path.split("/")[-1]
         is_measurement_group = (
@@ -117,14 +116,19 @@ def create_multiscale_from_datatree(
         if is_measurement_group:
             # Measurement groups: apply custom encoding
             encoding = create_measurements_encoding(
-                dataset, spatial_chunk=spatial_chunk, enable_sharding=enable_sharding
+                dataset,
+                spatial_chunk=spatial_chunk,
+                enable_sharding=enable_sharding,
+                keep_scale_offset=False,
             )
         else:
             # Non-measurement groups: preserve original chunking
             encoding = create_original_encoding(dataset)
+
         ds_out = stream_write_dataset(
             dataset,
-            output_group_path,
+            group_path,
+            output_group,
             encoding,
             enable_sharding=enable_sharding,
             crs=crs,
@@ -174,7 +178,9 @@ def create_multiscale_from_datatree(
         if r120m_dataset and len(r120m_dataset.data_vars) > 0:
             output_path_120 = f"{output_path}{r120m_path}"
             log.info("Writing r120m to {}", output_path_120=output_path_120)
-            encoding_120 = create_measurements_encoding(r120m_dataset, spatial_chunk=spatial_chunk)
+            encoding_120 = create_measurements_encoding(
+                r120m_dataset, spatial_chunk=spatial_chunk, keep_scale_offset=False
+            )
             ds_120 = stream_write_dataset(
                 r120m_dataset,
                 output_path_120,
@@ -196,7 +202,7 @@ def create_multiscale_from_datatree(
                     output_path_360 = f"{output_path}{r360m_path}"
                     log.info("Writing r360m to {}", output_path_360=output_path_360)
                     encoding_360 = create_measurements_encoding(
-                        r360m_dataset, spatial_chunk=spatial_chunk
+                        r360m_dataset, spatial_chunk=spatial_chunk, keep_scale_offset=False
                     )
                     ds_360 = stream_write_dataset(
                         r360m_dataset,
@@ -226,6 +232,7 @@ def create_multiscale_from_datatree(
                                 r720m_dataset,
                                 spatial_chunk=spatial_chunk,
                                 enable_sharding=enable_sharding,
+                                keep_scale_offset=False,
                             )
                             ds_720 = stream_write_dataset(
                                 r720m_dataset,
@@ -260,8 +267,7 @@ def create_multiscale_from_datatree(
     log.info("Adding multiscales metadata to parent groups")
 
     dt_multiscale = add_multiscales_metadata_to_parent(
-        output_path,
-        base_path,
+        output_group,
         resolution_groups,
         multiscales_flavor={"ogc_tms", "experimental_multiscales_convention"},
     )
@@ -271,7 +277,11 @@ def create_multiscale_from_datatree(
 
 
 def create_measurements_encoding(
-    dataset: xr.Dataset, *, spatial_chunk: int, enable_sharding: bool = True
+    dataset: xr.Dataset,
+    *,
+    spatial_chunk: int,
+    enable_sharding: bool = True,
+    keep_scale_offset: bool = True,
 ) -> dict[str, XarrayDataArrayEncoding]:
     """
     Create optimized encoding for a pyramid level with advanced chunking and sharding.
@@ -316,10 +326,16 @@ def create_measurements_encoding(
         else:
             var_encoding["shards"] = None
 
-        # Forward-propagate the existing encoding
-        for key in XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}:
+        # Forward-propagate the existing encoding, minus keys that should be omitted
+        keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
+
+        if keep_scale_offset:
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS
+
+        for key in keep_keys:
             if key in var_data.encoding:
                 var_encoding[key] = var_data.encoding[key]  # type: ignore[literal-required]
+
         if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
             log.warning(
                 "Unknown encoding keys in %s: %s",
@@ -389,8 +405,7 @@ def calculate_simple_shard_dimensions(
 
 
 def add_multiscales_metadata_to_parent(
-    output_path: str,
-    base_path: str,
+    group: zarr.Group,
     res_groups: Mapping[str, xr.Dataset],
     multiscales_flavor: set[MultiscalesFlavor] | None = None,
 ) -> xr.DataTree:
@@ -412,7 +427,7 @@ def add_multiscales_metadata_to_parent(
     if len(all_resolutions) < 2:
         log.info(
             "Skipping {} - only one resolution available",
-            base_path=base_path,
+            base_path=group.path,
         )
         return None
 
@@ -423,7 +438,7 @@ def add_multiscales_metadata_to_parent(
     # Get CRS and bounds
     native_crs = first_dataset.rio.crs if hasattr(first_dataset, "rio") else None
     if native_crs is None:
-        log.info("No CRS found, skipping multiscales metadata", base_path=base_path)
+        log.info("No CRS found, skipping multiscales metadata", base_path=group.path)
         return None
 
     native_bounds = None
@@ -553,7 +568,7 @@ def add_multiscales_metadata_to_parent(
         overview_levels.append(layout_entry)
 
     if len(overview_levels) < 2:
-        log.info("    Could not create overview levels for {}", base_path=base_path)
+        log.info("    Could not create overview levels for {}", base_path=group.path)
         return None
 
     multiscales: dict[str, Any] = {"multiscales": {}}
@@ -637,7 +652,6 @@ def add_multiscales_metadata_to_parent(
     )
 
     # Create parent group path
-    parent_group_path = f"{output_path}{base_path}"
     dt_multiscale = xr.DataTree()
     for res in all_resolutions:
         dt_multiscale[res] = xr.DataTree()
@@ -659,13 +673,13 @@ def add_multiscales_metadata_to_parent(
             dt_multiscale.attrs["proj:wkt2"] = native_crs.to_wkt()
 
     dt_multiscale.to_zarr(
-        parent_group_path,
+        group.store,
         mode="a",
         consolidated=False,
         zarr_format=3,
     )
 
-    log.info("Added %s multiscale levels to %s", len(overview_levels), base_path)
+    log.info("Added %s multiscale levels to %s", len(overview_levels), group.path)
 
     return dt_multiscale
 
@@ -839,6 +853,7 @@ def create_lazy_downsample_operation_from_existing(
 def stream_write_dataset(
     dataset: xr.Dataset,
     dataset_path: str,
+    group: zarr.Group,
     encoding: dict[str, XarrayDataArrayEncoding],
     *,
     enable_sharding: bool,
@@ -861,16 +876,13 @@ def stream_write_dataset(
         Written dataset
     """
     # Check if level already exists
-    if fs_utils.path_exists(dataset_path):
+    if dataset_path in group:
         log.info(
             "Level path {} already exists. Skipping write.",
             dataset_path=dataset_path,
         )
         return xr.open_dataset(
-            dataset_path,
-            engine="zarr",
-            chunks={},
-            decode_coords="all",
+            group.store, engine="zarr", chunks={}, decode_coords="all", group=dataset_path
         )
 
     log.info("Streaming computation and write to {}", dataset_path=dataset_path)
@@ -888,11 +900,12 @@ def stream_write_dataset(
     # Write with streaming computation and progress tracking
     # The to_zarr operation will trigger all lazy computations
     write_job = dataset.to_zarr(
-        dataset_path,
+        group.store,
         mode="w",
         consolidated=False,
         zarr_format=3,
         encoding=encoding,
+        group=dataset_path,
         compute=False,  # Create job first for progress tracking
     )
     write_job = write_job.persist()

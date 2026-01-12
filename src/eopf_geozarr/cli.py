@@ -1177,10 +1177,7 @@ def convert_s2_optimized_command(args: argparse.Namespace) -> None:
         log.info("Loading Sentinel-2 dataset from", input_path=args.input_path)
         storage_options = get_storage_options(str(args.input_path))
         dt_input = xr.open_datatree(
-            str(args.input_path),
-            engine="zarr",
-            chunks="auto",
-            storage_options=storage_options,
+            str(args.input_path), engine="zarr", chunks="auto", storage_options=storage_options
         )
 
         # Convert

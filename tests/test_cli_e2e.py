@@ -8,6 +8,7 @@ docs/analysis/eopf-geozarr/EOPF_Sentinel2_ZarrV3_geozarr_compliant.ipynb
 
 import json
 import subprocess
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -60,6 +61,25 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     expected_structure_json = tuplify_json(json.loads(expected_structure_path.read_text()))
     expected_structure = GroupSpec(**expected_structure_json)
     expected_structure_flat = expected_structure.to_flat()
+
+    # check that all multiscale levels have the same data type
+    # this is check is redundant with the later check, but it's expedient to check this here.
+    # eventually this check should be spun out into its own test
+    grp = expected_structure.to_zarr({}, "")
+    _, res_groups = zip(*grp["measurements/reflectance"].groups())
+
+    dtype_mismatch: set[object] = set()
+    for group_a, group_b in pairwise(res_groups):
+        for name, array in group_a.arrays():
+            dtype_a = array.dtype
+            if name in group_b:
+                dtype_b = group_b[name].dtype
+                if not dtype_a == dtype_b:
+                    dtype_mismatch.add(
+                        (f"{group_a.path}/{name}::{dtype_a}", f"{group_b.path}/{name}::{dtype_b}")
+                    )
+
+    assert dtype_mismatch == set()
 
     o_keys = set(observed_structure_flat.keys())
     e_keys = set(expected_structure_flat.keys())
