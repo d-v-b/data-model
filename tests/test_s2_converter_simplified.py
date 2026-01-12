@@ -241,6 +241,7 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
 class TestConvenienceFunction:
     """Test the convenience function."""
 
+    @patch("eopf_geozarr.s2_optimization.s2_converter.zarr.open_group")
     @patch("eopf_geozarr.s2_optimization.s2_converter.initialize_crs_from_dataset")
     @patch("eopf_geozarr.s2_optimization.s2_converter.get_zarr_group")
     @patch("eopf_geozarr.s2_optimization.s2_converter.is_sentinel2_dataset")
@@ -248,11 +249,12 @@ class TestConvenienceFunction:
     @patch("eopf_geozarr.s2_optimization.s2_converter.simple_root_consolidation")
     def test_convert_s2_optimized_convenience_function(
         self,
-        mock_consolidation,
-        mock_multiscale,
-        mock_is_s2,
-        mock_get_zarr_group,
-        mock_init_crs,
+        mock_consolidation: Mock,
+        mock_multiscale: Mock,
+        mock_is_s2: Mock,
+        mock_get_zarr_group: Mock,
+        mock_init_crs: Mock,
+        mock_zarr_open_group: Mock,
     ) -> None:
         """Test the convenience function parameter passing."""
         # Setup mocks
@@ -260,6 +262,7 @@ class TestConvenienceFunction:
         mock_is_s2.return_value = True
         mock_get_zarr_group.return_value = Mock()
         mock_init_crs.return_value = None  # Return None for CRS
+        mock_zarr_open_group.return_value = Mock()  # Mock zarr.open_group
 
         # Test parameter passing - Mock DataTree with groups attribute
         dt_input = Mock()

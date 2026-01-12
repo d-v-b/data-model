@@ -219,9 +219,11 @@ def convert_s2_optimized(
     # Step 2: Create multiscale pyramids for each group in the original structure
     log.info("Step 2: Creating multiscale pyramids (preserving original hierarchy)")
 
+    output_group = zarr.open_group(output_path)
+
     datasets = create_multiscale_from_datatree(
         dt_input,
-        output_path,
+        output_group,
         spatial_chunk=spatial_chunk,
         enable_sharding=enable_sharding,
         crs=crs,

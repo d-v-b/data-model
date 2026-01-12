@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import structlog
 import xarray as xr
-import zarr
 from dask import delayed
 from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
@@ -38,6 +37,8 @@ from .s2_resampling import determine_variable_type, downsample_variable
 
 if TYPE_CHECKING:
     from collections.abc import Hashable, Mapping
+
+    import zarr
 
     from eopf_geozarr.types import OverviewLevelJSON
 
@@ -127,14 +128,13 @@ def create_multiscale_from_datatree(
 
         ds_out = stream_write_dataset(
             dataset,
-            group_path,
-            output_group,
-            encoding,
+            path=group_path,
+            group=output_group,
+            encoding=encoding,
             enable_sharding=enable_sharding,
             crs=crs,
         )
         processed_groups[group_path] = ds_out
-
     # Step 2: Create downsampled resolution groups ONLY for measurements
     # Find all resolution-based groups under /measurements/ and organize by base path
     resolution_groups = {}
@@ -168,106 +168,80 @@ def create_multiscale_from_datatree(
         source_resolution=source_resolution,
     )
 
-    # Create r120m
-    try:
-        r120m_path = f"{base_path}/r120m"
-        factor = 120 // source_resolution
-        log.info("Creating r120m with factor {}", factor=factor)
+    r120m_path = f"{base_path}/r120m"
+    factor = 120 // source_resolution
+    log.info("Creating r120m with factor {}", factor=factor)
 
-        r120m_dataset = create_downsampled_resolution_group(source_dataset, factor=factor)
-        if r120m_dataset and len(r120m_dataset.data_vars) > 0:
-            output_path_120 = f"{output_path}{r120m_path}"
-            log.info("Writing r120m to {}", output_path_120=output_path_120)
-            encoding_120 = create_measurements_encoding(
-                r120m_dataset, spatial_chunk=spatial_chunk, keep_scale_offset=False
-            )
-            ds_120 = stream_write_dataset(
-                r120m_dataset,
-                output_path_120,
-                encoding_120,
-                enable_sharding=enable_sharding,
-                crs=crs,
-            )
-            processed_groups[r120m_path] = ds_120
-            resolution_groups["r120m"] = ds_120
+    r120m_dataset = create_downsampled_resolution_group(source_dataset, factor=factor)
+    log.info("Writing r120m to {}", output_path_120=r120m_path)
+    encoding_120 = create_measurements_encoding(
+        r120m_dataset, spatial_chunk=spatial_chunk, keep_scale_offset=False
+    )
+    ds_120 = stream_write_dataset(
+        r120m_dataset,
+        path=r120m_path,
+        group=output_group,
+        encoding=encoding_120,
+        enable_sharding=enable_sharding,
+        crs=crs,
+    )
+    processed_groups[r120m_path] = ds_120
+    resolution_groups["r120m"] = ds_120
 
-            # Create r360m from r120m
-            try:
-                r360m_path = f"{base_path}/r360m"
-                log.info("Creating r360m with factor 3")
+    r360m_path = f"{base_path}/r360m"
+    log.info("Creating r360m with factor 3")
 
-                r360m_dataset = create_downsampled_resolution_group(r120m_dataset, factor=3)
+    r360m_dataset = create_downsampled_resolution_group(r120m_dataset, factor=3)
 
-                if r360m_dataset and len(r360m_dataset.data_vars) > 0:
-                    output_path_360 = f"{output_path}{r360m_path}"
-                    log.info("Writing r360m to {}", output_path_360=output_path_360)
-                    encoding_360 = create_measurements_encoding(
-                        r360m_dataset, spatial_chunk=spatial_chunk, keep_scale_offset=False
-                    )
-                    ds_360 = stream_write_dataset(
-                        r360m_dataset,
-                        output_path_360,
-                        encoding_360,
-                        enable_sharding=enable_sharding,
-                        crs=crs,
-                    )
-                    processed_groups[r360m_path] = ds_360
-                    resolution_groups["r360m"] = ds_360
+    log.info("Writing r360m to {}", output_path_360=r360m_path)
+    encoding_360 = create_measurements_encoding(
+        r360m_dataset, spatial_chunk=spatial_chunk, keep_scale_offset=False
+    )
+    ds_360 = stream_write_dataset(
+        r360m_dataset,
+        path=r360m_path,
+        group=output_group,
+        encoding=encoding_360,
+        enable_sharding=enable_sharding,
+        crs=crs,
+    )
+    processed_groups[r360m_path] = ds_360
+    resolution_groups["r360m"] = ds_360
 
-                    # Create r720m from r360m
-                    try:
-                        r720m_path = f"{base_path}/r720m"
-                        log.info("    Creating r720m with factor 2")
+    r720m_path = f"{base_path}/r720m"
+    log.info("    Creating r720m with factor 2")
 
-                        r720m_dataset = create_downsampled_resolution_group(r360m_dataset, factor=2)
+    r720m_dataset = create_downsampled_resolution_group(r360m_dataset, factor=2)
 
-                        if r720m_dataset and len(r720m_dataset.data_vars) > 0:
-                            output_path_720 = f"{output_path}{r720m_path}"
-
-                            log.info(
-                                "    Writing r720m to {}",
-                                output_path_720=output_path_720,
-                            )
-                            encoding_720 = create_measurements_encoding(
-                                r720m_dataset,
-                                spatial_chunk=spatial_chunk,
-                                enable_sharding=enable_sharding,
-                                keep_scale_offset=False,
-                            )
-                            ds_720 = stream_write_dataset(
-                                r720m_dataset,
-                                output_path_720,
-                                encoding_720,
-                                enable_sharding=enable_sharding,
-                                crs=crs,
-                            )
-                            processed_groups[r720m_path] = ds_720
-                            resolution_groups["r720m"] = ds_720
-                        else:
-                            log.info("    r720m dataset is empty, skipping")
-                    except Exception as e:
-                        log.warning(
-                            "Could not create r720m",
-                            base_path=base_path,
-                            error=str(e),
-                        )
-                else:
-                    log.info("    r360m dataset is empty, skipping")
-            except Exception as e:
-                log.warning("Could not create r360m for {}: {}", base_path=base_path, e=e)
-            # Track r120m for multiscales if created
-
-            log.info("Tracking r120m for multiscales metadata")
-        else:
-            log.info("r120m dataset is empty, skipping")
-    except Exception as e:
-        log.warning("Could not create r120m for {}: {}", base_path=base_path, e=e)
+    log.info(
+        "    Writing r720m to {}",
+        output_path_720=r720m_path,
+    )
+    encoding_720 = create_measurements_encoding(
+        r720m_dataset,
+        spatial_chunk=spatial_chunk,
+        enable_sharding=enable_sharding,
+        keep_scale_offset=False,
+    )
+    ds_720 = stream_write_dataset(
+        r720m_dataset,
+        path=r720m_path,
+        group=output_group,
+        encoding=encoding_720,
+        enable_sharding=enable_sharding,
+        crs=crs,
+    )
+    processed_groups[r720m_path] = ds_720
+    resolution_groups["r720m"] = ds_720
 
     # Step 3: Add multiscales metadata to parent groups
     log.info("Adding multiscales metadata to parent groups")
 
+    # Get the parent group (it was created when writing the resolution groups)
+    parent_group = output_group[base_path]
+
     dt_multiscale = add_multiscales_metadata_to_parent(
-        output_group,
+        parent_group,
         resolution_groups,
         multiscales_flavor={"ogc_tms", "experimental_multiscales_convention"},
     )
@@ -329,7 +303,7 @@ def create_measurements_encoding(
         # Forward-propagate the existing encoding, minus keys that should be omitted
         keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
 
-        if keep_scale_offset:
+        if not keep_scale_offset:
             keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS
 
         for key in keep_keys:
@@ -442,24 +416,12 @@ def add_multiscales_metadata_to_parent(
         return None
 
     native_bounds = None
-    if hasattr(first_dataset, "rio"):
-        try:
-            native_bounds = first_dataset.rio.bounds()
-        except (AttributeError, TypeError):
-            # Try alternative method or construct from coordinates
-            try:
-                x_coords = first_dataset.x.values
-                y_coords = first_dataset.y.values
-                native_bounds = (x_coords.min(), y_coords.min(), x_coords.max(), y_coords.max())
-            except Exception:
-                pass
-
-    if native_bounds is None:
-        log.info(
-            "No bounds found, skipping multiscales metadata",
-            base_path=base_path,
-        )
-        return None
+    try:
+        native_bounds = first_dataset.rio.bounds()
+    except (AttributeError, TypeError):
+        x_coords = first_dataset.x.values
+        y_coords = first_dataset.y.values
+        native_bounds = (x_coords.min(), y_coords.min(), x_coords.max(), y_coords.max())
 
     # Create overview_levels structure following the multiscales v1.0 specification
     overview_levels: list[OverviewLevelJSON] = []
@@ -651,37 +613,28 @@ def add_multiscales_metadata_to_parent(
         ),
     )
 
-    # Create parent group path
-    dt_multiscale = xr.DataTree()
-    for res in all_resolutions:
-        dt_multiscale[res] = xr.DataTree()
-
-    # Add multiscale attributes
-    dt_multiscale.attrs.update(multiscale_attrs.model_dump())
+    # Write multiscale attributes directly to the parent group
+    attrs_to_write = multiscale_attrs.model_dump()
 
     # Add spatial and proj attributes at group level following specifications
     if native_crs and native_bounds:
         # Add spatial convention attributes
-        dt_multiscale.attrs["spatial:dimensions"] = ["y", "x"]  # Required field
-        dt_multiscale.attrs["spatial:bbox"] = list(native_bounds)  # [xmin, ymin, xmax, ymax]
-        dt_multiscale.attrs["spatial:registration"] = "pixel"  # Default registration type
+        attrs_to_write["spatial:dimensions"] = ["y", "x"]  # Required field
+        attrs_to_write["spatial:bbox"] = list(native_bounds)  # [xmin, ymin, xmax, ymax]
+        attrs_to_write["spatial:registration"] = "pixel"  # Default registration type
 
         # Add proj convention attributes
         if hasattr(native_crs, "to_epsg") and native_crs.to_epsg():
-            dt_multiscale.attrs["proj:code"] = f"EPSG:{native_crs.to_epsg()}"
+            attrs_to_write["proj:code"] = f"EPSG:{native_crs.to_epsg()}"
         elif hasattr(native_crs, "to_wkt"):
-            dt_multiscale.attrs["proj:wkt2"] = native_crs.to_wkt()
+            attrs_to_write["proj:wkt2"] = native_crs.to_wkt()
 
-    dt_multiscale.to_zarr(
-        group.store,
-        mode="a",
-        consolidated=False,
-        zarr_format=3,
-    )
+    # Write attributes directly to the zarr group
+    group.attrs.update(attrs_to_write)
 
     log.info("Added %s multiscale levels to %s", len(overview_levels), group.path)
 
-    return dt_multiscale
+    return None  # No DataTree to return since we wrote directly to the group
 
 
 def create_original_encoding(dataset: xr.Dataset) -> dict[str, XarrayDataArrayEncoding]:
@@ -852,10 +805,10 @@ def create_lazy_downsample_operation_from_existing(
 
 def stream_write_dataset(
     dataset: xr.Dataset,
-    dataset_path: str,
+    *,
+    path: str,
     group: zarr.Group,
     encoding: dict[str, XarrayDataArrayEncoding],
-    *,
     enable_sharding: bool,
     crs: CRS | None = None,
 ) -> xr.Dataset:
@@ -876,16 +829,16 @@ def stream_write_dataset(
         Written dataset
     """
     # Check if level already exists
-    if dataset_path in group:
+    if path in group:
         log.info(
             "Level path {} already exists. Skipping write.",
-            dataset_path=dataset_path,
+            dataset_path=path,
         )
         return xr.open_dataset(
-            group.store, engine="zarr", chunks={}, decode_coords="all", group=dataset_path
+            group.store, engine="zarr", chunks={}, decode_coords="all", group=path
         )
 
-    log.info("Streaming computation and write to {}", dataset_path=dataset_path)
+    log.info("Streaming computation and write to {}", dataset_path=path)
     log.info("Variables", variables=list(dataset.data_vars.keys()))
 
     # Rechunk dataset to align with encoding
@@ -894,7 +847,7 @@ def stream_write_dataset(
     # Add the geo metadata before writing for
     # - /measurements/ groups
     # - /quality/ groups
-    if "/measurements/" in dataset_path or "/quality/" in dataset_path:
+    if "/measurements/" in path or "/quality/" in path:
         write_geo_metadata(dataset, crs=crs)
 
     # Write with streaming computation and progress tracking
@@ -905,7 +858,7 @@ def stream_write_dataset(
         consolidated=False,
         zarr_format=3,
         encoding=encoding,
-        group=dataset_path,
+        group=path,
         compute=False,  # Create job first for progress tracking
     )
     write_job = write_job.persist()
@@ -941,7 +894,7 @@ def stream_write_dataset(
         log.info("Writing zarr file...")
         write_job.compute()
 
-    log.info("✅ Streaming write complete for dataset {}", dataset_path=dataset_path)
+    log.info("✅ Streaming write complete for dataset {}", dataset_path=path)
     return dataset
 
 

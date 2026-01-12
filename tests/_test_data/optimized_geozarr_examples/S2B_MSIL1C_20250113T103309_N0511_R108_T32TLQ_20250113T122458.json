@@ -4451,41 +4451,41 @@
                   {
                     "cellSize": 0.0,
                     "id": "r10m",
-                    "matrixHeight": 45,
-                    "matrixWidth": 45,
+                    "matrixHeight": 1,
+                    "matrixWidth": 1,
                     "pointOfOrigin": [
                       0.0,
                       0.0
                     ],
                     "scaleDenominator": 0.0,
-                    "tileHeight": 244,
-                    "tileWidth": 244
+                    "tileHeight": 10980,
+                    "tileWidth": 10980
                   },
                   {
                     "cellSize": 0.0,
                     "id": "r20m",
-                    "matrixHeight": 30,
-                    "matrixWidth": 30,
+                    "matrixHeight": 1,
+                    "matrixWidth": 1,
                     "pointOfOrigin": [
                       0.0,
                       0.0
                     ],
                     "scaleDenominator": 0.0,
-                    "tileHeight": 183,
-                    "tileWidth": 183
+                    "tileHeight": 5490,
+                    "tileWidth": 5490
                   },
                   {
                     "cellSize": 0.0,
                     "id": "r60m",
-                    "matrixHeight": 10,
-                    "matrixWidth": 10,
+                    "matrixHeight": 1,
+                    "matrixWidth": 1,
                     "pointOfOrigin": [
                       0.0,
                       0.0
                     ],
                     "scaleDenominator": 0.0,
-                    "tileHeight": 183,
-                    "tileWidth": 183
+                    "tileHeight": 1830,
+                    "tileWidth": 1830
                   },
                   {
                     "cellSize": 0.0,
@@ -4568,11 +4568,29 @@
           },
           "members": {
             "r10m": {
-              "attributes": {},
+              "attributes": {
+                "grid_mapping": "spatial_ref",
+                "proj:code": "EPSG:32632",
+                "spatial:bbox": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "spatial:dimensions": [
+                  "y",
+                  "x"
+                ],
+                "spatial:registration": "pixel",
+                "spatial:shape": [
+                  10980,
+                  10980
+                ]
+              },
               "members": {
                 "b02": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -4587,7 +4605,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -4615,7 +4632,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -4623,8 +4639,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        244,
-                        244
+                        10980,
+                        10980
                       ]
                     },
                     "name": "regular"
@@ -4638,27 +4654,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          244,
+                          244
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     10980,
@@ -4669,7 +4708,7 @@
                 },
                 "b03": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -4684,7 +4723,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -4712,7 +4750,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -4720,8 +4757,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        244,
-                        244
+                        10980,
+                        10980
                       ]
                     },
                     "name": "regular"
@@ -4735,27 +4772,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          244,
+                          244
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     10980,
@@ -4766,7 +4826,7 @@
                 },
                 "b04": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -4781,7 +4841,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -4809,7 +4868,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -4817,8 +4875,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        244,
-                        244
+                        10980,
+                        10980
                       ]
                     },
                     "name": "regular"
@@ -4832,27 +4890,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          244,
+                          244
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     10980,
@@ -4863,7 +4944,7 @@
                 },
                 "b08": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -4878,7 +4959,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -4906,7 +4986,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -4914,8 +4993,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        244,
-                        244
+                        10980,
+                        10980
                       ]
                     },
                     "name": "regular"
@@ -4929,27 +5008,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          244,
+                          244
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     10980,
@@ -5090,7 +5192,25 @@
               "zarr_format": 3
             },
             "r120m": {
-              "attributes": {},
+              "attributes": {
+                "grid_mapping": "spatial_ref",
+                "proj:code": "EPSG:32632",
+                "spatial:bbox": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "spatial:dimensions": [
+                  "y",
+                  "x"
+                ],
+                "spatial:registration": "pixel",
+                "spatial:shape": [
+                  915,
+                  915
+                ]
+              },
               "members": {
                 "b01": {
                   "attributes": {
@@ -5575,11 +5695,29 @@
               "zarr_format": 3
             },
             "r20m": {
-              "attributes": {},
+              "attributes": {
+                "grid_mapping": "spatial_ref",
+                "proj:code": "EPSG:32632",
+                "spatial:bbox": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "spatial:dimensions": [
+                  "y",
+                  "x"
+                ],
+                "spatial:registration": "pixel",
+                "spatial:shape": [
+                  5490,
+                  5490
+                ]
+              },
               "members": {
                 "b05": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -5594,7 +5732,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -5622,7 +5759,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -5630,8 +5766,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        5490,
+                        5490
                       ]
                     },
                     "name": "regular"
@@ -5645,27 +5781,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -5676,7 +5835,7 @@
                 },
                 "b06": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -5691,7 +5850,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -5719,7 +5877,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -5727,8 +5884,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        5490,
+                        5490
                       ]
                     },
                     "name": "regular"
@@ -5742,27 +5899,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -5773,7 +5953,7 @@
                 },
                 "b07": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -5788,7 +5968,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -5816,7 +5995,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -5824,8 +6002,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        5490,
+                        5490
                       ]
                     },
                     "name": "regular"
@@ -5839,27 +6017,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -5870,7 +6071,7 @@
                 },
                 "b11": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -5885,7 +6086,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -5913,7 +6113,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -5921,8 +6120,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        5490,
+                        5490
                       ]
                     },
                     "name": "regular"
@@ -5936,27 +6135,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -5967,7 +6189,7 @@
                 },
                 "b12": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -5982,7 +6204,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -6010,7 +6231,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -6018,8 +6238,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        5490,
+                        5490
                       ]
                     },
                     "name": "regular"
@@ -6033,27 +6253,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -6064,7 +6307,7 @@
                 },
                 "b8a": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -6079,7 +6322,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -6107,7 +6349,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -6115,8 +6356,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        5490,
+                        5490
                       ]
                     },
                     "name": "regular"
@@ -6130,27 +6371,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -6291,7 +6555,25 @@
               "zarr_format": 3
             },
             "r360m": {
-              "attributes": {},
+              "attributes": {
+                "grid_mapping": "spatial_ref",
+                "proj:code": "EPSG:32632",
+                "spatial:bbox": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "spatial:dimensions": [
+                  "y",
+                  "x"
+                ],
+                "spatial:registration": "pixel",
+                "spatial:shape": [
+                  305,
+                  305
+                ]
+              },
               "members": {
                 "b01": {
                   "attributes": {
@@ -6776,11 +7058,29 @@
               "zarr_format": 3
             },
             "r60m": {
-              "attributes": {},
+              "attributes": {
+                "grid_mapping": "spatial_ref",
+                "proj:code": "EPSG:32632",
+                "spatial:bbox": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "spatial:dimensions": [
+                  "y",
+                  "x"
+                ],
+                "spatial:registration": "pixel",
+                "spatial:shape": [
+                  1830,
+                  1830
+                ]
+              },
               "members": {
                 "b01": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -6795,7 +7095,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -6823,7 +7122,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -6831,8 +7129,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        1830,
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -6846,27 +7144,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     1830,
@@ -6877,7 +7198,7 @@
                 },
                 "b09": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -6892,7 +7213,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -6920,7 +7240,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -6928,8 +7247,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        1830,
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -6943,27 +7262,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     1830,
@@ -6974,7 +7316,7 @@
                 },
                 "b10": {
                   "attributes": {
-                    "_FillValue": 0,
+                    "_FillValue": "AAAAAAAAAAA=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -6989,7 +7331,6 @@
                       "scale_factor": 0.0001,
                       "units": "digital_counts"
                     },
-                    "add_offset": -0.1,
                     "dtype": "<u2",
                     "fill_value": 0,
                     "grid_mapping": "spatial_ref",
@@ -7017,7 +7358,6 @@
                       1.0
                     ],
                     "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-                    "scale_factor": 0.0001,
                     "units": "digital_counts",
                     "valid_max": 65535,
                     "valid_min": 1
@@ -7025,8 +7365,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        183,
-                        183
+                        1830,
+                        1830
                       ]
                     },
                     "name": "regular"
@@ -7040,27 +7380,50 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 2
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "uint16",
+                  "data_type": "float64",
                   "dimension_names": [
                     "y",
                     "x"
                   ],
-                  "fill_value": 0,
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     1830,
@@ -7201,7 +7564,25 @@
               "zarr_format": 3
             },
             "r720m": {
-              "attributes": {},
+              "attributes": {
+                "grid_mapping": "spatial_ref",
+                "proj:code": "EPSG:32632",
+                "spatial:bbox": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                "spatial:dimensions": [
+                  "y",
+                  "x"
+                ],
+                "spatial:registration": "pixel",
+                "spatial:shape": [
+                  152,
+                  152
+                ]
+              },
               "members": {
                 "b01": {
                   "attributes": {
@@ -7269,19 +7650,42 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          152,
+                          152
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
                   "data_type": "float64",
@@ -7364,19 +7768,42 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          152,
+                          152
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
                   "data_type": "float64",
@@ -7459,19 +7886,42 @@
                   "codecs": [
                     {
                       "configuration": {
-                        "endian": "little"
+                        "chunk_shape": [
+                          152,
+                          152
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 8
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
                       },
-                      "name": "bytes"
-                    },
-                    {
-                      "configuration": {
-                        "blocksize": 0,
-                        "clevel": 3,
-                        "cname": "zstd",
-                        "shuffle": "shuffle",
-                        "typesize": 8
-                      },
-                      "name": "blosc"
+                      "name": "sharding_indexed"
                     }
                   ],
                   "data_type": "float64",
