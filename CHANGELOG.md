@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-01-13
+
+### Changed
+
+- Simplified multiscale generation logic and improved data type handling by converting float64 outputs to float32 (#110)
+- Enhanced multiscale processing to use zarr groups instead of file paths for improved I/O efficiency (#110)
+- Consolidated test data structure by moving all test examples under unified `_test_data` directory (#105)
+- Refined scale offset encoding behavior during multiscale data generation (#110)
+
+### Fixed
+
+- Fixed failing mock tests in multiscale generation pipeline (#110)
+- Improved test fixture organization and removed redundant test data files (#105)
+
 ## [0.6.1] - 2026-01-05
 
 ### Added
