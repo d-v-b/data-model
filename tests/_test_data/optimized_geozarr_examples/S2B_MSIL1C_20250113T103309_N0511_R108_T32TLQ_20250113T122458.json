@@ -4671,7 +4671,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -4692,7 +4692,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -4789,7 +4789,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -4810,7 +4810,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -4907,7 +4907,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -4928,7 +4928,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -5025,7 +5025,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -5046,7 +5046,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -5295,7 +5295,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -5316,7 +5316,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -5413,7 +5413,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -5434,7 +5434,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -5531,7 +5531,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -5552,7 +5552,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -5798,7 +5798,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -5819,7 +5819,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -5916,7 +5916,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -5937,7 +5937,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -6034,7 +6034,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -6055,7 +6055,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -6152,7 +6152,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -6173,7 +6173,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -6270,7 +6270,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -6291,7 +6291,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -6388,7 +6388,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -6409,7 +6409,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -6658,7 +6658,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -6679,7 +6679,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -6776,7 +6776,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -6797,7 +6797,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -6894,7 +6894,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -6915,7 +6915,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -7161,7 +7161,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -7182,7 +7182,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -7279,7 +7279,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -7300,7 +7300,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -7397,7 +7397,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -7418,7 +7418,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -7667,7 +7667,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -7688,7 +7688,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -7785,7 +7785,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -7806,7 +7806,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"
@@ -7903,7 +7903,7 @@
                               "clevel": 3,
                               "cname": "zstd",
                               "shuffle": "shuffle",
-                              "typesize": 8
+                              "typesize": 4
                             },
                             "name": "blosc"
                           }
@@ -7924,7 +7924,7 @@
                       "name": "sharding_indexed"
                     }
                   ],
-                  "data_type": "float64",
+                  "data_type": "float32",
                   "dimension_names": [
                     "y",
                     "x"

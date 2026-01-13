@@ -1158,6 +1158,14 @@ def add_s2_optimization_commands(subparsers: argparse._SubParsersAction) -> None
     s2_parser.add_argument("--skip-validation", action="store_true", help="Skip output validation")
     s2_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     s2_parser.add_argument(
+        "--keep-scale-offset",
+        action="store_true",
+        help="""
+        Preserve scale-offset encoding. Default is False, in which case arrays stored with
+        scale-offset encoding will be re-saved as the decoded data type, i.e. floating point values.
+        """,
+    )
+    s2_parser.add_argument(
         "--dask-cluster",
         action="store_true",
         help="Start a local dask cluster for parallel processing and progress bars",
@@ -1188,6 +1196,7 @@ def convert_s2_optimized_command(args: argparse.Namespace) -> None:
             spatial_chunk=args.spatial_chunk,
             compression_level=args.compression_level,
             validate_output=not args.skip_validation,
+            keep_scale_offset=args.keep_scale_offset,
         )
 
         log.info("✅ S2 optimization completed", output_path=args.output_path)

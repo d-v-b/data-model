@@ -5,6 +5,7 @@ Uses lazy evaluation to minimize memory usage during dataset preparation.
 
 from __future__ import annotations
 
+from itertools import pairwise
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
@@ -65,10 +66,12 @@ def get_grid_spacing(ds: xr.DataArray, coords: tuple[Hashable, ...]) -> tuple[fl
 
 def create_multiscale_from_datatree(
     dt_input: xr.DataTree,
+    *,
     output_group: zarr.Group,
     enable_sharding: bool,
     spatial_chunk: int,
     crs: CRS | None = None,
+    keep_scale_offset: bool,
 ) -> dict[str, dict]:
     """
     Create multiscale versions preserving original structure.
@@ -85,6 +88,7 @@ def create_multiscale_from_datatree(
         Dictionary of processed groups
     """
     processed_groups = {}
+    # The scale levels in the output data. 10, 20, 60 already exist in the source data.
 
     # Step 1: Copy all original groups as-is
     for group_path in dt_input.groups:
@@ -120,10 +124,14 @@ def create_multiscale_from_datatree(
                 dataset,
                 spatial_chunk=spatial_chunk,
                 enable_sharding=enable_sharding,
-                keep_scale_offset=False,
+                keep_scale_offset=keep_scale_offset,
             )
+            # convert float64 arrays to float32
+            for data_var in dataset.data_vars:
+                if dataset[data_var].dtype in (np.dtype("<f8"), np.dtype(">f8")):
+                    dataset[data_var] = dataset[data_var].astype("float32")
         else:
-            # Non-measurement groups: preserve original chunking
+            # Non-measurement groups: preserve original encoding
             encoding = create_original_encoding(dataset)
 
         ds_out = stream_write_dataset(
@@ -137,7 +145,7 @@ def create_multiscale_from_datatree(
         processed_groups[group_path] = ds_out
     # Step 2: Create downsampled resolution groups ONLY for measurements
     # Find all resolution-based groups under /measurements/ and organize by base path
-    resolution_groups = {}
+    resolution_groups: dict[str, xr.Dataset] = {}
     base_path = "/measurements/reflectance"
     for group_path in processed_groups:
         # Only process groups under /measurements/reflectance
@@ -148,91 +156,46 @@ def create_multiscale_from_datatree(
         if group_name in ["r10m", "r20m", "r60m"]:
             resolution_groups[group_name] = processed_groups[group_path]
 
-    # Find the coarsest resolution (r60m > r20m > r10m)
-    source_dataset = None
-    source_resolution = None
+    scale_levels = tuple(pyramid_levels.values())
 
-    for res in ["r60m", "r20m", "r10m"]:
-        if res in resolution_groups:
-            source_dataset = resolution_groups[res]
-            source_resolution = int(res[1:-1])  # Extract number
-            break
+    # iterate over source, dest pairs: (60, 120), (120, 360), ...
+    for source_level, dest_level in pairwise(scale_levels[2:]):
+        dest_level_name = f"r{dest_level}m"
+        dest_level_path = f"{base_path}/{dest_level_name}"
 
-    if not source_dataset or source_resolution is None:
-        log.info("No source resolution found for downsampling, skipping downsampled levels")
-        return processed_groups  # Stop processing if no valid source dataset is found
+        source_ds = resolution_groups[f"r{source_level}m"]
 
-    log.info(
-        "Creating downsampled versions",
-        source_dataset=source_dataset,
-        source_resolution=source_resolution,
-    )
+        downsample_factor = dest_level // source_level
+        log.info("Creating level with resolution", level=dest_level_name, resolution=dest_level)
 
-    r120m_path = f"{base_path}/r120m"
-    factor = 120 // source_resolution
-    log.info("Creating r120m with factor {}", factor=factor)
+        # Create downsampled dataset
+        downsampled_dataset = create_downsampled_resolution_group(
+            source_ds, factor=downsample_factor
+        )
 
-    r120m_dataset = create_downsampled_resolution_group(source_dataset, factor=factor)
-    log.info("Writing r120m to {}", output_path_120=r120m_path)
-    encoding_120 = create_measurements_encoding(
-        r120m_dataset, spatial_chunk=spatial_chunk, keep_scale_offset=False
-    )
-    ds_120 = stream_write_dataset(
-        r120m_dataset,
-        path=r120m_path,
-        group=output_group,
-        encoding=encoding_120,
-        enable_sharding=enable_sharding,
-        crs=crs,
-    )
-    processed_groups[r120m_path] = ds_120
-    resolution_groups["r120m"] = ds_120
+        log.info("Writing level to path", level=dest_level_name, output_path=dest_level_path)
 
-    r360m_path = f"{base_path}/r360m"
-    log.info("Creating r360m with factor 3")
+        # Create encoding
+        encoding = create_measurements_encoding(
+            downsampled_dataset,
+            spatial_chunk=spatial_chunk,
+            enable_sharding=enable_sharding,
+            keep_scale_offset=keep_scale_offset,
+        )
 
-    r360m_dataset = create_downsampled_resolution_group(r120m_dataset, factor=3)
+        # Write dataset
+        ds_out = stream_write_dataset(
+            downsampled_dataset,
+            path=dest_level_path,
+            group=output_group,
+            encoding=encoding,
+            enable_sharding=enable_sharding,
+            crs=crs,
+        )
 
-    log.info("Writing r360m to {}", output_path_360=r360m_path)
-    encoding_360 = create_measurements_encoding(
-        r360m_dataset, spatial_chunk=spatial_chunk, keep_scale_offset=False
-    )
-    ds_360 = stream_write_dataset(
-        r360m_dataset,
-        path=r360m_path,
-        group=output_group,
-        encoding=encoding_360,
-        enable_sharding=enable_sharding,
-        crs=crs,
-    )
-    processed_groups[r360m_path] = ds_360
-    resolution_groups["r360m"] = ds_360
-
-    r720m_path = f"{base_path}/r720m"
-    log.info("    Creating r720m with factor 2")
-
-    r720m_dataset = create_downsampled_resolution_group(r360m_dataset, factor=2)
-
-    log.info(
-        "    Writing r720m to {}",
-        output_path_720=r720m_path,
-    )
-    encoding_720 = create_measurements_encoding(
-        r720m_dataset,
-        spatial_chunk=spatial_chunk,
-        enable_sharding=enable_sharding,
-        keep_scale_offset=False,
-    )
-    ds_720 = stream_write_dataset(
-        r720m_dataset,
-        path=r720m_path,
-        group=output_group,
-        encoding=encoding_720,
-        enable_sharding=enable_sharding,
-        crs=crs,
-    )
-    processed_groups[r720m_path] = ds_720
-    resolution_groups["r720m"] = ds_720
+        # Store results
+        processed_groups[dest_level_path] = ds_out
+        resolution_groups[dest_level_name] = ds_out
 
     # Step 3: Add multiscales metadata to parent groups
     log.info("Adding multiscales metadata to parent groups")

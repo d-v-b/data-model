@@ -36,8 +36,6 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
 
     res = subprocess.run(cmd, capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
-    # Check that the hierarchy we just created is structurally identical to what we expect.
-    # This is a very brittle check as it is sensitive to even the slightest change in Zarr metadata
 
 
 def test_cli_convert_real_sentinel2_data(s2_group_example: Path, tmp_path: Path) -> None:

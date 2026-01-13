@@ -164,6 +164,7 @@ def test_create_multiscale_from_datatree(
             output_group=output_group,
             enable_sharding=True,
             spatial_chunk=256,
+            keep_scale_offset=False,
         )
 
     observed_group = zarr.open_group(output_path, use_consolidated=False)
@@ -206,7 +207,6 @@ def test_create_multiscale_from_datatree(
                     dtype_mismatch.add(
                         (f"{group_a.path}/{name}::{dtype_a}", f"{group_b.path}/{name}::{dtype_b}")
                     )
-
     assert dtype_mismatch == set()
 
     o_keys = set(observed_structure_flat.keys())
