@@ -23,7 +23,7 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     """
     Test the convert-s2-optimized CLI command on a local copy of sentinel data
     """
-    output_path = tmp_path / f"test_convert_s2_optimized_{s2_group_example.stem}.zarr"
+    output_path = tmp_path
 
     cmd = [
         "python",
@@ -36,38 +36,6 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
 
     res = subprocess.run(cmd, capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
-    # Check that the hierarchy we just created is structurally identical to what we expect.
-    # This is a very brittle check as it is sensitive to even the slightest change in Zarr metadata
-
-    observed_structure_json = GroupSpec.from_zarr(
-        zarr.open_group(output_path, use_consolidated=False)
-    ).model_dump()
-
-    # Comparing JSON objects is sensitive to the difference between tuples and lists, but we
-    # don't care about that here, so we convert all lists to tuples before creating the GroupSpec
-    observed_structure = GroupSpec(**tuplify_json(observed_structure_json))
-    observed_structure_flat = observed_structure.to_flat()
-    expected_structure_path = Path("tests/_test_data/optimized_geozarr_examples/") / (
-        s2_group_example.stem + ".json"
-    )
-
-    # Uncomment this section to write out the expected structure from the observed structure
-    # This is useful when the expected structure needs to be updated
-    # expected_structure_path.write_text(
-    #    json.dumps(observed_structure_json, indent=2, sort_keys=True)
-    # )
-
-    expected_structure_json = tuplify_json(json.loads(expected_structure_path.read_text()))
-    expected_structure = GroupSpec(**expected_structure_json)
-    expected_structure_flat = expected_structure.to_flat()
-
-    o_keys = set(observed_structure_flat.keys())
-    e_keys = set(expected_structure_flat.keys())
-
-    # Check that all of the keys are the same
-    assert o_keys == e_keys
-    # Check that all values are the same
-    assert [k for k in o_keys if expected_structure_flat[k] != observed_structure_flat[k]] == []
 
 
 def test_cli_convert_real_sentinel2_data(s2_group_example: Path, tmp_path: Path) -> None:

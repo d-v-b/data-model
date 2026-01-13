@@ -45,9 +45,7 @@ def create_group_from_json(source_path: pathlib.Path, out_path: pathlib.Path) ->
 
 
 @pytest.fixture(params=s1_example_json_paths, ids=get_stem)
-def s1_group_example(
-    request: pytest.FixtureRequest, tmp_path: pathlib.Path
-) -> tuple[pathlib.Path, ...]:
+def s1_group_example(request: pytest.FixtureRequest, tmp_path: pathlib.Path) -> pathlib.Path:
     """
     A fixture that returns the path to a Zarr group with the same layout as a sentinel 1
     product
@@ -56,9 +54,7 @@ def s1_group_example(
 
 
 @pytest.fixture(params=s2_example_json_paths, ids=get_stem)
-def s2_group_example(
-    request: pytest.FixtureRequest, tmp_path: pathlib.Path
-) -> tuple[pathlib.Path, ...]:
+def s2_group_example(request: pytest.FixtureRequest, tmp_path: pathlib.Path) -> pathlib.Path:
     """
     A fixture that returns the path to a Zarr group with the same layout as a sentinel 2
     product

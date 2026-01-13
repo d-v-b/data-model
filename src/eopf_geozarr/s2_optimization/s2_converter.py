@@ -137,9 +137,10 @@ def convert_s2(
     log.info("Step 2: Creating multiscale pyramids (preserving original hierarchy)")
     datasets = create_multiscale_from_datatree(
         dt_input,
-        output_path,
+        output_group=zarr.open_group(output_path),
         spatial_chunk=spatial_chunk,
         enable_sharding=enable_sharding,
+        keep_scale_offset=False,
     )
 
     log.info("Created multiscale pyramids", num_groups=len(datasets))
@@ -181,6 +182,7 @@ def convert_s2_optimized(
     spatial_chunk: int,
     compression_level: int,
     validate_output: bool,
+    keep_scale_offset: bool,
     max_retries: int = 3,
 ) -> xr.DataTree:
     """
@@ -193,6 +195,7 @@ def convert_s2_optimized(
         spatial_chunk: Spatial chunk size
         compression_level: Compression level 1-9
         validate_output: Whether to validate the output
+        keep_scale_offset: Whether to preserve scale-offset encoding of the source data.
         max_retries: Maximum number of retries for network operations
 
     Returns:
@@ -219,12 +222,15 @@ def convert_s2_optimized(
     # Step 2: Create multiscale pyramids for each group in the original structure
     log.info("Step 2: Creating multiscale pyramids (preserving original hierarchy)")
 
+    output_group = zarr.open_group(output_path)
+
     datasets = create_multiscale_from_datatree(
         dt_input,
-        output_path,
+        output_group=output_group,
         spatial_chunk=spatial_chunk,
         enable_sharding=enable_sharding,
         crs=crs,
+        keep_scale_offset=keep_scale_offset,
     )
 
     log.info("Created multiscale pyramids", num_groups=len(datasets))
@@ -334,17 +340,13 @@ def optimization_summary(dt_input: xr.DataTree, dt_output: xr.DataTree, output_p
 
 def create_result_datatree(output_path: str) -> xr.DataTree:
     """Create result DataTree from written output."""
-    try:
-        storage_options = get_storage_options(output_path)
-        return xr.open_datatree(
-            output_path,
-            engine="zarr",
-            chunks="auto",
-            storage_options=storage_options,
-        )
-    except Exception as e:
-        log.warning("Could not open result DataTree", error=str(e))
-        return xr.DataTree()
+    storage_options = get_storage_options(output_path)
+    return xr.open_datatree(
+        output_path,
+        engine="zarr",
+        chunks="auto",
+        storage_options=storage_options,
+    )
 
 
 def is_sentinel2_dataset(group: zarr.Group) -> bool:

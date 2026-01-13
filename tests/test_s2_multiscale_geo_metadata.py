@@ -10,6 +10,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 import xarray as xr
+import zarr
 
 from eopf_geozarr.s2_optimization.s2_multiscale import (
     create_measurements_encoding,
@@ -225,14 +226,21 @@ class TestWriteGeoMetadata:
         # Create encoding for the dataset
         encoding = create_measurements_encoding(ds, spatial_chunk=1024, enable_sharding=True)
 
-        # Create a temporary output path that matches the pattern for geo metadata
-        output_path = str(tmp_path / "measurements" / "test_dataset.zarr")
-
         # Call _stream_write_dataset (which should call _write_geo_metadata internally)
-        stream_write_dataset(ds, output_path, encoding, enable_sharding=True)
+        # Use a measurements path to trigger geo metadata writing
+        dataset_path = "/measurements/reflectance/r10m"
+        stream_write_dataset(
+            ds,
+            path=dataset_path,
+            group=zarr.create_group(tmp_path),
+            encoding=encoding,
+            enable_sharding=True,
+        )
 
         # Re-open the written dataset to verify CRS was persisted
-        written_ds = xr.open_dataset(output_path, engine="zarr", chunks={}, decode_coords="all")
+        written_ds = xr.open_dataset(
+            tmp_path, engine="zarr", chunks={}, decode_coords="all", group=dataset_path
+        )
 
         # Verify CRS was written and persisted
         assert hasattr(written_ds, "rio")

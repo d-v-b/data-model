@@ -241,6 +241,8 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
 class TestConvenienceFunction:
     """Test the convenience function."""
 
+    @patch("eopf_geozarr.s2_optimization.s2_converter.create_result_datatree")
+    @patch("eopf_geozarr.s2_optimization.s2_converter.zarr.open_group")
     @patch("eopf_geozarr.s2_optimization.s2_converter.initialize_crs_from_dataset")
     @patch("eopf_geozarr.s2_optimization.s2_converter.get_zarr_group")
     @patch("eopf_geozarr.s2_optimization.s2_converter.is_sentinel2_dataset")
@@ -248,11 +250,13 @@ class TestConvenienceFunction:
     @patch("eopf_geozarr.s2_optimization.s2_converter.simple_root_consolidation")
     def test_convert_s2_optimized_convenience_function(
         self,
-        mock_consolidation,
-        mock_multiscale,
-        mock_is_s2,
-        mock_get_zarr_group,
-        mock_init_crs,
+        mock_consolidation: Mock,
+        mock_multiscale: Mock,
+        mock_is_s2: Mock,
+        mock_get_zarr_group: Mock,
+        mock_init_crs: Mock,
+        mock_zarr_open_group: Mock,
+        mock_create_result_datatree: Mock,
     ) -> None:
         """Test the convenience function parameter passing."""
         # Setup mocks
@@ -260,6 +264,17 @@ class TestConvenienceFunction:
         mock_is_s2.return_value = True
         mock_get_zarr_group.return_value = Mock()
         mock_init_crs.return_value = None  # Return None for CRS
+
+        # Mock zarr.open_group to return a group with proper groups() and members() methods
+        mock_zarr_group = Mock()
+        mock_zarr_group.groups.return_value = iter([])  # Return empty iterator for groups
+        mock_zarr_group.members.return_value = {}  # Return empty dict for members
+        mock_zarr_open_group.return_value = mock_zarr_group
+
+        # Mock create_result_datatree to return a mock DataTree with groups attribute
+        mock_result_dt = Mock()
+        mock_result_dt.groups = []  # Empty list for groups
+        mock_create_result_datatree.return_value = mock_result_dt
 
         # Test parameter passing - Mock DataTree with groups attribute
         dt_input = Mock()
@@ -274,6 +289,7 @@ class TestConvenienceFunction:
             compression_level=2,
             max_retries=5,
             validate_output=False,
+            keep_scale_offset=False,
         )
 
         # Verify multiscale function was called with correct args
