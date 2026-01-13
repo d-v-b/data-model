@@ -6,15 +6,12 @@ from typing import Any
 import numpy as np
 import pytest
 from pydantic import ValidationError
-from pydantic_zarr.experimental.v2 import ArraySpec, GroupSpec
+from pydantic_zarr.v2 import GroupSpec
 
 from eopf_geozarr.data_api.geozarr.v2 import (
     DataArray,
-    DataArrayAttrs,
     check_valid_coordinates,
 )
-
-from .conftest import example_group
 
 
 class GroupWithDataArrays(GroupSpec):
@@ -71,16 +68,3 @@ class TestCheckValidCoordinates:
         msg = "Dimension .* for array 'base' has a shape mismatch:"
         with pytest.raises(ValueError, match=msg):
             check_valid_coordinates(group)
-
-
-@pytest.mark.skip(reason="We don't have a v2 example group yet")
-def test_dataarray_attrs_round_trip() -> None:
-    """
-    Ensure that we can round-trip dataarray attributes through the `Multiscales` model.
-    """
-    source_untyped = GroupSpec.from_zarr(example_group)
-    flat = source_untyped.to_flat()
-    for val in flat.values():
-        if isinstance(val, ArraySpec):
-            model_json = val.model_dump()["attributes"]
-            assert DataArrayAttrs(**model_json).model_dump() == model_json

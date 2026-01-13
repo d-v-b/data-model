@@ -1163,7 +1163,15 @@ def add_s2_optimization_commands(subparsers: argparse._SubParsersAction) -> None
     s2_parser.add_argument(
         "--allow-json-nan",
         action="store_true",
-        help="Allow invalid float values (nan, inf) in output JSON",
+        help="Allow invalid float values (nan, inf) in output JSON"
+        )
+    s2_parser.add_argument(
+        "--keep-scale-offset",
+        action="store_true",
+        help="""
+        Preserve scale-offset encoding. Default is False, in which case arrays stored with
+        scale-offset encoding will be re-saved as the decoded data type, i.e. floating point values.
+        """,
     )
     s2_parser.add_argument(
         "--dask-cluster",
@@ -1204,6 +1212,7 @@ def convert_s2_optimized_command(args: argparse.Namespace) -> None:
             compression_level=args.compression_level,
             validate_output=not args.skip_validation,
             allow_json_nan=args.allow_json_nan,
+            keep_scale_offset=args.keep_scale_offset,
         )
 
         log.info("✅ S2 optimization completed", output_path=args.output_path)

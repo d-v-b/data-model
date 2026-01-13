@@ -63,12 +63,11 @@ class TestCheckValidCoordinates:
             check_valid_coordinates(group)
 
 
-@pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
-def test_dataarray_round_trip(example_group: zarr.Group) -> None:
+def test_dataarray_round_trip(s2_geozarr_group_example: Any) -> None:
     """
     Ensure that we can round-trip dataarray attributes through the `Multiscales` model.
     """
-    source_untyped = GroupSpec.from_zarr(example_group)
+    source_untyped = GroupSpec.from_zarr(s2_geozarr_group_example)
     flat = source_untyped.to_flat()
     for val in flat.values():
         if isinstance(val, ArraySpec) and val.dimension_names is not None:
@@ -76,11 +75,11 @@ def test_dataarray_round_trip(example_group: zarr.Group) -> None:
             assert DataArray(**model_json).model_dump() == model_json
 
 
-def test_multiscale_attrs_round_trip(example_group: Any) -> None:
+def test_multiscale_attrs_round_trip(s2_geozarr_group_example: Any) -> None:
     """
     Test that multiscale datasets round-trip through the `Multiscales` model
     """
-    source_group_members = dict(example_group.members(max_depth=None))
+    source_group_members = dict(s2_geozarr_group_example.members(max_depth=None))
     for val in source_group_members.values():
         if isinstance(val, zarr.Group) and "multiscales" in val.attrs.asdict():
             model_json = MultiscaleGroup.from_zarr(val).model_dump()

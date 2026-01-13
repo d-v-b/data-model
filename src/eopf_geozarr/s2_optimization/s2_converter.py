@@ -291,32 +291,22 @@ def convert_s2_optimized(
     compression_level: int,
     validate_output: bool,
     omit_nodes: set[str] | None = None,
+    keep_scale_offset: bool,
     max_retries: int = 3,
     allow_json_nan: bool = False,
 ) -> xr.DataTree:
     """
     Convenience function for S2 optimization.
 
-    Parameters
-    ----------
-    dt_input : xr.DataTree
-        Input Sentinel-2 DataTree
-    output_path : str
-        Output path
-    enable_sharding : bool
-        Enable Zarr v3 sharding
-    spatial_chunk : int
-        Spatial chunk size
-    compression_level : int
-        Compression level 1-9
-    validate_output : bool
-        Whether to validate the output
-    omit_nodes : set[str] | None, optional
-        Set of node paths to omit from conversion, by default None
-    max_retries : int, default=3
-        Maximum number of retries for network operations
-    allow_json_nan : bool, default=False
-        Whether to allow NaN values in JSON output
+    Args:
+        dt_input: Input Sentinel-2 DataTree
+        output_path: Output path
+        enable_sharding: Enable Zarr v3 sharding
+        spatial_chunk: Spatial chunk size
+        compression_level: Compression level 1-9
+        validate_output: Whether to validate the output
+        keep_scale_offset: Whether to preserve scale-offset encoding of the source data.
+        max_retries: Maximum number of retries for network operations
 
     Returns
     -------
@@ -486,14 +476,13 @@ def optimization_summary(dt_input: xr.DataTree, dt_output: xr.DataTree, output_p
 
 def create_result_datatree(output_path: str) -> xr.DataTree:
     """Create result DataTree from written output."""
-    try:
-        storage_options = get_storage_options(output_path)
-        return xr.open_datatree(
-            output_path, engine="zarr", chunks="auto", storage_options=storage_options
-        )
-    except Exception as e:
-        log.warning("Could not open result DataTree", error=str(e))
-        return xr.DataTree()
+    storage_options = get_storage_options(output_path)
+    return xr.open_datatree(
+        output_path,
+        engine="zarr",
+        chunks="auto",
+        storage_options=storage_options,
+    )
 
 
 def is_sentinel2_dataset(group: zarr.Group) -> bool:

@@ -16,7 +16,6 @@ from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
 from zarr.codecs import BloscCodec
 
-from eopf_geozarr.conversion import fs_utils
 from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
     create_native_crs_tile_matrix_set,
@@ -29,6 +28,7 @@ from eopf_geozarr.data_api.geozarr.multiscales.geozarr import (
 )
 from eopf_geozarr.data_api.geozarr.spatial import SpatialConventionMetadata
 from eopf_geozarr.data_api.geozarr.types import (
+    CF_SCALE_OFFSET_KEYS,
     XARRAY_ENCODING_KEYS,
     XarrayDataArrayEncoding,
 )
@@ -192,7 +192,11 @@ def auto_chunks(shape: tuple[int, ...], target_chunk_size: int) -> tuple[int, ..
 
 
 def create_measurements_encoding(
-    dataset: xr.Dataset, *, spatial_chunk: int, enable_sharding: bool = True
+    dataset: xr.Dataset,
+    *,
+    spatial_chunk: int,
+    enable_sharding: bool = True,
+    keep_scale_offset: bool = True,
 ) -> dict[str, XarrayDataArrayEncoding]:
     """
     Create optimized encoding for a pyramid level with advanced chunking and sharding.
@@ -237,10 +241,16 @@ def create_measurements_encoding(
         else:
             var_encoding["shards"] = None
 
-        # Forward-propagate the existing encoding
-        for key in XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}:
+        # Forward-propagate the existing encoding, minus keys that should be omitted
+        keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
+
+        if not keep_scale_offset:
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS
+
+        for key in keep_keys:
             if key in var_data.encoding:
                 var_encoding[key] = var_data.encoding[key]  # type: ignore[literal-required]
+
         if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
             log.warning(
                 "Unknown encoding keys in %s: %s",
@@ -704,9 +714,10 @@ def create_lazy_downsample_operation_from_existing(
 
 def stream_write_dataset(
     dataset: xr.Dataset,
-    dataset_path: str,
-    encoding: dict[str, XarrayDataArrayEncoding],
     *,
+    path: str,
+    group: zarr.Group,
+    encoding: dict[str, XarrayDataArrayEncoding],
     enable_sharding: bool,
     crs: CRS | None = None,
 ) -> xr.Dataset:
@@ -727,10 +738,10 @@ def stream_write_dataset(
         Written dataset
     """
     # Check if level already exists
-    if fs_utils.path_exists(dataset_path):
+    if path in group:
         log.info(
             "Level path {} already exists. Skipping write.",
-            dataset_path=dataset_path,
+            dataset_path=path,
         )
         return xr.open_dataset(
             dataset_path,
@@ -740,7 +751,7 @@ def stream_write_dataset(
             consolidated=False,
         )
 
-    log.info("Streaming computation and write to {}", dataset_path=dataset_path)
+    log.info("Streaming computation and write to {}", dataset_path=path)
     log.info("Variables", variables=list(dataset.data_vars.keys()))
 
     # Rechunk dataset to align with encoding
@@ -749,17 +760,18 @@ def stream_write_dataset(
     # Add the geo metadata before writing for
     # - /measurements/ groups
     # - /quality/ groups
-    if "/measurements/" in dataset_path or "/quality/" in dataset_path:
+    if "/measurements/" in path or "/quality/" in path:
         write_geo_metadata(dataset, crs=crs)
 
     # Write with streaming computation and progress tracking
     # The to_zarr operation will trigger all lazy computations
     write_job = dataset.to_zarr(
-        dataset_path,
+        group.store,
         mode="w",
         consolidated=False,
         zarr_format=3,
         encoding=encoding,
+        group=path,
         compute=False,  # Create job first for progress tracking
     )
 
@@ -767,15 +779,34 @@ def stream_write_dataset(
         try:
             import distributed
 
-            distributed.progress(write_job, notebook=False)
+            # Try to get current client for better status monitoring
+            try:
+                client = distributed.Client.current()
+                # Use client.compute to get a proper Future with status
+                future = client.compute(write_job)
+                log.info("Using distributed client for write job monitoring")
+
+                try:
+                    distributed.progress(future, notebook=False)
+                except Exception as progress_error:
+                    log.warning("Could not display progress bar: {}", e=progress_error)
+
+                # Get result and raise if computation failed
+                future.result()
+            except ValueError:
+                # No current client, fall back to regular distributed.progress
+                log.info("No distributed client available, using regular progress")
+                distributed.progress(write_job, notebook=False)
+                write_job.compute()
+
         except Exception as e:
-            log.warning("Could not display progress bar: {}", e=e)
+            log.warning("Could not use distributed features: {}", e=e)
             write_job.compute()
     else:
         log.info("Writing zarr file...")
         write_job.compute()
 
-    log.info("✅ Streaming write complete for dataset {}", dataset_path=dataset_path)
+    log.info("✅ Streaming write complete for dataset {}", dataset_path=path)
     return dataset
 
 

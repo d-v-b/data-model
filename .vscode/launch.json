@@ -203,7 +203,7 @@
         // "s3://esa-zarr-sentinel-explorer-fra/tests-output/sentinel-2-l2a-opt/S2A_MSIL2A_20250908T100041_N0511_R122_T32TQM_20250908T115116.zarr",
         // "s3://esa-zarr-sentinel-explorer-fra/tests-output/sentinel-2-l2a-staging/S2B_MSIL2A_20251115T091139_N0511_R050_T35SLU_20251115T111807.zarr",
         // "s3://esa-zarr-sentinel-explorer-fra/tests-output/sentinel-2-l2a-staging/S2A_MSIL2A_20251116T085431_N0511_R107_T35SQD_20251116T103813.zarr",
-        "./tests-output/eopf_geozarr/s2l2_optimized_92.zarr",
+        "./tests-output/eopf_geozarr/s2l2_optimized_dis.zarr",
         "--spatial-chunk",
         "256",
         "--compression-level",

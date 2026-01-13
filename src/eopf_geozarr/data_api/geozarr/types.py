@@ -16,6 +16,8 @@ class TileMatrixLimitJSON(TypedDict):
     maxTileRow: int
 
 
+CF_SCALE_OFFSET_KEYS: Final[set[str]] = {"scale_factor", "add_offset", "dtype"}
+
 XARRAY_ENCODING_KEYS: Final[set[str]] = {
     "chunks",
     "preferred_chunks",
@@ -23,10 +25,7 @@ XARRAY_ENCODING_KEYS: Final[set[str]] = {
     "filters",
     "shards",
     "_FillValue",
-    "scale_factor",
-    "add_offset",
-    "dtype",
-}
+} | CF_SCALE_OFFSET_KEYS
 
 
 class XarrayDataArrayEncoding(TypedDict):

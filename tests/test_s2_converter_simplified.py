@@ -130,6 +130,7 @@ class TestConvenienceFunction:
             compression_level=compression_level,
             max_retries=5,
             validate_output=False,
+            keep_scale_offset=False,
         )
 
         # Verify the output was created
