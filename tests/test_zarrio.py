@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numcodecs
 import pytest
 import zarr
+from zarr.core.dtype import Float32, UInt16
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
 from eopf_geozarr.zarrio import (
@@ -71,7 +74,7 @@ def test_reencode_array_fill_value_none() -> None:
 
 def test_reencode_array_fill_value_custom() -> None:
     """
-    Test that custom fill_value is preserved
+    Test that a custom fill_value is preserved
     """
     array_a = zarr.create_array(
         {}, shape=(10,), dtype="uint8", zarr_format=2, compressors=None, fill_value=255
@@ -79,6 +82,24 @@ def test_reencode_array_fill_value_custom() -> None:
 
     meta = default_array_reencoder("test_array", array_a.metadata)
     assert meta.fill_value == 255
+
+
+@pytest.mark.parametrize("keep_scale_offset", [True, False])
+def test_reencode_array_scale_offset(keep_scale_offset: bool) -> None:
+    v2_meta = ArrayV2Metadata(
+        shape=(10,),
+        dtype=UInt16(),
+        chunks=(5,),
+        order="C",
+        compressor=None,
+        fill_value=0,
+        attributes={"scale_factor": 0.1, "add_offset": 10, "dtype": ">u2"},
+    )
+    observed = default_array_reencoder(
+        "test_array", v2_meta, config={"keep_scale_offset": keep_scale_offset}
+    )
+    expect_dtype = v2_meta.dtype if keep_scale_offset else Float32()
+    assert observed.data_type == expect_dtype
 
 
 def test_reencode_array_blosc_compression_converts() -> None:
@@ -238,7 +259,9 @@ def test_reencode_group_with_chunk_reencoder() -> None:
     )
     new_chunks = (25,)
 
-    def custom_array_encoder(key: str, metadata: ArrayV2Metadata) -> ArrayV3Metadata:
+    def custom_array_encoder(
+        key: str, metadata: ArrayV2Metadata, *, config: Any
+    ) -> ArrayV3Metadata:
         return ArrayV3Metadata(
             shape=metadata.shape,
             data_type=metadata.dtype,

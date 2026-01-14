@@ -14,16 +14,17 @@ import xarray as xr
 import zarr
 from pydantic import TypeAdapter
 from pyproj import CRS
-from zarr.core.dtype.npy.time import TimeDelta64
+from zarr.core.dtype import Float32, TimeDelta64, ZDType
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 from zarr.core.sync import sync
 from zarr.storage._common import make_store
 
 from eopf_geozarr.conversion.fs_utils import get_storage_options
 from eopf_geozarr.conversion.geozarr import get_zarr_group
+from eopf_geozarr.data_api.geozarr.common import extract_scale_offset
 from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
-from eopf_geozarr.zarrio import convert_compression, reencode_group
+from eopf_geozarr.zarrio import ArrayReencoderConfig, convert_compression, reencode_group
 
 from .s2_multiscale import (
     auto_chunks,
@@ -182,24 +183,35 @@ def array_reencoder(
     key: str,
     metadata: ArrayV2Metadata,
     *,
-    spatial_chunk: int,
-    enable_sharding: bool = False,
-    compression_level: int | None = None,
+    config: ArrayReencoderConfig | None = None,
 ) -> ArrayV3Metadata:
     """
     Generate Zarr V3 Metadata from a key and a Zarr V2 metadata document.
     """
-    attributes: dict[str, object] = metadata.attributes.copy()
+    if config is None:
+        config = {}
+    keep_scale_offset = config.get("keep_scale_offset", False)
+    spatial_chunk = config.get("spatial_chunk", 256)
+    enable_sharding = config.get("enable_sharding", False)
+    compression_level = config.get("compression_level")
+
+    attrs, maybe_scale_offset = extract_scale_offset(metadata.attributes.copy())
+    out_dtype: ZDType[Any, Any]
+    # If the array used CF scale/offset encoding, we change the output dtype to Float32
+    out_dtype = metadata.dtype
+    if not keep_scale_offset and len(maybe_scale_offset) > 0:
+        out_dtype = Float32()
+
     # handle xarray datetime/timedelta encoding
     # If the array has time-related units, ensure the dtype attribute matches the actual dtype
-    if attributes.get("units") in TIME_UNIT:
-        numpy_time_unit = _netcdf_unit_to_numpy_time_unit(attributes["units"])  # type: ignore[arg-type]
+    if attrs.get("units") in TIME_UNIT:
+        numpy_time_unit = _netcdf_unit_to_numpy_time_unit(attrs["units"])  # type: ignore[arg-type]
         # Check if this is a timedelta or datetime based on:
         # 1. The zarr dtype (if it's a native time type like TimeDelta64)
         # 2. The existing dtype attribute (for int64-encoded times)
         # 3. The standard_name attribute (e.g., "forecast_period" indicates timedelta)
-        existing_dtype_attr = str(attributes.get("dtype", ""))
-        standard_name = str(attributes.get("standard_name", ""))
+        existing_dtype_attr = str(attrs.get("dtype", ""))
+        standard_name = str(attrs.get("standard_name", ""))
         is_timedelta = (
             isinstance(metadata.dtype, TimeDelta64)
             or "timedelta" in existing_dtype_attr
@@ -210,12 +222,12 @@ def array_reencoder(
             # This is a timedelta array - set or correct the dtype attribute
             # Note: xarray/pandas only support timedelta64 with s/ms/us/ns, not m/h/D
             # Use 's' as the safest option
-            attributes["dtype"] = "timedelta64[ns]"
+            attrs["dtype"] = "timedelta64[ns]"
         else:
             # This is a datetime array - set or correct the dtype attribute
-            attributes["dtype"] = f"datetime64[{numpy_time_unit}]"
+            attrs["dtype"] = f"datetime64[{numpy_time_unit}]"
 
-    dimension_names: None | tuple[str, ...] = attributes.pop("_ARRAY_DIMENSIONS", None)  # type: ignore[assignment]
+    dimension_names: None | tuple[str, ...] = attrs.pop("_ARRAY_DIMENSIONS", None)  # type: ignore[assignment]
     compressor_converted = convert_compression(
         metadata.compressor, compression_level=compression_level
     )
@@ -272,13 +284,13 @@ def array_reencoder(
         codecs = ({"name": "bytes"}, *compressor_converted)  # type: ignore[assignment]
     return ArrayV3Metadata(
         shape=metadata.shape,
-        data_type=metadata.dtype,
+        data_type=out_dtype,
         chunk_key_encoding=chunk_key_encoding,
         chunk_grid=chunk_grid,
         fill_value=fill_value,
         dimension_names=dimension_names,
         codecs=codecs,
-        attributes=attributes,
+        attributes=attrs,
     )
 
 
@@ -338,9 +350,12 @@ def convert_s2_optimized(
     # Create a partial function by specifying parameters for our array encoder
     _array_reencoder = partial(
         array_reencoder,
-        spatial_chunk=spatial_chunk,
-        enable_sharding=enable_sharding,
-        compression_level=compression_level,
+        config={
+            "spatial_chunk": spatial_chunk,
+            "enable_sharding": enable_sharding,
+            "compression_level": compression_level,
+            "keep_scale_offset": keep_scale_offset,
+        },
     )
 
     out_group = reencode_group(
@@ -348,7 +363,7 @@ def convert_s2_optimized(
         out_store,
         path="",
         overwrite=True,
-        array_reencoder=_array_reencoder,
+        array_reencoder=_array_reencoder,  # type: ignore[arg-type]
         omit_nodes=omit_nodes,
         allow_json_nan=allow_json_nan,
     )

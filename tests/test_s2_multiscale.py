@@ -16,13 +16,11 @@ from pydantic_zarr.v3 import GroupSpec
 from structlog.testing import capture_logs
 
 from eopf_geozarr.s2_optimization.s2_multiscale import (
-    auto_chunks,
     calculate_aligned_chunk_size,
     calculate_simple_shard_dimensions,
     create_downsampled_resolution_group,
     create_measurements_encoding,
     create_multiscale_levels,
-    create_multiscales_metadata,
 )
 
 
@@ -161,7 +159,7 @@ def test_create_multiscale_from_datatree(
 
     # Capture log output using structlog's testing context manager
     with capture_logs():
-        create_multiscale_from_datatree(
+        create_multiscale_levels(
             dt_input,
             output_group=output_group,
             enable_sharding=True,

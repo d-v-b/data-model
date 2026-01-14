@@ -1163,8 +1163,8 @@ def add_s2_optimization_commands(subparsers: argparse._SubParsersAction) -> None
     s2_parser.add_argument(
         "--allow-json-nan",
         action="store_true",
-        help="Allow invalid float values (nan, inf) in output JSON"
-        )
+        help="Allow invalid float values (nan, inf) in output JSON",
+    )
     s2_parser.add_argument(
         "--keep-scale-offset",
         action="store_true",

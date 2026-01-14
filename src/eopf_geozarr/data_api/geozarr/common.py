@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import urllib
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -24,10 +25,16 @@ from pydantic import AfterValidator, BaseModel, Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import Protocol, TypedDict, runtime_checkable
 
-from eopf_geozarr.data_api.geozarr.projjson import ProjJSON  # noqa: TC001
+from eopf_geozarr.data_api.geozarr.types import (
+    CF_SCALE_OFFSET_KEYS,
+    CFScaleOffset,
+    EmptyDict,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from eopf_geozarr.data_api.geozarr.projjson import ProjJSON
 
 
 @dataclass(frozen=True)
@@ -289,3 +296,38 @@ def check_grid_mapping(model: TDataSetLike) -> TDataSetLike:
 
 def is_none(data: object) -> TypeGuard[None]:
     return data is None
+
+
+def extract_scale_offset(
+    data: Mapping[str, object],
+) -> tuple[dict[str, object], CFScaleOffset | EmptyDict]:
+    """
+    Extract scale/offset information from a mapping, returning the remaining data and the scale/offset info.
+
+    Parameters
+    ----------
+    data : Mapping[[str, object]]
+        The input mapping from which to extract scale/offset information.
+
+    Returns
+    -------
+    tuple[Mapping[str, object], CFScaleOffset]
+        A tuple containing the remaining data (with scale/offset keys removed) and the extracted scale/offset info.
+    """
+    scale_offset: CFScaleOffset = {}  # type: ignore[typeddict-item]
+    remaining_data: dict[str, object] = {}
+
+    if set(data.keys()).isdisjoint(CF_SCALE_OFFSET_KEYS):
+        return dict(data), {}
+
+    if set(data.keys()).issuperset(CF_SCALE_OFFSET_KEYS):
+        for key, value in data.items():
+            if key in CF_SCALE_OFFSET_KEYS:
+                scale_offset[key] = value  # type: ignore[literal-required]
+            else:
+                remaining_data[key] = value
+        return remaining_data, scale_offset
+
+    raise ValueError(
+        "Incomplete scale/offset information: all of 'scale_factor', 'add_offset', and 'dtype' must be present."
+    )

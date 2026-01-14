@@ -744,11 +744,12 @@ def stream_write_dataset(
             dataset_path=path,
         )
         return xr.open_dataset(
-            dataset_path,
+            group.store,
             engine="zarr",
             chunks={},
             decode_coords="all",
             consolidated=False,
+            group=f"{group.path}/{path}",
         )
 
     log.info("Streaming computation and write to {}", dataset_path=path)

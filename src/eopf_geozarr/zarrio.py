@@ -5,7 +5,7 @@ This module contains zarr-specific IO routines
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypedDict
 
 import numcodecs
 import structlog
@@ -13,10 +13,13 @@ import zarr
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
 from zarr.core.sync import sync
+from zarr.dtype import Float32, ZDType
 from zarr.storage._common import make_store_path
 
+from eopf_geozarr.data_api.geozarr.common import extract_scale_offset
+
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Mapping
 
     from zarr.core.metadata.v2 import ArrayV2Metadata
 
@@ -65,6 +68,13 @@ def convert_compression(
     raise ValueError(f"Only blosc -> blosc or None -> () is supported. Got {compressor=}")
 
 
+class ArrayReencoderConfig(TypedDict):
+    keep_scale_offset: NotRequired[bool]
+    spatial_chunk: NotRequired[int]
+    enable_sharding: NotRequired[bool]
+    compression_level: NotRequired[int]
+
+
 def default_array_reencoder(
     key: str,
     metadata: ArrayV2Metadata,
@@ -72,20 +82,26 @@ def default_array_reencoder(
     """
     Re-encode a zarr array into a new zarr v3 array.
     """
-
+    keep_scale_offset = False
     new_codecs = convert_compression(metadata.compressor)
     if metadata.fill_value is None:
         fill_value = metadata.dtype.default_scalar()
     else:
         fill_value = metadata.fill_value
-    attributes = metadata.attributes.copy()
-    dimension_names = attributes.pop("_ARRAY_DIMENSIONS", None)
+    attrs, maybe_scale_offset = extract_scale_offset(metadata.attributes.copy())
+    out_dtype: ZDType[Any, Any]
+    # If the array used CF scale/offset encoding, we change the output dtype to Float32
+    out_dtype = metadata.dtype
+    if not keep_scale_offset and len(maybe_scale_offset) > 0:
+        out_dtype = Float32()
+
+    dimension_names = attrs.pop("_ARRAY_DIMENSIONS", None)
     chunk_grid_shape = metadata.chunks
     codecs = ({"name": "bytes"}, *new_codecs)
 
     return ArrayV3Metadata(
         shape=metadata.shape,
-        data_type=metadata.dtype,
+        data_type=out_dtype,
         chunk_key_encoding={"name": "default", "configuration": {"separator": "/"}},
         chunk_grid={
             "name": "regular",
@@ -94,7 +110,7 @@ def default_array_reencoder(
         fill_value=fill_value,
         dimension_names=dimension_names,
         codecs=codecs,
-        attributes=attributes,
+        attributes=attrs,
     )
 
 
@@ -128,6 +144,14 @@ def replace_json_invalid_floats(obj: object) -> object:
     return obj
 
 
+class ArrayReencoder(Protocol):
+    @staticmethod
+    def __call__(
+        key: str,
+        metadata: ArrayV2Metadata,
+    ) -> ArrayV3Metadata: ...
+
+
 def reencode_group(
     group: zarr.Group,
     store: zarr.storage.StoreLike,
@@ -136,7 +160,7 @@ def reencode_group(
     overwrite: bool = False,
     use_consolidated_for_children: bool = False,
     omit_nodes: set[str] | None = None,
-    array_reencoder: Callable[[str, ArrayV2Metadata], ArrayV3Metadata] = default_array_reencoder,
+    array_reencoder: ArrayReencoder = default_array_reencoder,
     allow_json_nan: bool = False,
 ) -> zarr.Group:
     """
@@ -192,6 +216,7 @@ def reencode_group(
                 name,
             )
             continue
+
         log.info("Re-encoding member %s", name)
         new_path = f"{path}/{name}"
         source_meta = member.metadata
