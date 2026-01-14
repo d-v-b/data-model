@@ -69,13 +69,13 @@ def create_multiscale_levels(group: zarr.Group, path: str) -> None:
     """
     Add additional multiscale levels to an existing Zarr group
     """
-    ds_levels = (2, 6, 12, 36, 72)
+    ds_levels = (20, 60, 120, 360, 720)
     # Construct the full path to the group containing resolution levels
     full_path = f"{group.path}/{path}" if group.path else path
 
-    for cur_factor, next_factor in pairwise((1, *ds_levels)):
-        cur_group_name = f"r{10 * cur_factor}m"
-        next_group_name = f"r{10 * next_factor}m"
+    for cur_factor, next_factor in pairwise((10, *ds_levels)):
+        cur_group_name = f"r{cur_factor}m"
+        next_group_name = f"r{next_factor}m"
         # Open the current resolution level as a dataset
         cur_group_path = f"{full_path}/{cur_group_name}"
         cur_ds = xr.open_dataset(group.store, group=cur_group_path, engine="zarr")
