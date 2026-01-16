@@ -79,6 +79,7 @@ def test_check_standard_name_invalid() -> None:
         check_standard_name("invalid_standard_name")
 
 
+@pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
 def test_multiscales_round_trip(s2_optimized_geozarr_group_example: zarr.Group) -> None:
     """
     Ensure that we can round-trip multiscale metadata through the `Multiscales` model.

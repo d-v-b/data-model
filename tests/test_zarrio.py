@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import numcodecs
 import pytest
 import zarr
 from zarr.core.dtype import Float32, UInt16
 from zarr.core.metadata import ArrayV2Metadata, ArrayV3Metadata
 
+from eopf_geozarr.s2_optimization.s2_converter import array_reencoder
 from eopf_geozarr.zarrio import (
     convert_compression,
     default_array_reencoder,
@@ -95,7 +94,7 @@ def test_reencode_array_scale_offset(keep_scale_offset: bool) -> None:
         fill_value=0,
         attributes={"scale_factor": 0.1, "add_offset": 10, "dtype": ">u2"},
     )
-    observed = default_array_reencoder(
+    observed = array_reencoder(
         "test_array", v2_meta, config={"keep_scale_offset": keep_scale_offset}
     )
     expect_dtype = v2_meta.dtype if keep_scale_offset else Float32()
@@ -259,9 +258,7 @@ def test_reencode_group_with_chunk_reencoder() -> None:
     )
     new_chunks = (25,)
 
-    def custom_array_encoder(
-        key: str, metadata: ArrayV2Metadata, *, config: Any
-    ) -> ArrayV3Metadata:
+    def custom_array_encoder(key: str, metadata: ArrayV2Metadata) -> ArrayV3Metadata:
         return ArrayV3Metadata(
             shape=metadata.shape,
             data_type=metadata.dtype,

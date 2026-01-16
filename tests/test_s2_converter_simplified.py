@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
+from structlog import cap_logs
 
 from eopf_geozarr.s2_optimization.s2_converter import (
     convert_s2_optimized,
@@ -122,16 +123,17 @@ class TestConvenienceFunction:
         output_path = str(tmp_path / "test_output.zarr")
 
         # Run the conversion
-        result = convert_s2_optimized(
-            dt_input,
-            output_path=output_path,
-            enable_sharding=enable_sharding,
-            spatial_chunk=spatial_chunk,
-            compression_level=compression_level,
-            max_retries=5,
-            validate_output=False,
-            keep_scale_offset=False,
-        )
+        with cap_logs():
+            result = convert_s2_optimized(
+                dt_input,
+                output_path=output_path,
+                enable_sharding=enable_sharding,
+                spatial_chunk=spatial_chunk,
+                compression_level=compression_level,
+                max_retries=5,
+                validate_output=False,
+                keep_scale_offset=False,
+            )
 
         # Verify the output was created
         assert Path(output_path).exists()

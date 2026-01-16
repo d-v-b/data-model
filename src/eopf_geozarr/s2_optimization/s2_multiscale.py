@@ -825,73 +825,69 @@ def write_geo_metadata(
         grid_mapping_var_name: Name for grid mapping variable
         crs: Coordinate Reference System to use (if None, attempts to detect from dataset)
     """
+    # Write CRS using rioxarray
+    # NOTE: for now rioxarray only supports writing grid mapping using CF conventions
     dataset.rio.write_crs(crs, grid_mapping_name=grid_mapping_var_name, inplace=True)
     dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
+    dataset.attrs["grid_mapping"] = grid_mapping_var_name
 
-    if crs is not None:
-        # Write CRS using rioxarray
-        # NOTE: for now rioxarray only supports writing grid mapping using CF conventions
-        dataset.rio.write_crs(crs, grid_mapping_name=grid_mapping_var_name, inplace=True)
-        dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
-        dataset.attrs["grid_mapping"] = grid_mapping_var_name
+    for var in dataset.data_vars.values():
+        var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
+        var.attrs["grid_mapping"] = grid_mapping_var_name
 
-        for var in dataset.data_vars.values():
-            var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
-            var.attrs["grid_mapping"] = grid_mapping_var_name
+    # Also add proj: and spatial: zarr conventions at dataset level
+    # TODO : Remove once rioxarray supports writing these conventions directly
+    # https://github.com/corteva/rioxarray/pull/883
 
-        # Also add proj: and spatial: zarr conventions at dataset level
-        # TODO : Remove once rioxarray supports writing these conventions directly
-        # https://github.com/corteva/rioxarray/pull/883
+    # Add spatial convention attributes
+    dataset.attrs["spatial:dimensions"] = ["y", "x"]  # Required field
+    dataset.attrs["spatial:registration"] = "pixel"  # Default registration type
 
-        # Add spatial convention attributes
-        dataset.attrs["spatial:dimensions"] = ["y", "x"]  # Required field
-        dataset.attrs["spatial:registration"] = "pixel"  # Default registration type
+    # Calculate and add spatial bbox if coordinates are available
+    if "x" in dataset.coords and "y" in dataset.coords:
+        x_coords = dataset.coords["x"].values
+        y_coords = dataset.coords["y"].values
+        x_min, x_max = float(x_coords.min()), float(x_coords.max())
+        y_min, y_max = float(y_coords.min()), float(y_coords.max())
+        dataset.attrs["spatial:bbox"] = [x_min, y_min, x_max, y_max]
 
-        # Calculate and add spatial bbox if coordinates are available
-        if "x" in dataset.coords and "y" in dataset.coords:
-            x_coords = dataset.coords["x"].values
-            y_coords = dataset.coords["y"].values
-            x_min, x_max = float(x_coords.min()), float(x_coords.max())
-            y_min, y_max = float(y_coords.min()), float(y_coords.max())
-            dataset.attrs["spatial:bbox"] = [x_min, y_min, x_max, y_max]
+        # Calculate spatial transform (affine transformation)
+        spatial_transform = None
+        if hasattr(dataset, "rio") and hasattr(dataset.rio, "transform"):
+            try:
+                rio_transform = dataset.rio.transform
+                if callable(rio_transform):
+                    rio_transform = rio_transform()
+                spatial_transform = list(rio_transform)[:6]
+            except (AttributeError, TypeError):
+                # Fallback: construct from coordinate spacing
+                pixel_size_x = float(get_grid_spacing(dataset, ("x",))[0])
+                pixel_size_y = float(get_grid_spacing(dataset, ("y",))[0])
+                spatial_transform = [
+                    pixel_size_x,
+                    0.0,
+                    x_min,
+                    0.0,
+                    -pixel_size_y,
+                    y_max,
+                ]
 
-            # Calculate spatial transform (affine transformation)
-            spatial_transform = None
-            if hasattr(dataset, "rio") and hasattr(dataset.rio, "transform"):
-                try:
-                    rio_transform = dataset.rio.transform
-                    if callable(rio_transform):
-                        rio_transform = rio_transform()
-                    spatial_transform = list(rio_transform)[:6]
-                except (AttributeError, TypeError):
-                    # Fallback: construct from coordinate spacing
-                    pixel_size_x = float(get_grid_spacing(dataset, ("x",))[0])
-                    pixel_size_y = float(get_grid_spacing(dataset, ("y",))[0])
-                    spatial_transform = [
-                        pixel_size_x,
-                        0.0,
-                        x_min,
-                        0.0,
-                        -pixel_size_y,
-                        y_max,
-                    ]
+        # Only add spatial:transform if we have valid transform data (not all zeros)
+        if spatial_transform is not None and not all(t == 0 for t in spatial_transform):
+            dataset.attrs["spatial:transform"] = spatial_transform
 
-            # Only add spatial:transform if we have valid transform data (not all zeros)
-            if spatial_transform is not None and not all(t == 0 for t in spatial_transform):
-                dataset.attrs["spatial:transform"] = spatial_transform
+        # Add spatial shape if data variables exist
+        if dataset.data_vars:
+            first_var = next(iter(dataset.data_vars.values()))
+            if first_var.ndim >= 2:
+                height, width = first_var.shape[-2:]
+                dataset.attrs["spatial:shape"] = [height, width]
 
-            # Add spatial shape if data variables exist
-            if dataset.data_vars:
-                first_var = next(iter(dataset.data_vars.values()))
-                if first_var.ndim >= 2:
-                    height, width = first_var.shape[-2:]
-                    dataset.attrs["spatial:shape"] = [height, width]
-
-        # Add proj convention attributes
-        if hasattr(crs, "to_epsg") and crs.to_epsg():
-            dataset.attrs["proj:code"] = f"EPSG:{crs.to_epsg()}"
-        elif hasattr(crs, "to_wkt"):
-            dataset.attrs["proj:wkt2"] = crs.to_wkt()
+    # Add proj convention attributes
+    if hasattr(crs, "to_epsg") and crs.to_epsg():
+        dataset.attrs["proj:code"] = f"EPSG:{crs.to_epsg()}"
+    elif hasattr(crs, "to_wkt"):
+        dataset.attrs["proj:wkt2"] = crs.to_wkt()
 
 
 def rechunk_dataset_for_encoding(

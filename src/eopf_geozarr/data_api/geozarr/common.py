@@ -329,5 +329,5 @@ def extract_scale_offset(
         return remaining_data, scale_offset
 
     raise ValueError(
-        "Incomplete scale/offset information: all of 'scale_factor', 'add_offset', and 'dtype' must be present."
+        "Incomplete scale/offset information: all of 'scale_factor', 'add_offset', must be present."
     )
