@@ -15,14 +15,13 @@ from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.v3 import GroupSpec
 from structlog.testing import capture_logs
 
+from eopf_geozarr.s2_optimization.s2_converter import convert_s2_optimized
 from eopf_geozarr.s2_optimization.s2_multiscale import (
     calculate_aligned_chunk_size,
     calculate_simple_shard_dimensions,
     create_downsampled_resolution_group,
     create_measurements_encoding,
-    create_multiscale_levels,
 )
-from eopf_geozarr.zarrio import reencode_group
 
 try:
     from pyproj import CRS as ProjCRS
@@ -307,57 +306,33 @@ def test_calculate_aligned_chunk_size() -> None:
 @pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
 @pytest.mark.filterwarnings("ignore:.*:FutureWarning")
 @pytest.mark.filterwarnings("ignore:.*:UserWarning")
-def test_create_multiscale_from_datatree(
-    s2_group_example: zarr.Group,
+def test_convert_s2_optimized(
+    s2_group_example: Path,
     tmp_path: pathlib.Path,
 ) -> None:
     """Test multiscale creation from DataTree."""
-    output_path = str(tmp_path / "output.zarr")
     input_group = zarr.open_group(s2_group_example)
-    output_group = zarr.create_group(output_path)
+
+    # Use a separate output directory to avoid overwriting the input
+    output_path = tmp_path / "output.zarr"
+
     dt_input = xr.open_datatree(input_group.store, engine="zarr", chunks="auto")
-
-    # Capture log output using structlog's testing context manager
     with capture_logs():
-        # WORKAROUND: Re-encoding the full product fails because some arrays (quality/mask)
-        # have 'dtype' in attributes but not scale_factor/add_offset, which triggers
-        # validation error in extract_scale_offset. This is a known issue - dtype is
-        # standard array metadata, not necessarily CF scale/offset.
-        # For now, only reencode measurements/reflectance which has proper CF encoding.
-        input_reflectance = input_group["measurements/reflectance"]
-        assert isinstance(input_reflectance, zarr.Group)
-
-        reencode_group(
-            group=input_reflectance,
-            store=output_group.store,
-            path="measurements/reflectance",
-            overwrite=True,
+        convert_s2_optimized(
+            dt_input,
+            output_path=str(output_path),
+            enable_sharding=True,
+            spatial_chunk=256,
+            compression_level=1,
+            validate_output=False,
+            keep_scale_offset=False,
         )
-
-        # Then create multiscale levels for measurements/reflectance
-        create_multiscale_levels(
-            group=output_group,
-            path="measurements/reflectance",
-        )
-
-        # TODO: Add spatial_ref coordinate to all resolution levels
-        # This should be done during re-encoding, but for now we skip it
-        # Uncomment when spatial_ref creation is implemented:
-        # add_spatial_ref_to_group(output_group["measurements/reflectance"])
-
-        # Add multiscales metadata and spatial/proj attributes to the reflectance group
-        # NOTE: This will fail with "Cannot determine native CRS" because spatial_ref
-        # is missing. For now, we skip this step in the test.
-        # reflectance_group = output_group["measurements/reflectance"]
-        # assert isinstance(reflectance_group, zarr.Group)
-        # create_multiscales_metadata(reflectance_group)
-
-    observed_group = zarr.open_group(output_path, use_consolidated=False)
-
-    observed_structure_json = GroupSpec.from_zarr(observed_group).model_dump()
+    observed_group = zarr.open_group(output_path)
+    observed_structure = GroupSpec.from_zarr(observed_group)
 
     # Comparing JSON objects is sensitive to the difference between tuples and lists, but we
     # don't care about that here, so we convert all lists to tuples before creating the GroupSpec
+    observed_structure_json = observed_structure.model_dump()
     observed_structure = GroupSpec(**tuplify_json(observed_structure_json))
     observed_structure_flat = observed_structure.to_flat()
     expected_structure_path = Path("tests/_test_data/optimized_geozarr_examples/") / (
@@ -395,46 +370,15 @@ def test_create_multiscale_from_datatree(
     o_keys = set(observed_structure_flat.keys())
     e_keys = set(expected_structure_flat.keys())
 
-    # TODO: Investigate why spatial_ref is not being created during re-encoding
-    # The source data has proj:epsg and proj:wkt2 attributes but no spatial_ref coordinate
-    # Expected output has spatial_ref - need to determine where this should be created
-
-    # Filter out known acceptable differences:
-    # 1. Scope: observed only has measurements/reflectance, expected has full product
-    #    (working around extract_scale_offset validation issue with dtype attribute)
-    # 2. Extra b08 in r20m/r60m in observed (intended behavior for now)
-    # 3. Missing spatial_ref in observed (TODO: needs investigation)
-
-    # Only compare measurements/reflectance subtree
-    o_keys_filtered = {
-        k for k in o_keys if k.startswith("members/measurements/reflectance") or k == ""
-    }
-    e_keys_filtered = {
-        k for k in e_keys if k.startswith("members/measurements/reflectance") or k == ""
-    }
-
-    # Ignore spatial_ref keys
-    o_keys_filtered = {k for k in o_keys_filtered if "spatial_ref" not in k}
-    e_keys_filtered = {k for k in e_keys_filtered if "spatial_ref" not in k}
-
-    # Ignore extra b08 in r20m/r60m
-    ignore_patterns = [
-        "members/measurements/reflectance/members/r20m/members/b08",
-        "members/measurements/reflectance/members/r60m/members/b08",
-    ]
-    o_keys_filtered = {
-        k for k in o_keys_filtered if not any(pattern in k for pattern in ignore_patterns)
-    }
-
-    # Check that all of the keys are the same (after filtering)
-    assert o_keys_filtered == e_keys_filtered, (
+    # Check that all of the keys are the same
+    assert o_keys == e_keys, (
         f"Key mismatch after filtering.\n"
-        f"Extra in observed: {sorted(o_keys_filtered - e_keys_filtered)[:20]}\n"
-        f"Missing in observed: {sorted(e_keys_filtered - o_keys_filtered)[:20]}"
+        f"Extra in observed: {sorted(o_keys - e_keys)[:20]}\n"
+        f"Missing in observed: {sorted(e_keys - o_keys)[:20]}"
     )
 
     # Check that all values are the same for common keys
-    common_keys = o_keys_filtered & e_keys_filtered
+    common_keys = o_keys & e_keys
     mismatched_values = [
         k for k in common_keys if expected_structure_flat.get(k) != observed_structure_flat.get(k)
     ]
