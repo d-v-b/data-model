@@ -245,7 +245,8 @@ def create_measurements_encoding(
         keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
 
         if not keep_scale_offset:
-            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS
+            # Remove scale/offset keys AND dtype to prevent transformation
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"dtype"}
 
         for key in keep_keys:
             if key in var_data.encoding:

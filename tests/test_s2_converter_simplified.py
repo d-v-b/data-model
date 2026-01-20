@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
-from structlog import cap_logs
+from structlog.testing import capture_logs as cap_logs
 
 from eopf_geozarr.s2_optimization.s2_converter import (
     convert_s2_optimized,
