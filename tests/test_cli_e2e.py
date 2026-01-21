@@ -23,7 +23,7 @@ def test_convert_s2_optimized(s2_group_example: Path, tmp_path: Path) -> None:
     """
     Test the convert-s2-optimized CLI command on a local copy of sentinel data
     """
-    output_path = tmp_path
+    output_path = tmp_path / (s2_group_example.stem + '_geozarr.zarr')
 
     cmd = [
         "python",

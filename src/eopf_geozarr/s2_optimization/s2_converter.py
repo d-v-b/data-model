@@ -256,12 +256,18 @@ def array_reencoder(
 
     chunk_shape: tuple[int, ...] = metadata.chunks
 
+    # check if this is a coordinate variable
+    is_coord_var = [key] == metadata.attributes.get('_ARRAY_DIMENSIONS')
+
     if in_measurements_group:
         chunk_shape = auto_chunks(metadata.shape, spatial_chunk)
 
+    if is_coord_var:
+        chunk_shape = metadata.shape
+
     subchunk_shape: tuple[int, ...] | None = None
 
-    if in_measurements_group and metadata.ndim >= 2 and enable_sharding:
+    if in_measurements_group and metadata.ndim >= 2 and enable_sharding and not is_coord_var:
         subchunk_shape = chunk_shape
         chunk_shape = calculate_simple_shard_dimensions(metadata.shape, chunk_shape)
 
