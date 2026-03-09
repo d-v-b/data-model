@@ -83,11 +83,11 @@ In tabular form:
         "dtype": "|u1",
         "shape": [10,11,12],
         "chunks": [10,11,12],
-        "filters": null
-        "compressor": null
-        "order": "C"
+        "filters": null,
+        "compressor": null,
+        "order": "C",
         "dimension_separator": "/"
-        }
+        },
     ".zattrs": {
         "_ARRAY_DIMENSIONS": ["lat", "lon", "time"]
         }
@@ -128,7 +128,7 @@ In tabular form:
         "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10,11,12]}},
         "codecs": [{"name": "bytes"}],
         "dimension_names": ["lat", "lon", "time"],
-        "storage_transformers": [],
+        "storage_transformers": []
         }
 }
 ```
