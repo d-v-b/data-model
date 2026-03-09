@@ -47,75 +47,30 @@ GeoZarr defines a Zarr hierarchy — a particular arrangement of Zarr arrays and
 their attributes. This document defines that hierarchy from the bottom-up, starting with arrays
 and their attributes before moving to higher-level structures like groups and their attributes.
 
-The GeoZarr specification can be implemented in Zarr V2 and V3. The main difference between the Zarr V2 and V3 implementations is how the dimension names of an array are specified. The Zarr conventions described in this document (geo-proj, spatial, multiscales) are **Zarr V3 only**; the DataArray rules for Zarr V2 remain as documented.
+This specification targets **Zarr V3** exclusively. The geo-proj, spatial, and multiscales conventions are all Zarr V3.
 
 ## DataArray
 
-A DataArray is a Zarr array with named axes. The structure of a DataArray depends on the Zarr format.
+A DataArray is a Zarr V3 array with named axes.
 
-This section contains the rules for *individual* DataArrays. Additional 
-constraints on groups of DataArrays are defined in the section on [Datasets](#dataset)
+This section contains the rules for *individual* DataArrays. Additional
+constraints on groups of DataArrays are defined in the section on [Datasets](#dataset).
 
-### Zarr V2
+### Attributes
 
-#### Attributes
+No particular attributes are required for DataArrays.
 
-| key               | type                                                         | required | notes                                        |
-| ----------------- | ------------------------------------------------------------ | -------- | -------------------------------------------- |
-| _ARRAY_DIMENSIONS | array of strings, length matches number of axes of the array | yes      | xarray convention for naming axes in Zarr V2 |
+### Array metadata
 
-#### Array metadata
-
-Zarr V2 DataArrays must have at least 1 dimension, i.e. scalar Zarr V2 DataArrays are not allowed.
-
-In tabular form: 
-
-| attribute | constraint         | notes                    |
-| --------- | ------------------ | ------------------------ |
-| `shape`   | at least 1 element | No scalar arrays allowed |
-
-#### Example 
-
-```json
-{
-    ".zarray": {
-        "zarr_format": 2,
-        "dtype": "|u1",
-        "shape": [10,11,12],
-        "chunks": [10,11,12],
-        "filters": null,
-        "compressor": null,
-        "order": "C",
-        "dimension_separator": "/"
-        },
-    ".zattrs": {
-        "_ARRAY_DIMENSIONS": ["lat", "lon", "time"]
-        }
-
-}
-```
-
-### Zarr V3
-
-#### Attributes
-
-No particular attributes are required for Zarr V3 DataArrays.
-
-#### Array metadata
-
-Zarr V3 DataArrays must have at least 1 dimension, i.e. scalar Zarr V3 DataArrays are not allowed. The 
-`dimension_names` attribute of a Zarr V3 DataArray must be set, the elements of `dimension_names` must 
-all be strings, and they must all be unique.
-
-In tabular form:
+DataArrays must have at least 1 dimension — scalar arrays are not allowed. The
+`dimension_names` field must be set, all elements must be strings, and they must all be unique.
 
 | attribute         | constraint                 | notes                                  |
 | ----------------- | -------------------------- | -------------------------------------- |
 | `shape`           | at least 1 element         | No scalar arrays allowed               |
-| `dimension_names` | an array of unique strings | all array axes must be uniquely named. |
+| `dimension_names` | an array of unique strings | All array axes must be uniquely named  |
 
-
-#### Example
+### Example
 
 ```json
 {
