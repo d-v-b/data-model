@@ -1,98 +1,76 @@
 # GeoZarr Mini Spec
 
-This document specifies the GeoZarr model used in this repository. It's a "mini" version of the [official GeoZarr spec](https://zarr.dev/geozarr-spec/documents/standard/template/geozarr-spec.html) that documents the specific subset of the specification that this implementation supports, along with implementation-specific details.
+This document specifies the GeoZarr model used in this repository. It is a "mini" version of the emerging [GeoZarr specification](https://geozarr.org/) that documents the specific subset of conventions this implementation supports, along with implementation-specific details.
+
+GeoZarr is a set of modular, composable [Zarr conventions](https://geozarr.org/conventions) for storing multidimensional georeferenced grids. The specification is developed by the [OGC GeoZarr Standards Working Group](https://geozarr.org/) and is on track for Architecture Board review in summer 2026 (see [roadmap](https://geozarr.org/roadmap)). All three core conventions are currently at **Proposal** maturity, targeting **Candidate** status (3+ independent implementations) for GeoZarr V1.
+
+> **Evolution note**: Earlier versions of this mini-spec documented a "V0 maximalist" approach based on GeoZarr 0.4 (TileMatrixSet multiscales, mandatory CF conventions, `grid_mapping` 0D arrays). That approach has been superseded by the modular Zarr Conventions described below, which were established at the Zarr Summit in Rome (December 2025) and are the basis of this implementation since v1.0.
 
 ## Relationship to Other Documentation
 
 This mini spec is referenced by and aligns with:
 
-- **[Architecture](architecture.md)** - Technical implementation details that follow this specification
-- **[GeoZarr Specification Contribution](geozarr-specification-contribution.md)** - Our contributions to the official spec based on this implementation
-- **[Main Documentation](index.md)** - General library documentation and usage guides
+- **[geozarr.org](https://geozarr.org/)** — Canonical home for the GeoZarr specification effort
+- **[geozarr.org/conventions](https://geozarr.org/conventions)** — Core conventions reference (geo-proj, spatial, multiscales)
+- **[zarr-conventions-spec](https://github.com/zarr-conventions/zarr-conventions-spec)** — The Zarr Conventions meta-framework
+- **[EOPF Explorer Data Model](https://explorer.eopf.copernicus.eu/software-services/datamodel/)** — Project context and community leadership
+- **[Architecture](architecture.md)** — Technical implementation details that follow this specification
+- **[GeoZarr Specification Contribution](geozarr-specification-contribution.md)** — Our contributions to the GeoZarr spec based on this implementation
+- **[Main Documentation](index.md)** — General library documentation and usage guides
 
-The implementation described in this mini spec addresses specific requirements for Earth observation data processing while maintaining compliance with the broader GeoZarr specification.
+## Zarr Conventions Framework
+
+GeoZarr is built on the [Zarr Conventions Framework](https://github.com/zarr-conventions/zarr-conventions-spec). A convention is a set of attributes on a Zarr array or group that confer special meaning about the contained data. Each node that uses a convention **must** declare it in a `zarr_conventions` array within its attributes.
+
+This implementation uses three core GeoZarr conventions:
+
+| Convention | Namespace | UUID | Purpose |
+| ---------- | --------- | ---- | ------- |
+| [multiscales](https://github.com/zarr-conventions/multiscales) | `multiscales` | `d35379db-88df-4056-af3a-620245f8e347` | Pyramid layout for multi-resolution data |
+| [geo-proj](https://github.com/zarr-conventions/geo-proj) | `proj:` | `f17cb550-5864-4468-aeb7-f3180cfb622f` | CRS and datum encoding |
+| [spatial](https://github.com/zarr-conventions/spatial) | `spatial:` | `689b58e2-cf7b-45e0-9fff-9cfc0883d6b4` | Array index to spatial coordinate relationship |
+
+Conventions are composable: a single Zarr group can declare and use all three simultaneously, with `spatial:*` and `proj:*` properties extending `multiscales` layout entries. See [geozarr.org/conventions](https://geozarr.org/conventions) for the full conventions reference and maturity framework.
 
 ## Spec conventions
 
 ### Array and Group attributes
-This document only defines rules for a finite subset of the keys in Zarr array 
-and group attributes. Unless otherwise stated, any external keys in Zarr array and group attributes are consistent with this specification. This means this specification composes with the presence of, e.g., [CF metadata](https://cfconventions.org/), at different levels of the Zarr hierarchy.
+
+This document only defines rules for a finite subset of the keys in Zarr array
+and group attributes. Unless otherwise stated, any external keys in Zarr array and group attributes are consistent with this specification. This means this specification composes with the presence of, e.g., [CF metadata](https://cfconventions.org/), at different levels of the Zarr hierarchy. CF metadata is no longer required by this specification but remains fully compatible and may be included alongside the Zarr conventions described here.
+
+Convention properties are placed at the root `attributes` level of the Zarr node, following the [Zarr Conventions Specification](https://github.com/zarr-conventions/zarr-conventions-spec).
 
 ## Organization
 
-GeoZarr defines a Zarr hierarchy, i.e. a particular arrangements of Zarr arrays and groups, and 
+GeoZarr defines a Zarr hierarchy — a particular arrangement of Zarr arrays and groups and
 their attributes. This document defines that hierarchy from the bottom-up, starting with arrays
-and their attributes before moving to higher-level structures, like groups and their attributes.
+and their attributes before moving to higher-level structures like groups and their attributes.
 
-The GeoZarr specification can be implemented in Zarr V2 and V3. The main difference between the Zarr V2 and Zarr V3 implementations is how the dimension names of an array are specified.
+This specification targets **Zarr V3** exclusively. The geo-proj, spatial, and multiscales conventions are all Zarr V3.
 
 ## DataArray
 
-A DataArray is a Zarr array with named axes. The structure of a DataArray depends on the Zarr format.
+A DataArray is a Zarr V3 array with named axes.
 
-This section contains the rules for *individual* DataArrays. Additional 
-constraints on groups of DataArrays are defined in the section on [Datasets](#dataset)
+This section contains the rules for *individual* DataArrays. Additional
+constraints on groups of DataArrays are defined in the section on [Datasets](#dataset).
 
-### Zarr V2
+### Attributes
 
-#### Attributes
+No particular attributes are required for DataArrays.
 
-| key               | type                                                         | required | notes                                        |
-| ----------------- | ------------------------------------------------------------ | -------- | -------------------------------------------- |
-| _ARRAY_DIMENSIONS | array of strings, length matches number of axes of the array | yes      | xarray convention for naming axes in Zarr V2 |
+### Array metadata
 
-#### Array metadata
-
-Zarr V2 DataArrays must have at least 1 dimension, i.e. scalar Zarr V2 DataArrays are not allowed.
-
-In tabular form: 
-
-| attribute | constraint         | notes                    |
-| --------- | ------------------ | ------------------------ |
-| `shape`   | at least 1 element | No scalar arrays allowed |
-
-#### Example 
-
-```json
-{
-    ".zarray": {
-        "zarr_format": 2,
-        "dtype": "|u1",
-        "shape": [10,11,12],
-        "chunks": [10,11,12],
-        "filters": null
-        "compressor": null
-        "order": "C"
-        "dimension_separator": "/"
-        }
-    ".zattrs": {
-        "_ARRAY_DIMENSIONS": ["lat", "lon", "time"]
-        }
-
-}
-```
-
-### Zarr V3
-
-#### Attributes
-
-No particular attributes are required for Zarr V3 DataArrays.
-
-#### Array metadata
-
-Zarr V3 DataArrays must have at least 1 dimension, i.e. scalar Zarr V3 DataArrays are not allowed. The 
-`dimension_names` attribute of a Zarr V3 DataArray must be set, the elements of `dimension_names` must 
-all be strings, and they must all be unique.
-
-In tabular form:
+DataArrays must have at least 1 dimension — scalar arrays are not allowed. The
+`dimension_names` field must be set, all elements must be strings, and they must all be unique.
 
 | attribute         | constraint                 | notes                                  |
 | ----------------- | -------------------------- | -------------------------------------- |
 | `shape`           | at least 1 element         | No scalar arrays allowed               |
-| `dimension_names` | an array of unique strings | all array axes must be uniquely named. |
+| `dimension_names` | an array of unique strings | All array axes must be uniquely named  |
 
-
-#### Example
+### Example
 
 ```json
 {
@@ -105,34 +83,49 @@ In tabular form:
         "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10,11,12]}},
         "codecs": [{"name": "bytes"}],
         "dimension_names": ["lat", "lon", "time"],
-        "storage_transformers": [],
+        "storage_transformers": []
         }
 }
 ```
 
 ## Dataset
 
-A GeoZarr dataset is a Zarr group that contains Zarr arrays that together describe a measured quantity, 
+A GeoZarr dataset is a Zarr group that contains Zarr arrays that together describe a measured quantity,
 as well as arbitrary sub-groups.
 
 ### Attributes
 
-There are no required attributes for Datasets but to qualify as a GeoZarr Dataset, the group must contain at least one DataArray with spatial reference information.
-This DataArray is referenced in the `grid_mapping` attribute of the dataset and is usually named `spatial_ref`.
+There are no required attributes for Datasets. To qualify as a GeoZarr Dataset, the group must carry geospatial metadata via the `proj:` and `spatial:` conventions declared in its `zarr_conventions` attribute.
 
-#### CF Compliance Requirements
+#### Geospatial Metadata
 
-The implementation enforces CF (Climate and Forecast) metadata conventions compliance:
+Geospatial reference information is encoded through two complementary conventions declared in the `zarr_conventions` array. Both conventions follow the [geo-proj](https://github.com/zarr-conventions/geo-proj) and [spatial](https://github.com/zarr-conventions/spatial) specifications.
 
-- **Grid Mapping**: All data variables MUST include a `grid_mapping` attribute that references a coordinate reference system variable
-- **Standard Names**: Data variables MUST include CF-compliant `standard_name` attributes. The implementation validates these against the official CF standard names table
-- **Coordinate Variables**: Coordinate variables (x, y, time, etc.) MUST include appropriate CF standard names:
-  - For projected coordinates: `projection_x_coordinate` and `projection_y_coordinate` 
-  - For geographic coordinates: `longitude` and `latitude`
-  - Units must be specified (`m` for projected, `degrees_east`/`degrees_north` for geographic)
-- **Array Dimensions**: All arrays MUST include `_ARRAY_DIMENSIONS` attributes for Zarr V2 compatibility
+**`proj:` convention** — defines the coordinate reference system (CRS) for the dataset. Defined once at the group level; it is inherited by all direct child arrays (which can override it individually).
 
-More information on spatial reference information can be found in the [CF conventions](https://cfconventions.org). Another interesting resource is the [rioxarray](https://corteva.github.io/rioxarray/stable/) and more specifically the documentation on [Coordinate Reference System Management](https://corteva.github.io/rioxarray/stable/getting_started/crs_management.html).
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `proj:code` | string | conditional* | Authority:code identifier, e.g. `"EPSG:32633"`. Pattern: `^[A-Z]+:[0-9]+$` |
+| `proj:wkt2` | string | conditional* | WKT2 (ISO 19162) CRS representation |
+| `proj:projjson` | object | conditional* | PROJJSON CRS representation |
+
+\* At least one of `proj:code`, `proj:wkt2`, or `proj:projjson` MUST be provided.
+
+**`spatial:` convention** — defines the relationship between array indices and spatial coordinates. Can be set at the group level (applying to all direct child arrays) or per-array.
+
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `spatial:dimensions` | string[] | yes | Names of spatial dimensions in row-major order, e.g. `["Y", "X"]` |
+| `spatial:transform` | number[6] | no | Affine transform coefficients `[a, b, c, d, e, f]` (Rasterio/Affine ordering). Maps array index `(i, j)` to coordinates via `x = a*i + b*j + c`, `y = d*i + e*j + f` |
+| `spatial:bbox` | number[] | no | Bounding box `[xmin, ymin, xmax, ymax]` in the CRS coordinate space |
+| `spatial:shape` | integer[] | no | Shape of spatial dimensions `[height, width]` |
+| `spatial:registration` | string | no | Grid cell registration type: `"pixel"` (default, cell-registered, equivalent to GeoTIFF PixelIsArea) or `"node"` (grid-registered, equivalent to GeoTIFF PixelIsPoint) |
+
+> [!Note]
+> The `spatial:transform` uses **Rasterio/Affine coefficient ordering** `[a, b, c, d, e, f]`, which differs from GDAL's `GetGeoTransform` ordering `[c, a, b, f, d, e]`. Converting from GDAL: `spatial_transform = [GT(1), GT(2), GT(0), GT(4), GT(5), GT(3)]`.
+
+> [!Note]
+> CF metadata (`standard_name`, `grid_mapping` variables, coordinate variable attributes) is no longer required by this specification but remains compatible and may be included alongside the Zarr conventions. See [CF conventions](https://cfconventions.org) for reference.
 
 ### Members
 
@@ -141,572 +134,402 @@ If any member of a GeoZarr Dataset is an array, then it must comply with the [Da
 If the Dataset contains a DataArray `D`, then for each dimension name `N` in the list of `D`'s named dimensions, 
 the Dataset must contain a one-dimensional DataArray named `N` with a shape that matches the the length 
 of `D` along the axis named by `N`. In this case, `D` is called a "data variable", and the each 
-DataArrays matching a dimension names of `D` is called a "coordinate variable". 
+of `D` along the axis named by `N`. In this case, `D` is called a "data variable", and each 
+DataArray matching a dimension names of `D` is called a "coordinate variable". 
 
 > [!Note]
 > These two definitions are not mutually exclusive, as a 1-dimensional DataArray named `D` with
 dimension names `["D"]` is both a coordinate variable and a data variable.
 
 
-#### Examples 
+#### Examples
 
-This example demonstrates the stored representation of a valid Dataset. Notice how 
-the dimension names defined on the DataArray named `"data"` (i.e., `"lat"` and `"lon"`) are 
-the names of one-dimensional DataArrays in the same Zarr group as `"data"`.
-
-In this case, `"data"` is a data variable, and `"lat"` and `"lon"` are coordinate variables.
+This example shows a geospatial Dataset with two spatial data variables. The `zarr_conventions` array at the group level declares the `proj:` and `spatial:` conventions. The group-level `proj:code` applies to all child arrays, and `spatial:dimensions`, `spatial:transform`, and `spatial:bbox` describe the georeferencing.
 
 ```json
 {
-    "zarr.json" : {
+    "zarr.json": {
         "node_type": "group",
         "zarr_format": 3,
-        },
-    "data/zarr.json" : {
+        "attributes": {
+            "zarr_conventions": [
+                {
+                    "uuid": "f17cb550-5864-4468-aeb7-f3180cfb622f",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-experimental/geo-proj/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-experimental/geo-proj/blob/v1/README.md",
+                    "name": "proj:",
+                    "description": "Coordinate reference system information for geospatial data"
+                },
+                {
+                    "uuid": "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-conventions/spatial/blob/v1/README.md",
+                    "name": "spatial:",
+                    "description": "Spatial coordinate and transformation information"
+                }
+            ],
+            "proj:code": "EPSG:32633",
+            "spatial:dimensions": ["Y", "X"],
+            "spatial:transform": [10.0, 0.0, 500000.0, 0.0, -10.0, 5000000.0],
+            "spatial:bbox": [500000.0, 4900000.0, 600000.0, 5000000.0]
+        }
+    },
+    "red/zarr.json": {
         "zarr_format": 3,
         "node_type": "array",
-        "shape": [10,11],
-        "data_type": "uint8",
-        "chunk_key_encoding": {"name": "default", "configuration": {"separator" : "/"}},
-        "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10,11]}},
-        "codecs": [{"name": "bytes"}],
-        "dimension_names": ["lat", "lon"],
-        "storage_transformers": [],
-        },
+        "shape": [10000, 10000],
+        "data_type": "uint16",
+        "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1024, 1024]}},
+        "codecs": [{"name": "bytes", "configuration": {"endian": "little"}}],
+        "dimension_names": ["Y", "X"],
+        "attributes": {}
+    },
+    "nir/zarr.json": {
+        "zarr_format": 3,
+        "node_type": "array",
+        "shape": [10000, 10000],
+        "data_type": "uint16",
+        "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1024, 1024]}},
+        "codecs": [{"name": "bytes", "configuration": {"endian": "little"}}],
+        "dimension_names": ["Y", "X"],
+        "attributes": {}
+    }
+}
+```
+
+This example demonstrates a minimal Dataset with a single 1D array. A single array is only permitted if that array is one-dimensional, and the name of the DataArray in the Dataset matches the (single) dimension name defined for that DataArray. In this case `lat` is both a coordinate variable and a data variable.
+
+```json
+{
+    "zarr.json": {
+        "node_type": "group",
+        "zarr_format": 3
+    },
     "lat/zarr.json": {
         "zarr_format": 3,
         "node_type": "array",
         "shape": [10],
-        "data_type": "uint8",
-        "chunk_key_encoding": {"name": "default", "configuration": {"separator" : "/"}},
+        "data_type": "float64",
         "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10]}},
-        "codecs": [{"name": "bytes"}],
+        "codecs": [{"name": "bytes", "configuration": {"endian": "little"}}],
         "dimension_names": ["lat"],
-        "storage_transformers": [],
-        },
-    "lon/zarr.json": {
-        "zarr_format": 3,
-        "node_type": "array",
-        "shape": [11],
-        "data_type": "uint8",
-        "chunk_key_encoding": {"name": "default", "configuration": {"separator" : "/"}},
-        "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [11]}},
-        "codecs": [{"name": "bytes"}],
-        "dimension_names": ["lon"],
-        "storage_transformers": [],
-        },
+        "attributes": {}
+    }
 }
 ```
 
-This example demonstrates the layout of a Dataset with just one DataArray. A single array
-is only permitted if that array is one dimensional, and the name of that DataArray in the Dataset 
-matches the (single) dimension name defined for that DataArray. 
+## Multiscale Dataset
 
-In this case `lat` is both a coordinate variable and a data variable.
+A Multiscale Dataset is a Zarr group that contains multiple resolution levels (a pyramid) of the same data, following the [multiscales Zarr convention](https://github.com/zarr-conventions/multiscales).
 
-```json
-{
-    "zarr.json" : {
-        "node_type": "group",
-        "zarr_format": 3,
-        },
-    "lat/zarr.json" : {
-        "zarr_format": 3,
-        "node_type": "array",
-        "shape": [10],
-        "data_type": "uint8",
-        "chunk_key_encoding": {"name": "default", "configuration": {"separator" : "/"}},
-        "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10,11]}},
-        "codecs": [{"name": "bytes"}],
-        "dimension_names": ["lat"],
-        "storage_transformers": [],
-    },
-}
-```
+Downsampling is a process in which a collection of localized data points is resampled on a subset of its original sampling locations. In the case of arrays, downsampling generally reduces an array's shape along at least one dimension. To downsample the contents of a Dataset `D` and generate a new Dataset `E`, all of the coordinate variable – data variable relationships in `D` must be preserved in `E`.
 
-## Multiscale Dataset 
-
-This implementation supports **two multiscales metadata conventions**:
-
-1. **[Zarr Multiscales Convention](https://github.com/zarr-conventions/multiscales)**: An experimental convention for describing multi-resolution data with simple scale and translation metadata
-2. **GeoZarr 0.4 TileMatrixSet Specification**: The experimental GeoZarr specification using OGC TileMatrixSet definitions for geospatial data
-
-**Both conventions can coexist in the same Zarr store**, providing flexibility for different use cases and ensuring compatibility with various tools and workflows. The implementation follows the specifications defined in:
-
-- **[Zarr Multiscales Convention Specification](https://github.com/zarr-conventions/multiscales)** - For the experimental multiscales convention with examples at [https://github.com/zarr-conventions/multiscales/tree/main/examples](https://github.com/zarr-conventions/multiscales/tree/main/examples)
-  - See particularly [sentinel-2-multiresolution.json](https://github.com/zarr-conventions/multiscales/blob/main/examples/sentinel-2-multiresolution.json) for Sentinel-2 multi-resolution structure
-- **[GeoZarr Specification](https://zarr.dev/geozarr-spec/)** - For the OGC TileMatrixSet-based convention
-
-When both conventions are enabled, they are written to the same group attributes with different keys, allowing tools to use whichever convention they support.
-
-Downsampling is a process in which a collection of localized data points is resampled on a subset of its original sampling locations. 
-
-In the case of arrays, downsampling generally reduces an array's shape along at least one dimension. To downsample the
-contents of a Dataset `D` and generate a new Dataset `E`, all of the coordinate variable - data variable 
-relationships in `D` must be preserved in `E`. If `D/data` is a data variable with dimension names (`"a"` , `"b"`), then `D/a` and `D/b` are coordinate variables with shapes aligned to the dimensions of `D/data`. If we downsample `D/data` and assign the result to `E/data`, we must also generate (e.g., by more downsampling) coordinate variables `E/a` and `E/b` so that `E` can be a valid Dataset according to the relevant [Dataset members rule](#members).
-
-The downsampling transformation is thus well-defined for Datasets. Downsampling 
-is often applied multiple times in a series, e.g. to generate multiple levels of 
-detail for a data variable. 
+The downsampling transformation is thus well-defined for Datasets. Downsampling is often applied multiple times in a series to generate multiple levels of detail for a data variable.
 
 ### Implementation Approach
 
 The implementation uses a **pyramid-based downsampling approach** with the following characteristics:
 
-- **Variable Downsampling Factors**: Overview levels use optimal downsampling factors based on data characteristics (e.g., 2x, 3x) rather than strictly factor-of-2. For Sentinel-2, this results in resolution levels: 10m → 20m → 60m → 120m (2x) → 360m (3x) → 720m (2x)
-- **Pyramid Generation**: Overview levels are created sequentially, with each level generated from the previous level rather than from the native resolution
+- **Variable Downsampling Factors**: Overview levels use optimal downsampling factors based on data characteristics (e.g., 2x, 3x). For Sentinel-2, this results in resolution levels: 10m → 20m (2x) → 60m (3x) → 120m (2x) → 360m (3x) → 720m (2x)
+- **Pyramid Generation**: Overview levels are created sequentially from the previous level
 - **Minimum Dimension Threshold**: Overview generation stops when the smallest dimension falls below a configurable threshold (default: 256 pixels)
-- **Native CRS Preservation**: All overview levels maintain the same coordinate reference system as the native data
+- **Native CRS Preservation**: All overview levels maintain the same CRS, expressed via `proj:code` at the group level
 - **Consistent Variable Structure**: Each overview level contains the same set of variables as the native resolution level
-
-GeoZarr defines a layout for downsampled Datasets (and the original dataset). Given some source Dataset `s0`, 
-that dataset and all downsampled Datasets `s1`, `s2`, ... are stored in a flat layout inside a Multiscale Dataset
- `D`. The presence of downsampled Datsets in `D` is signalled by a [special key](#attributes-3) in the attributes of `D`.
 
 ### Attributes
 
-The attributes of a Multiscale Dataset function as an entry point to a collection of downsampled Datasets. Accordingly, the attributes of a Multiscale Dataset declare the names of the downsampled datasets it contains, as well as spatial metadata for those datasets.
+The `zarr_conventions` array at the Multiscale Dataset's root group MUST declare all three conventions: `multiscales`, `proj:`, and `spatial:`. The `multiscales` key then holds the pyramid layout.
 
-| key             | type                                        | required | notes                                                                        |
-| --------------- | ------------------------------------------- | -------- | ---------------------------------------------------------------------------- |
-| `"multiscales"` | [`MultiscaleMetadata`](#multiscalemetadata) | yes      | this field defines the layout of the multiscale Datasets inside this Dataset |
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `zarr_conventions` | array | yes | Declares the multiscales, proj: and spatial: conventions |
+| `multiscales` | [MultiscalesMetadata](#multiscalesmetadata) | yes | Pyramid layout for this group |
+| `proj:code` | string | conditional* | CRS for all resolution levels (group-level inheritance) |
+| `spatial:dimensions` | string[] | yes | Names of spatial dimensions, e.g. `["Y", "X"]` |
+| `spatial:bbox` | number[] | no | Overall bounding box in the CRS coordinate space |
 
-#### MultiscaleMetadata
+\* At least one of `proj:code`, `proj:wkt2`, or `proj:projjson` must be provided for geospatial datasets.
 
-`MultiscaleMetadata` is a JSON object that declares the names of the downsampled Datasets inside a Multiscale Dataset, as well as the downsampling method used. This object has the following structure:
+#### MultiscalesMetadata
 
-| key                   | type                                            | required | notes                                                                                                                                                                                                                                                                                                                                                                                                    |
-| --------------------- | ----------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"resampling_method"` | [ResamplingMethod](#resamplingmethod)           | yes      | This is a string that declares the resampling method used to create the downsampled datasets.                                                                                                                                                                                                                                                                                                            |
-| `"tile_matrix_set"`   | [TileMatrixSet](#tilematrixset) or string       | yes      | This object declares the names of the downsampled Datasets. If `"tile_matrix_set"` is a string, it must be the name of a well-known [`TileMatrixSet`](https://docs.ogc.org/is/17-083r4/17-083r4.html#toc48), which must resolve to a JSON object consistent with the `[TileMatrixSet](#tilematrixset)` definition. For scientific coordinate systems, custom inline TileMatrixSet objects are supported. |
-| `"tile_matrix_limits"` | {`string`: [TileMatrixLimit](#tilematrixlimit)} | no       | Optional limits for each tile matrix level |
+The `multiscales` object has the following structure:
+
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `layout` | [[LayoutObject](#layoutobject), ...] | yes | Ordered array of resolution levels; must not be empty |
+| `resampling_method` | string | no | Default resampling method used across all levels (e.g. `"average"`, `"nearest"`). Can be overridden per level |
+
+#### LayoutObject
+
+Each object in the `layout` array represents one resolution level:
+
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `asset` | string | yes | Path to the Zarr group (or array) for this level, relative to the multiscales group. E.g. `"r10m"`, `"0"` |
+| `derived_from` | string | no | Path to the source level from which this level was generated. Required to define the transform |
+| `transform` | [TransformObject](#transformobject) | conditional | Required when `derived_from` is present. Describes the relative coordinate transformation from the source level |
+| `resampling_method` | string | no | Per-level override of the default resampling method |
+| `spatial:shape` | integer[] | no | Shape of the spatial dimensions at this level `[height, width]` |
+| `spatial:transform` | number[6] | no | Affine transform coefficients for this level, in Rasterio/Affine ordering `[a, b, c, d, e, f]` |
+
+#### TransformObject
+
+The `transform` object inside a `LayoutObject` captures the **relative** coordinate transformation from the `derived_from` level to this level. Note that this is separate from `spatial:transform`, which encodes the **absolute** georeferencing of a level.
+
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `scale` | number[] | no | Scale factors per axis. A scale of `2.0` means this level covers the same extent with half the resolution |
+| `translation` | number[] | no | Translation offsets per axis in the coordinate space. For georeferenced pyramids sharing the same origin, this is `[0.0, 0.0]` |
+
+> [!Note]
+> `transform.scale` and `transform.translation` describe how coordinates change **between levels** (relative). `spatial:transform` placed directly on a layout entry describes the absolute affine georeferencing of that level. When composing with the spatial convention, always specify `spatial:transform` and `spatial:shape` explicitly at each level.
 
 ### Members
 
-All of the members declared in the `multiscales` attribute must comply with the [Dataset](#dataset) definition. All of these Datasets must
-have the exact same set of member names. The names of the downsampled Datasets are specified by 
-the `"id"` field of each `TileMatrix` object in the `"tileMatrices"` field in the `"TileMatrixSet"` object in the `tile_matrix_set` field in the [`MultiscaleMetadata`](#multiscalemetadata) object in the `"multiscales"` field in the attributes of the Multiscale Dataset. Or, more compactly, using a path-like JSON query:
+All of the members declared in the `multiscales.layout` must comply with the [Dataset](#dataset) definition. All resolution levels must have the exact same set of variable names within their group.
 
-`attributes.multiscales.tile_matrix_set.tileMatrices[$idx].id`
+A Multiscale Dataset should not contain any members that are not declared in the `multiscales.layout`. Any additional Zarr arrays and groups are considered external to the GeoZarr model.
 
-#### Chunking Requirements for Downsampled Datasets
+#### Chunking Recommendations
 
-When creating downsampled datasets in a multiscale hierarchy, careful consideration must be given to chunk sizes to ensure optimal performance and storage efficiency. The chunk dimensions should be aligned with the tile dimensions specified in the corresponding `TileMatrix` definition to enable efficient tile-based access patterns.
+- **Consistent Chunking Strategy**: All data variables within a resolution level should use the same chunk shape to maintain spatial coherence
+- **Memory Constraints**: Keep individual chunks under 100 MB
+- **Cloud-Optimal Access**: Use `"/"` as separator in `chunk_key_encoding` to allow prefix-based range requests
+- **Shard Alignment**: When using Zarr V3 sharding, align shard boundaries with the level's spatial extent
 
-Key chunking considerations:
+### Examples
 
-- **Chunk-Tile Alignment**: Chunk sizes should match or be divisible by the `tileWidth` and `tileHeight` values defined in the `TileMatrix` for each zoom level
-- **Consistent Chunking Strategy**: All data variables within a zoom level should use the same chunking scheme to maintain spatial coherence
-- **Memory Constraints**: Chunk sizes should be chosen to balance I/O efficiency with memory usage, typically keeping individual chunks under 100MB
-- **Decimation Factor Alignment**: When downsampling by integer factors (e.g., 2x, 3x), chunk boundaries should align across zoom levels to enable efficient pyramid generation
+#### Simple Power-of-2 Pyramid
 
-For example, if a `TileMatrix` specifies `tileWidth: 1024` and `tileHeight: 1024`, the corresponding data arrays should use chunk shapes of `[1024, 1024]` or compatible subdivisions like `[512, 512]`.
-
-#### Extra members
-
-A multiscale Dataset should not contain any members that are not explicitly declared in the `"multiscales"` field for that multiscale Dataset. Any additional Zarr arrays and groups should be considered external to the GeoZarr model.  
-
-### Custom Coordinate Reference Systems
-
-GeoZarr explicitly supports custom TileMatrixSet definitions for arbitrary coordinate reference systems, encouraging preservation of native CRS in Earth observation data. This is particularly useful for scientific projections including UTM zones, polar stereographic, sinusoidal, and other non-web coordinate systems.
-
-For a dataset to be GeoZarr compliant, data variables MUST include a `grid_mapping` attribute that references a coordinate reference system variable. This `grid_mapping` variable defines the spatial referencing information and MUST be consistent with the CRS specified in the TileMatrixSet.
-
-#### Custom TileMatrixSet Example
-
-For custom coordinate systems, the `tile_matrix_set` should be defined as an inline JSON object following the OGC TileMatrixSet v2.0 specification:
+A minimal 2-level geospatial pyramid — well-suited for web mapping or non-EO data:
 
 ```json
 {
-  "multiscales": {
-    "tile_matrix_set": {
-      "id": "UTM_Zone_33N_Custom",
-      "title": "UTM Zone 33N for Sentinel-2 native resolution",
-      "crs": "EPSG:32633", 
-      "orderedAxes": ["E", "N"],
-      "tileMatrices": [
-        {
-          "id": "0",
-          "scaleDenominator": 35.28,
-          "cellSize": 10.0,
-          "pointOfOrigin": [299960.0, 9000000.0],
-          "tileWidth": 1024,
-          "tileHeight": 1024,
-          "matrixWidth": 1094,
-          "matrixHeight": 1094
-        },
-        {
-          "id": "1", 
-          "scaleDenominator": 70.56,
-          "cellSize": 20.0,
-          "pointOfOrigin": [299960.0, 9000000.0],
-          "tileWidth": 512,
-          "tileHeight": 512,
-          "matrixWidth": 547,
-          "matrixHeight": 547
-        }
-      ]
-    },
-    "resampling_method": "average"
-  }
-}
-```
-
-#### Custom Decimation Factors
-
-While standard web mapping assumes quadtree decimation (scaling by factor of 2), custom TileMatrixSets may use alternative decimation factors:
-
-- **Factor of 2 (quadtree)**: Standard web mapping approach where each zoom level has 4x more tiles
-- **Factor of 3 (nonary tree)**: Each zoom level has 9x more tiles, useful for certain scientific gridding schemes  
-- **Other integer factors**: Application-specific requirements may dictate alternative decimation
-
-Example with factor-of-3 decimation:
-
-```json
-{
-  "id": "Custom_Nonary_Grid",
-  "crs": "EPSG:4326",
-  "tileMatrices": [
-    {
-      "id": "0",
-      "matrixWidth": 1,
-      "matrixHeight": 1,
-      "tileWidth": 256,
-      "tileHeight": 256
-    },
-    {
-      "id": "1", 
-      "matrixWidth": 3,
-      "matrixHeight": 3,
-      "tileWidth": 256,
-      "tileHeight": 256
-    },
-    {
-      "id": "2",
-      "matrixWidth": 9,
-      "matrixHeight": 9,
-      "tileWidth": 256,
-      "tileHeight": 256
-    }
-  ]
-}
-```
-
-#### Custom CRS Multiscale Dataset Layout Example
-
-Here's a complete example of a multiscale dataset using a custom UTM coordinate reference system:
-
-```json
-{
-  "zarr.json": {
-    "node_type": "group",
-    "zarr_format": 3,
-    "attributes": {
-      "multiscales": {
-        "tile_matrix_set": {
-          "id": "UTM_Zone_33N_Sentinel2",
-          "title": "UTM Zone 33N for Sentinel-2 L2A",
-          "crs": "EPSG:32633",
-          "orderedAxes": ["E", "N"],
-          "tileMatrices": [
-            {
-              "id": "0",
-              "scaleDenominator": 35.28,
-              "cellSize": 10.0,
-              "pointOfOrigin": [299960.0, 9000000.0],
-              "tileWidth": 1024,
-              "tileHeight": 1024,
-              "matrixWidth": 1094,
-              "matrixHeight": 1094
+    "zarr.json": {
+        "node_type": "group",
+        "zarr_format": 3,
+        "attributes": {
+            "zarr_conventions": [
+                {
+                    "uuid": "d35379db-88df-4056-af3a-620245f8e347",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-conventions/multiscales/blob/v1/README.md",
+                    "name": "multiscales",
+                    "description": "Multiscale layout of zarr datasets"
+                },
+                {
+                    "uuid": "f17cb550-5864-4468-aeb7-f3180cfb622f",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-experimental/geo-proj/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-experimental/geo-proj/blob/v1/README.md",
+                    "name": "proj:",
+                    "description": "Coordinate reference system information for geospatial data"
+                },
+                {
+                    "uuid": "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-conventions/spatial/blob/v1/README.md",
+                    "name": "spatial:",
+                    "description": "Spatial coordinate and transformation information"
+                }
+            ],
+            "multiscales": {
+                "layout": [
+                    {
+                        "asset": "0",
+                        "transform": {"scale": [1.0, 1.0], "translation": [0.0, 0.0]},
+                        "spatial:shape": [1024, 1024],
+                        "spatial:transform": [10.0, 0.0, 500000.0, 0.0, -10.0, 5000000.0]
+                    },
+                    {
+                        "asset": "1",
+                        "derived_from": "0",
+                        "transform": {"scale": [2.0, 2.0], "translation": [0.0, 0.0]},
+                        "spatial:shape": [512, 512],
+                        "spatial:transform": [20.0, 0.0, 500000.0, 0.0, -20.0, 5000000.0]
+                    }
+                ],
+                "resampling_method": "average"
             },
-            {
-              "id": "1",
-              "scaleDenominator": 70.56,
-              "cellSize": 20.0,
-              "pointOfOrigin": [299960.0, 9000000.0],
-              "tileWidth": 512,
-              "tileHeight": 512,
-              "matrixWidth": 547,
-              "matrixHeight": 547
-            }
-          ]
-        },
-        "resampling_method": "average"
-      }
+            "proj:code": "EPSG:32633",
+            "spatial:dimensions": ["Y", "X"],
+            "spatial:bbox": [500000.0, 4890240.0, 510240.0, 5000000.0]
+        }
     }
-  },
-  "0/zarr.json": {
-    "node_type": "group",
-    "zarr_format": 3
-  },
-  "0/red/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [1094, 1094],
-    "data_type": "uint16",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1024, 1024]}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y", "x"],
-    "attributes": {
-      "grid_mapping": "spatial_ref"
-    }
-  },
-  "0/nir/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array", 
-    "shape": [1094, 1094],
-    "data_type": "uint16",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1024, 1024]}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y", "x"],
-    "attributes": {
-      "grid_mapping": "spatial_ref"
-    }
-  },
-  "0/spatial_ref/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [],
-    "data_type": "int32",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": []}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": [],
-    "attributes": {
-      "crs_wkt": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-    "semi_major_axis": 6378137.0,
-    "semi_minor_axis": 6356752.314245179,
-    "inverse_flattening": 298.257223563,
-    "reference_ellipsoid_name": "WGS 84",
-    "longitude_of_prime_meridian": 0.0,
-    "prime_meridian_name": "Greenwich",
-    "geographic_crs_name": "WGS 84",
-    "horizontal_datum_name": "World Geodetic System 1984",
-    "projected_crs_name": "WGS 84 / UTM zone 32N",
-    "grid_mapping_name": "transverse_mercator",
-    "latitude_of_projection_origin": 0.0,
-    "longitude_of_central_meridian": 9.0,
-    "false_easting": 500000.0,
-    "false_northing": 0.0,
-    "scale_factor_at_central_meridian": 0.9996,
-    "spatial_ref": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-    "_ARRAY_DIMENSIONS": [],
-    "GeoTransform": "300000.0 10.0 0.0 5000040.0 0.0 -10.0"
-    }
-  },
-  "0/x/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [1094],
-    "data_type": "float64",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1094]}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": ["x"]
-  },
-  "0/y/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [1094],
-    "data_type": "float64", 
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [1094]}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y"]
-  },
-  "1/zarr.json": {
-    "node_type": "group",
-    "zarr_format": 3
-  },
-  "1/red/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [547, 547],
-    "data_type": "uint16",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [512, 512]}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y", "x"],
-    "attributes": {
-      "grid_mapping": "spatial_ref"
-    }
-  },
-  "1/nir/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [547, 547], 
-    "data_type": "uint16",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [512, 512]}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y", "x"],
-    "attributes": {
-      "grid_mapping": "spatial_ref"
-    }
-  },
-  "1/spatial_ref/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [],
-    "data_type": "int32",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": []}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": [],
-    "attributes": {
-      "crs_wkt": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-    "semi_major_axis": 6378137.0,
-    "semi_minor_axis": 6356752.314245179,
-    "inverse_flattening": 298.257223563,
-    "reference_ellipsoid_name": "WGS 84",
-    "longitude_of_prime_meridian": 0.0,
-    "prime_meridian_name": "Greenwich",
-    "geographic_crs_name": "WGS 84",
-    "horizontal_datum_name": "World Geodetic System 1984",
-    "projected_crs_name": "WGS 84 / UTM zone 32N",
-    "grid_mapping_name": "transverse_mercator",
-    "latitude_of_projection_origin": 0.0,
-    "longitude_of_central_meridian": 9.0,
-    "false_easting": 500000.0,
-    "false_northing": 0.0,
-    "scale_factor_at_central_meridian": 0.9996,
-    "spatial_ref": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
-    "_ARRAY_DIMENSIONS": [],
-    "GeoTransform": "300000.0 10.0 0.0 5000040.0 0.0 -10.0"
-    }
-  },
-  "1/x/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [547],
-    "data_type": "float64",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [547]}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": ["x"]
-  },
-  "1/y/zarr.json": {
-    "zarr_format": 3,
-    "node_type": "array",
-    "shape": [547],
-    "data_type": "float64",
-    "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [547]}},
-    "codecs": [{"name": "bytes"}],
-    "dimension_names": ["y"]
-  }
 }
 ```
 
-This example demonstrates:
-- **Custom CRS**: Uses EPSG:32633 (UTM Zone 33N) instead of web mapping CRS
-- **Scientific Resolution**: Native 10m pixel size typical for Sentinel-2 L2A data
-- **Custom Tile Sizes**: 1024x1024 for native, 512x512 for overview to match scientific data characteristics
-- **Consistent Structure**: Both zoom levels (`0` and `1`) contain the same variables (`red`, `nir`, `x`, `y`)
-- **Coordinate Variables**: UTM coordinates in meters stored as `x` and `y` arrays
-- **Chunk Alignment**: Chunk sizes match the `tileWidth` and `tileHeight` from the TileMatrix definition
+#### Sentinel-2 Multi-Resolution Pyramid
 
-#### File System Hierarchy Example
+A complete Sentinel-2 L2A scene with 6 resolution levels (variable downsampling factors 2x and 3x). Resolution levels are named after pixel size: `r10m`, `r20m`, `r60m`, `r120m`, `r360m`, `r720m`. Each level's `derived_from` records the actual parent in the downsampling chain, and `transform.scale` records the factor used.
 
-The same custom CRS multiscale dataset would appear as the following directory structure on disk:
+```json
+{
+    "zarr.json": {
+        "node_type": "group",
+        "zarr_format": 3,
+        "attributes": {
+            "zarr_conventions": [
+                {
+                    "uuid": "d35379db-88df-4056-af3a-620245f8e347",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-conventions/multiscales/blob/v1/README.md",
+                    "name": "multiscales",
+                    "description": "Multiscale layout of zarr datasets"
+                },
+                {
+                    "uuid": "f17cb550-5864-4468-aeb7-f3180cfb622f",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-experimental/geo-proj/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-experimental/geo-proj/blob/v1/README.md",
+                    "name": "proj:",
+                    "description": "Coordinate reference system information for geospatial data"
+                },
+                {
+                    "uuid": "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-conventions/spatial/blob/v1/README.md",
+                    "name": "spatial:",
+                    "description": "Spatial coordinate and transformation information"
+                }
+            ],
+            "multiscales": {
+                "layout": [
+                    {
+                        "asset": "r10m",
+                        "transform": {"scale": [1.0, 1.0]},
+                        "spatial:shape": [10980, 10980],
+                        "spatial:transform": [10.0, 0.0, 500000.0, 0.0, -10.0, 5000000.0]
+                    },
+                    {
+                        "asset": "r20m",
+                        "derived_from": "r10m",
+                        "transform": {"scale": [2.0, 2.0], "translation": [0.0, 0.0]},
+                        "spatial:shape": [5490, 5490],
+                        "spatial:transform": [20.0, 0.0, 500000.0, 0.0, -20.0, 5000000.0]
+                    },
+                    {
+                        "asset": "r60m",
+                        "derived_from": "r10m",
+                        "transform": {"scale": [6.0, 6.0], "translation": [0.0, 0.0]},
+                        "spatial:shape": [1830, 1830],
+                        "spatial:transform": [60.0, 0.0, 500000.0, 0.0, -60.0, 5000000.0]
+                    },
+                    {
+                        "asset": "r120m",
+                        "derived_from": "r60m",
+                        "transform": {"scale": [2.0, 2.0], "translation": [0.0, 0.0]},
+                        "spatial:shape": [915, 915],
+                        "spatial:transform": [120.0, 0.0, 500000.0, 0.0, -120.0, 5000000.0]
+                    },
+                    {
+                        "asset": "r360m",
+                        "derived_from": "r120m",
+                        "transform": {"scale": [3.0, 3.0], "translation": [0.0, 0.0]},
+                        "spatial:shape": [305, 305],
+                        "spatial:transform": [360.0, 0.0, 500000.0, 0.0, -360.0, 5000000.0]
+                    },
+                    {
+                        "asset": "r720m",
+                        "derived_from": "r360m",
+                        "transform": {"scale": [2.0, 2.0], "translation": [0.0, 0.0]},
+                        "spatial:shape": [153, 153],
+                        "spatial:transform": [720.0, 0.0, 500000.0, 0.0, -720.0, 5000000.0]
+                    }
+                ],
+                "resampling_method": "average"
+            },
+            "proj:code": "EPSG:32633",
+            "spatial:dimensions": ["Y", "X"],
+            "spatial:bbox": [500000.0, 4890220.0, 609800.0, 5000000.0]
+        }
+    }
+}
+```
+
+This closely mirrors the [sentinel-2-multiresolution.json](https://github.com/zarr-conventions/multiscales/blob/main/examples/sentinel-2-multiresolution.json) example from the multiscales convention repository.
+
+#### File System Layout
+
+The Sentinel-2 example above corresponds to the following directory structure on disk:
 
 ```
-sentinel2_utm33n.zarr/
-├── zarr.json                    # Root group with multiscales metadata
-├── 0/                          # Native resolution (10m) zoom level
-│   ├── zarr.json               # Group metadata for zoom level 0
-│   ├── red/                    # Red band data variable
-│   │   ├── zarr.json           # Array metadata
-│   │   └── c/                  # Chunk directory
-│   │       ├── 0/0             # Chunk files (1024x1024 chunks)
-│   │       ├── 0/1
-│   │       └── ...
-│   ├── nir/                    # Near-infrared band data variable
-│   │   ├── zarr.json           # Array metadata
-│   │   └── c/                  # Chunk directory
-│   │       ├── 0/0             # Chunk files (1024x1024 chunks)
-│   │       ├── 0/1
-│   │       └── ...
-│   ├── spatial_ref/            # Spatial reference system variable
-│   │   ├── zarr.json           # Array metadata with CRS information
-│   │   └── c/                  # Chunk directory
-│   │       └── 0               # Single chunk (scalar)
-│   ├── x/                      # X coordinate variable (UTM Easting)
-│   │   ├── zarr.json           # Array metadata
-│   │   └── c/                  # Chunk directory
-│   │       └── 0               # Single chunk (1094 elements)
-│   └── y/                      # Y coordinate variable (UTM Northing)
-│       ├── zarr.json           # Array metadata
-│       └── c/                  # Chunk directory
-│           └── 0               # Single chunk (1094 elements)
-└── 1/                          # Overview level (20m) zoom level
-    ├── zarr.json               # Group metadata for zoom level 1
-    ├── red/                    # Red band data variable
-    │   ├── zarr.json           # Array metadata
-    │   └── c/                  # Chunk directory
-    │       ├── 0/0             # Chunk files (512x512 chunks)
-    │       ├── 0/1
-    │       └── ...
-    ├── nir/                    # Near-infrared band data variable
-    │   ├── zarr.json           # Array metadata
-    │   └── c/                  # Chunk directory
-    │       ├── 0/0             # Chunk files (512x512 chunks)
-    │       ├── 0/1
-    │       └── ...
-    ├── spatial_ref/            # Spatial reference system variable
-    │   ├── zarr.json           # Array metadata with CRS information
-    │   └── c/                  # Chunk directory
-    │       └── 0               # Single chunk (scalar)
-    ├── x/                      # X coordinate variable (UTM Easting)
-    │   ├── zarr.json           # Array metadata
-    │   └── c/                  # Chunk directory
-    │       └── 0               # Single chunk (547 elements)
-    └── y/                      # Y coordinate variable (UTM Northing)
-        ├── zarr.json           # Array metadata
-        └── c/                  # Chunk directory
-            └── 0               # Single chunk (547 elements)
+S2_scene.zarr/
+├── zarr.json                    # Root group: zarr_conventions + multiscales + proj: + spatial: metadata
+├── r10m/                        # Native resolution (10m)
+│   ├── zarr.json                # Group metadata
+│   ├── B02/                     # Blue band
+│   │   ├── zarr.json            # Array metadata (shape: [10980, 10980], chunks: [1024, 1024])
+│   │   └── c/                   # Chunk files
+│   ├── B03/                     # Green band
+│   ├── B04/                     # Red band
+│   └── B08/                     # NIR band
+├── r20m/                        # 20m overview (2x from r10m)
+│   ├── zarr.json
+│   ├── B02/
+│   ├── B05/                     # Red-Edge band (native 20m)
+│   └── ...
+├── r60m/                        # 60m overview (6x from r10m)
+├── r120m/                       # 120m overview (2x from r60m)
+├── r360m/                       # 360m overview (3x from r120m)
+└── r720m/                       # 720m overview (2x from r360m)
 ```
 
-Key aspects of this file system layout:
-- **Root metadata**: The `zarr.json` at the root contains the `multiscales` attribute defining the custom UTM TileMatrixSet
-- **Zoom level groups**: Directories `0/` and `1/` correspond exactly to the TileMatrix `id` values
-- **Consistent variables**: Each zoom level contains the same set of variables (`red`, `nir`, `x`, `y`)
-- **Chunk organization**: Data is stored in chunks that align with the tile dimensions specified in the TileMatrixSet
-- **Coordinate preservation**: UTM coordinates are maintained at each resolution level
+Key aspects:
+- **Root metadata**: `zarr.json` at the root carries all convention declarations, `proj:code`, `spatial:dimensions`, `spatial:bbox`, and the full `multiscales.layout`
+- **Level groups**: Directories (`r10m/`, `r20m/`, ...) match the `asset` paths in the layout
+- **Consistent variables**: Each level contains the same set of variable names
+- **No `spatial_ref` array**: CRS is expressed via `proj:code` at the group level, not as a 0D array
 
 ## Appendix
 
 ### Definitions
 
-#### TileMatrixLimit
+#### MultiscalesMetadata
 
-| key            | type   | required | notes |
-| -------------- | ------ | -------- | ----- |
-| `"tileMatrix"` | string | yes      |       |
-| `"minTileCol"` | int    | yes      |       |  |
-| `"minTileRow"` | int    | yes      |       |
-| `"maxTileCol"` | int    | yes      |       |
-| `"maxTileRow"` | int    | yes      |       |
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `layout` | [LayoutObject[], ...] | yes | Must not be empty |
+| `resampling_method` | string | no | Default resampling method |
 
-#### TileMatrix
+#### LayoutObject
 
-| key                  | type           | required | notes |
-| -------------------- | -------------- | -------- | ----- |
-| `"id"`               | string         | yes      |       |
-| `"scaleDenominator"` | float          | yes      |       |
-| `"cellSize"`         | float          | yes      |       |
-| `"pointOfOrigin"`    | [float, float] | yes      |       |
-| `"tileWidth"`        | int            | yes      |       |
-| `"tileHeight"`       | int            | yes      |       |
-| `"matrixWidth"`      | int            | yes      |       |
-| `"matrixHeight"`     | int            | yes      |       |
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `asset` | string | yes | Relative path to the level group or array |
+| `derived_from` | string | no | Relative path to the source level |
+| `transform` | TransformObject | conditional | Required when `derived_from` is present |
+| `resampling_method` | string | no | Per-level resampling override |
+| `spatial:shape` | integer[] | no | Spatial dimensions shape `[height, width]` at this level |
+| `spatial:transform` | number[6] | no | Absolute affine transform for this level (Rasterio/Affine ordering) |
 
+#### TransformObject
 
-#### TileMatrixSet
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `scale` | number[] | no | Scale factors per axis (relative to `derived_from` level). Scale > 1.0 means lower resolution |
+| `translation` | number[] | no | Translation offsets per axis |
 
-| key              | type                             | required | notes            |
-| ---------------- | -------------------------------- | -------- | ---------------- |
-| `"id"`           | string                           | yes      |                  |
-| `"title"`        | string                           | no       |                  |
-| `"crs"`          | string                           | no       |                  |
-| `"supportedCRS"` | string                           | no       |                  |
-| `"orderedAxes"`  | [str, str]                       | no       |                  |
-| `"tileMatrices"` | [[TileMatrix](#tilematrix), ...] | yes      | May not be empty |
+#### proj: Properties
+
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `proj:code` | string | conditional* | Authority:code CRS identifier, e.g. `"EPSG:4326"`. Pattern: `^[A-Z]+:[0-9]+$` |
+| `proj:wkt2` | string | conditional* | WKT2 (ISO 19162) CRS string |
+| `proj:projjson` | object | conditional* | PROJJSON object |
+
+\* At least one of these MUST be provided. Full spec: [github.com/zarr-conventions/geo-proj](https://github.com/zarr-conventions/geo-proj)
+
+#### spatial: Properties
+
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `spatial:dimensions` | string[] | yes | Names of spatial dimensions in row-major order |
+| `spatial:transform` | number[6] | no | Affine coefficients `[a, b, c, d, e, f]`. `x = a*i + b*j + c`, `y = d*i + e*j + f` |
+| `spatial:bbox` | number[] | no | Bounding box `[xmin, ymin, xmax, ymax]` in CRS coordinates |
+| `spatial:shape` | integer[] | no | Spatial shape `[height, width]` |
+| `spatial:registration` | string | no | `"pixel"` (default) or `"node"` |
+
+Full spec: [github.com/zarr-conventions/spatial](https://github.com/zarr-conventions/spatial)
 
 #### ResamplingMethod
 
-This is a string literal defined [here](https://zarr.dev/geozarr-spec/documents/standard/template/geozarr-spec.html#_71eeacb0-5e4e-8a8e-5714-02fc0838075b).
-
-The implementation defaults to `"average"` for creating overview levels in multiscale datasets.
+A string describing the algorithm used to produce a downsampled or upsampled level. Common values: `"nearest"`, `"average"`, `"bilinear"`, `"cubic"`, `"lanczos"`, `"mode"`, `"max"`, `"min"`, `"sum"`. The implementation defaults to `"average"` for creating overview levels. Any string is valid; see the [multiscales convention spec](https://github.com/zarr-conventions/multiscales) for the full list of common values.
