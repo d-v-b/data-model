@@ -134,7 +134,8 @@ If any member of a GeoZarr Dataset is an array, then it must comply with the [Da
 If the Dataset contains a DataArray `D`, then for each dimension name `N` in the list of `D`'s named dimensions, 
 the Dataset must contain a one-dimensional DataArray named `N` with a shape that matches the the length 
 of `D` along the axis named by `N`. In this case, `D` is called a "data variable", and the each 
-DataArrays matching a dimension names of `D` is called a "coordinate variable". 
+of `D` along the axis named by `N`. In this case, `D` is called a "data variable", and each 
+DataArray matching a dimension names of `D` is called a "coordinate variable". 
 
 > [!Note]
 > These two definitions are not mutually exclusive, as a 1-dimensional DataArray named `D` with
