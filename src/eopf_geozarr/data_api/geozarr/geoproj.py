@@ -7,21 +7,13 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, model_validator
 from zarr_cm import geo_proj
 
-from eopf_geozarr.data_api.geozarr.common import ZarrConventionMetadata, is_none
+from eopf_geozarr.data_api.geozarr.common import is_none
 from eopf_geozarr.data_api.geozarr.projjson import ProjJSON  # noqa: TC001
 
 PROJ_UUID = geo_proj.UUID
 
 # Re-export the zarr-cm TypedDict for the convention metadata object
 ProjConvention = geo_proj.GeoProjAttrs
-
-
-class ProjConventionMetadata(ZarrConventionMetadata):
-    uuid: str = geo_proj.CMO["uuid"]
-    name: str = geo_proj.CMO["name"]
-    schema_url: str = geo_proj.CMO["schema_url"]
-    spec_url: str = geo_proj.CMO["spec_url"]
-    description: str = geo_proj.CMO["description"]
 
 
 class Proj(BaseModel):

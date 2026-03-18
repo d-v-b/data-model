@@ -2,6 +2,7 @@ from typing import Any, Literal
 
 import pytest
 from pydantic.experimental.missing_sentinel import MISSING
+from zarr_cm import multiscales as multiscales_cm
 
 from eopf_geozarr.data_api.geozarr.multiscales import tms, zcm
 from eopf_geozarr.data_api.geozarr.multiscales.geozarr import (
@@ -27,7 +28,7 @@ def test_multiscale_group_attrs(multiscale_flavor: set[Literal["zcm", "tms"]]) -
             ),
         )
         zcm_meta = zcm.Multiscales(layout=layout, resampling_method="nearest").model_dump()
-        zarr_conventions_meta = (zcm.MULTISCALE_CONVENTION_METADATA,)
+        zarr_conventions_meta = (multiscales_cm.CMO,)
     if "tms" in multiscale_flavor:
         tile_matrix_set = tms.TileMatrixSet(
             id="example_tms",

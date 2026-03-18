@@ -15,19 +15,20 @@ from dask import delayed
 from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
 from pyproj import CRS
+from zarr_cm import geo_proj
+from zarr_cm import multiscales as multiscales_cm
+from zarr_cm import spatial as spatial_cm
 
 from eopf_geozarr.conversion.fs_utils import sanitize_dataset_attributes
 from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
     create_native_crs_tile_matrix_set,
 )
-from eopf_geozarr.data_api.geozarr.geoproj import ProjConventionMetadata
 from eopf_geozarr.data_api.geozarr.multiscales import tms, zcm
 from eopf_geozarr.data_api.geozarr.multiscales.geozarr import (
     MultiscaleGroupAttrs,
     MultiscaleMeta,
 )
-from eopf_geozarr.data_api.geozarr.spatial import SpatialConventionMetadata
 from eopf_geozarr.data_api.geozarr.types import (
     CF_SCALE_OFFSET_KEYS,
     XARRAY_ENCODING_KEYS,
@@ -625,9 +626,9 @@ def add_multiscales_metadata_to_parent(
     # Create convention metadata for all three conventions
     multiscale_attrs = MultiscaleGroupAttrs(
         zarr_conventions=(
-            zcm.MultiscaleConventionMetadata(),
-            SpatialConventionMetadata(),
-            ProjConventionMetadata(),
+            multiscales_cm.CMO,
+            spatial_cm.CMO,
+            geo_proj.CMO,
         ),
         multiscales=MultiscaleMeta(
             layout=layout,
@@ -1016,8 +1017,8 @@ def write_geo_metadata(
 
         # Add zarr convention declarations
         conventions = [
-            SpatialConventionMetadata().model_dump(),
-            ProjConventionMetadata().model_dump(),
+            spatial_cm.CMO,
+            geo_proj.CMO,
         ]
         dataset.attrs["zarr_conventions"] = conventions
 

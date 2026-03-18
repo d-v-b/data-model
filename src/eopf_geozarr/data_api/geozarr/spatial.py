@@ -7,20 +7,12 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, model_validator
 from zarr_cm import spatial as spatial_cm
 
-from eopf_geozarr.data_api.geozarr.common import ZarrConventionMetadata, is_none
+from eopf_geozarr.data_api.geozarr.common import is_none
 
 SPATIAL_UUID = spatial_cm.UUID
 
 # Re-export the zarr-cm TypedDict for the convention metadata object
 SpatialConvention = spatial_cm.SpatialAttrs
-
-
-class SpatialConventionMetadata(ZarrConventionMetadata):
-    uuid: str = spatial_cm.CMO["uuid"]
-    name: str = spatial_cm.CMO["name"]
-    schema_url: str = spatial_cm.CMO["schema_url"]
-    spec_url: str = spatial_cm.CMO["spec_url"]
-    description: str = spatial_cm.CMO["description"]
 
 
 class Spatial(BaseModel):
