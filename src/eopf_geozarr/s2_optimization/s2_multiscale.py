@@ -131,6 +131,11 @@ def create_multiscale_from_datatree(
             for data_var in dataset.data_vars:
                 if dataset[data_var].dtype in (np.dtype("<f8"), np.dtype(">f8")):
                     dataset[data_var] = dataset[data_var].astype("float32")
+            # Clear _FillValue from the DataArray's own encoding to prevent
+            # xarray from raising "Zarr does not support _FillValue in encoding".
+            if not keep_scale_offset:
+                for data_var in dataset.data_vars:
+                    dataset[data_var].encoding.pop("_FillValue", None)
         else:
             # Non-measurement groups: preserve original encoding
             encoding = create_original_encoding(dataset)
@@ -183,6 +188,11 @@ def create_multiscale_from_datatree(
             enable_sharding=enable_sharding,
             keep_scale_offset=keep_scale_offset,
         )
+
+        # Strip _FillValue from DataArray encoding for downsampled levels too
+        if not keep_scale_offset:
+            for data_var in downsampled_dataset.data_vars:
+                downsampled_dataset[data_var].encoding.pop("_FillValue", None)
 
         # Write dataset
         ds_out = stream_write_dataset(
@@ -268,7 +278,15 @@ def create_measurements_encoding(
         keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
 
         if not keep_scale_offset:
-            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS
+            # When stripping scale/offset, also strip _FillValue since the original
+            # _FillValue is in raw integer units and meaningless for decoded float data.
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue"}
+            # Set zarr fill_value to NaN so nodata regions are correctly identified
+            # as transparent by zarr-aware viewers (e.g. OpenLayers GeoZarr source).
+            # xarray's zarr backend uses "fill_value" (no underscore) in encoding
+            # to set the zarr-level fill value, distinct from "_FillValue" which
+            # controls CF-convention attribute masking.
+            var_encoding["fill_value"] = float("nan")
 
         for key in keep_keys:
             if key in var_data.encoding:

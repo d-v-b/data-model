@@ -4606,7 +4606,7 @@
               "members": {
                 "b02": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -4713,7 +4713,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     10980,
@@ -4724,7 +4724,7 @@
                 },
                 "b03": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -4831,7 +4831,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     10980,
@@ -4842,7 +4842,7 @@
                 },
                 "b04": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -4949,7 +4949,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     10980,
@@ -4960,7 +4960,7 @@
                 },
                 "b08": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -5067,7 +5067,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     10980,
@@ -5353,7 +5353,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     915,
@@ -5471,7 +5471,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     915,
@@ -5589,7 +5589,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     915,
@@ -5765,7 +5765,7 @@
               "members": {
                 "b05": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -5872,7 +5872,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -5883,7 +5883,7 @@
                 },
                 "b06": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -5990,7 +5990,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -6001,7 +6001,7 @@
                 },
                 "b07": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -6108,7 +6108,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -6119,7 +6119,7 @@
                 },
                 "b11": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -6226,7 +6226,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -6237,7 +6237,7 @@
                 },
                 "b12": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -6344,7 +6344,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -6355,7 +6355,7 @@
                 },
                 "b8a": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -6462,7 +6462,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     5490,
@@ -6748,7 +6748,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     305,
@@ -6866,7 +6866,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     305,
@@ -6984,7 +6984,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     305,
@@ -7160,7 +7160,7 @@
               "members": {
                 "b01": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -7267,7 +7267,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     1830,
@@ -7278,7 +7278,7 @@
                 },
                 "b09": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -7385,7 +7385,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     1830,
@@ -7396,7 +7396,7 @@
                 },
                 "b10": {
                   "attributes": {
-                    "_FillValue": "AAAAAAAAAAA=",
+                    "_FillValue": "AAAAAAAA+H8=",
                     "_eopf_attrs": {
                       "add_offset": -0.1,
                       "coordinates": [
@@ -7503,7 +7503,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     1830,
@@ -7789,7 +7789,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     152,
@@ -7907,7 +7907,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     152,
@@ -8025,7 +8025,7 @@
                     "y",
                     "x"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     152,
