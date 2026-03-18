@@ -44,6 +44,7 @@ from eopf_geozarr.types import (
 )
 
 from . import fs_utils, utils
+from .fs_utils import sanitize_dataset_attributes
 from .sentinel1_reprojection import reproject_sentinel1_with_gcps
 
 log = structlog.get_logger()
@@ -173,7 +174,9 @@ def setup_datatree_metadata_geozarr_spec_compliant(
     """
     geozarr_groups: dict[str, xr.Dataset] = {}
     grid_mapping_var_name = "spatial_ref"
-    epsg_CPM_260 = dt.attrs.get("other_metadata", {}).get("horizontal_CRS_code", None)
+    epsg_CPM_260 = dt.attrs.get("other_metadata", {}).get(
+        "horizontal_CRS_code", dt.attrs.get("other_metadata", {}).get("horizontal_crs_code", None)
+    )
     if epsg_CPM_260 is not None:
         epsg_CPM_260 = epsg_CPM_260.split(":")[-1]
 
@@ -347,6 +350,9 @@ def iterative_copy(
         # Process groups with data variables
         if node.data_vars:
             log.info("Writing %s with data variables to GeoZarr DataTree", current_group_path)
+
+            # Sanitize NaN values in attributes before writing
+            ds = sanitize_dataset_attributes(ds)
 
             # Set up encoding
             encoding = _create_encoding(ds, compressor, spatial_chunk)
@@ -715,6 +721,9 @@ def create_geozarr_compliant_multiscales(
         # Ensure the directory exists for local paths
         if not fs_utils.is_s3_path(overview_path):
             os.makedirs(os.path.dirname(overview_path), exist_ok=True)
+
+        # Sanitize NaN values in overview dataset attributes
+        overview_ds = sanitize_dataset_attributes(overview_ds)
 
         # Write the overview dataset
         overview_group = f"{group_name}/{level}"
@@ -1167,6 +1176,9 @@ def write_dataset_band_by_band_with_validation(
                     single_var_ds[var] = single_var_ds[var].chunk(chunk_dict)
                 else:
                     single_var_ds[var] = single_var_ds[var].chunk()
+
+                # Sanitize NaN values in single variable dataset attributes
+                single_var_ds = sanitize_dataset_attributes(single_var_ds)
 
                 single_var_ds.to_zarr(
                     output_path,

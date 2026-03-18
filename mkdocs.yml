@@ -3,6 +3,7 @@ site_description: Documentation for the EOPF GeoZarr library - converting EOPF d
 site_author: Development Seed
 repo_url: https://github.com/eopf-explorer/data-model
 edit_uri: edit/main/docs/
+site_url: https://eopf-explorer.github.io/
 
 theme:
   name: material
