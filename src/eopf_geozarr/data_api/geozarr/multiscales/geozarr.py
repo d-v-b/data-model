@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NotRequired, Self
+from typing import NotRequired, Self
 
 from pydantic import BaseModel, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import TypedDict
+from zarr_cm import ConventionMetadataObject  # noqa: TC002
 
 from . import tms, zcm
-
-if TYPE_CHECKING:
-    from zarr_cm import ConventionMetadataObject
 
 
 class MultiscaleMeta(BaseModel):
