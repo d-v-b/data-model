@@ -12,9 +12,9 @@ import pytest
 import xarray as xr
 import zarr
 from pyproj import CRS
+from zarr_cm import geo_proj
+from zarr_cm import spatial as spatial_cm
 
-from eopf_geozarr.data_api.geozarr.geoproj import ProjConventionMetadata
-from eopf_geozarr.data_api.geozarr.spatial import SpatialConventionMetadata
 from eopf_geozarr.s2_optimization.s2_multiscale import (
     create_measurements_encoding,
     stream_write_dataset,
@@ -421,12 +421,12 @@ class TestWriteGeoMetadataEdgeCases:
 
         # Verify spatial convention
         assert spatial_convention is not None
-        expected_spatial = SpatialConventionMetadata().model_dump()
+        expected_spatial = spatial_cm.CMO
         assert spatial_convention == expected_spatial
 
         # Verify proj convention
         assert proj_convention is not None
-        expected_proj = ProjConventionMetadata().model_dump()
+        expected_proj = geo_proj.CMO
         assert proj_convention == expected_proj
 
     def test_write_geo_metadata_adds_spatial_and_proj_attributes(

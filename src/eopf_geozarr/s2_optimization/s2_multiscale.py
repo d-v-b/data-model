@@ -13,10 +13,10 @@ import xarray as xr
 from dask import delayed
 from dask.array import from_delayed
 from zarr.codecs import BloscCodec
+from zarr_cm import geo_proj
+from zarr_cm import spatial as spatial_cm
 
 from eopf_geozarr.conversion.fs_utils import sanitize_dataset_attributes
-from eopf_geozarr.data_api.geozarr.geoproj import ProjConventionMetadata
-from eopf_geozarr.data_api.geozarr.spatial import SpatialConventionMetadata
 from eopf_geozarr.data_api.geozarr.types import (
     CF_SCALE_OFFSET_KEYS,
     XARRAY_ENCODING_KEYS,
@@ -586,8 +586,8 @@ def write_geo_metadata(
 
     # Add zarr convention declarations
     conventions = [
-        SpatialConventionMetadata().model_dump(),
-        ProjConventionMetadata().model_dump(),
+        spatial_cm.CMO,
+        geo_proj.CMO,
     ]
     dataset.attrs["zarr_conventions"] = conventions
 

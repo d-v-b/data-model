@@ -19,18 +19,19 @@ from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
 from zarr.dtype import Int64
+from zarr_cm import geo_proj
+from zarr_cm import multiscales as multiscales_cm
+from zarr_cm import spatial as spatial_cm
 
 from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
     create_native_crs_tile_matrix_set,
 )
-from eopf_geozarr.data_api.geozarr.geoproj import ProjConventionMetadata
 from eopf_geozarr.data_api.geozarr.multiscales import zcm
 from eopf_geozarr.data_api.geozarr.multiscales.geozarr import (
     MultiscaleGroupAttrs,
     MultiscaleMeta,
 )
-from eopf_geozarr.data_api.geozarr.spatial import SpatialConventionMetadata
 from eopf_geozarr.zarrio import ArrayReencoder, replace_json_invalid_floats
 
 if TYPE_CHECKING:
@@ -144,8 +145,8 @@ def build_geo_group_attrs(
         attrs["proj:wkt2"] = crs.to_wkt()
 
     conventions = [
-        SpatialConventionMetadata().model_dump(),
-        ProjConventionMetadata().model_dump(),
+        spatial_cm.CMO,
+        geo_proj.CMO,
     ]
     attrs["zarr_conventions"] = conventions
 
@@ -648,9 +649,9 @@ def compute_multiscales_group_attrs(
 
     multiscale_attrs = MultiscaleGroupAttrs(
         zarr_conventions=(
-            zcm.MultiscaleConventionMetadata(),
-            SpatialConventionMetadata(),
-            ProjConventionMetadata(),
+            multiscales_cm.CMO,
+            spatial_cm.CMO,
+            geo_proj.CMO,
         ),
         multiscales=MultiscaleMeta(
             layout=tuple(layout),
