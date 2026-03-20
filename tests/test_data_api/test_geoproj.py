@@ -5,42 +5,8 @@ import pytest
 from pydantic import ValidationError
 from pydantic_zarr.core import tuplify_json
 
-from eopf_geozarr.data_api.geozarr.geoproj import GeoProj, Proj, ProjConventionMetadata
+from eopf_geozarr.data_api.geozarr.geoproj import GeoProj, Proj
 from tests.test_data_api.conftest import view_json_diff
-
-
-class TestProjConventionMetadata:
-    """Test the ProjConventionMetadata class."""
-
-    def test_default_values(self) -> None:
-        """Test that default values are correctly set."""
-        metadata = ProjConventionMetadata()
-
-        assert metadata.uuid == "f17cb550-5864-4468-aeb7-f3180cfb622f"
-        assert metadata.name == "proj:"
-        assert (
-            metadata.schema_url
-            == "https://raw.githubusercontent.com/zarr-experimental/geo-proj/refs/tags/v1/schema.json"
-        )
-        assert (
-            metadata.spec_url == "https://github.com/zarr-experimental/geo-proj/blob/v1/README.md"
-        )
-        assert metadata.description == "Coordinate reference system information for geospatial data"
-
-    def test_serialization(self) -> None:
-        """Test that metadata can be serialized correctly."""
-        metadata = ProjConventionMetadata()
-        result = metadata.model_dump()
-
-        expected = {
-            "uuid": "f17cb550-5864-4468-aeb7-f3180cfb622f",
-            "name": "proj:",
-            "schema_url": "https://raw.githubusercontent.com/zarr-experimental/geo-proj/refs/tags/v1/schema.json",
-            "spec_url": "https://github.com/zarr-experimental/geo-proj/blob/v1/README.md",
-            "description": "Coordinate reference system information for geospatial data",
-        }
-
-        assert result == expected
 
 
 class TestProj:

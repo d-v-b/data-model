@@ -1,70 +1,26 @@
 from __future__ import annotations
 
-from typing import Final, Literal, NotRequired
-
 from pydantic import BaseModel, field_validator
 from pydantic.experimental.missing_sentinel import MISSING
-from typing_extensions import TypedDict
+from zarr_cm import ConventionMetadataObject
+from zarr_cm import multiscales as multiscales_cm
 
-from eopf_geozarr.data_api.geozarr.common import (
-    ZarrConventionMetadata,
-    ZarrConventionMetadataJSON,
-)
+# Convention constants from zarr-cm
+CONVENTION_ID = multiscales_cm.UUID
+CONVENTION_SCHEMA_URL = multiscales_cm.SCHEMA_URL
+CONVENTION_SPEC_URL = multiscales_cm.SPEC_URL
+CONVENTION_NAME = multiscales_cm.CMO["name"]
+CONVENTION_DESCRIPTION = multiscales_cm.CMO["description"]
 
-ConventionID = Literal["d35379db-88df-4056-af3a-620245f8e347"]
-CONVENTION_ID: Final[ConventionID] = "d35379db-88df-4056-af3a-620245f8e347"
-
-ConventionSchemaURL = Literal[
-    "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v1/schema.json"
-]
-CONVENTION_SCHEMA_URL: Final[ConventionSchemaURL] = (
-    "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v1/schema.json"
-)
-
-ConventionSpecURL = Literal["https://github.com/zarr-conventions/multiscales/blob/v1/README.md"]
-CONVENTION_SPEC_URL: Final[ConventionSpecURL] = (
-    "https://github.com/zarr-conventions/multiscales/blob/v1/README.md"
-)
-
-ConventionDescription = Literal["Multiscale layout of zarr datasets"]
-CONVENTION_DESCRIPTION: Final[ConventionDescription] = "Multiscale layout of zarr datasets"
-
-ConventionName = Literal["multiscales"]
-CONVENTION_NAME: Final[ConventionName] = "multiscales"
-
-
-class MultiscaleConventionMetadata(ZarrConventionMetadata):
-    uuid: ConventionID = CONVENTION_ID
-    schema_url: ConventionSchemaURL = CONVENTION_SCHEMA_URL
-    name: ConventionName = CONVENTION_NAME
-    description: ConventionDescription = CONVENTION_DESCRIPTION
-    spec_url: ConventionSpecURL = CONVENTION_SPEC_URL
-
-
-class MultiscaleConventionMetadataJSON(TypedDict):
-    """
-    A TypedDict representation of the Multiscales convention metadata
-    """
-
-    uuid: NotRequired[ConventionID]
-    schema_url: NotRequired[ConventionSchemaURL]
-    name: NotRequired[ConventionName]
-    description: NotRequired[ConventionDescription]
-    spec_url: NotRequired[ConventionSpecURL]
-
-
-# A final dict representation of the Multiscales convention metadata
-MULTISCALE_CONVENTION_METADATA: Final[MultiscaleConventionMetadataJSON] = {
-    "uuid": CONVENTION_ID,
-    "schema_url": CONVENTION_SCHEMA_URL,
-    "name": CONVENTION_NAME,
-    "description": CONVENTION_DESCRIPTION,
-    "spec_url": CONVENTION_SPEC_URL,
-}
+# Re-export zarr-cm TypedDicts
+TransformJSON = multiscales_cm.Transform
+ScaleLevelJSON = multiscales_cm.LayoutObject
+MultiscalesJSON = multiscales_cm.MultiscalesAttrs
+MultiscalesConventionAttrsJSON = multiscales_cm.MultiscalesConventionAttrs
 
 
 class ZarrConventionAttrs(BaseModel):
-    zarr_conventions: tuple[ZarrConventionMetadata, ...]
+    zarr_conventions: tuple[ConventionMetadataObject, ...]
 
     model_config = {"extra": "allow"}
 
@@ -72,11 +28,6 @@ class ZarrConventionAttrs(BaseModel):
 class Transform(BaseModel):
     scale: tuple[float, ...] | MISSING = MISSING
     translation: tuple[float, ...] | MISSING = MISSING
-
-
-class TransformJSON(TypedDict):
-    scale: NotRequired[tuple[float, ...]]
-    translation: NotRequired[tuple[float, ...]]
 
 
 class ScaleLevel(BaseModel):
@@ -88,24 +39,11 @@ class ScaleLevel(BaseModel):
     model_config = {"extra": "allow"}
 
 
-class ScaleLevelJSON(TypedDict):
-    asset: str
-    derived_from: NotRequired[str]
-    transform: TransformJSON
-    resampling_method: NotRequired[str]
-
-
 class Multiscales(BaseModel):
     layout: tuple[ScaleLevel, ...]
     resampling_method: str | MISSING = MISSING
 
     model_config = {"extra": "allow"}
-
-
-class MultiscalesJSON(TypedDict):
-    version: NotRequired[str]
-    layout: tuple[ScaleLevelJSON, ...]
-    resampling_method: NotRequired[str]
 
 
 class MultiscalesAttrs(ZarrConventionAttrs):
@@ -115,25 +53,15 @@ class MultiscalesAttrs(ZarrConventionAttrs):
     @field_validator("zarr_conventions", mode="after")
     @classmethod
     def ensure_multiscales_convention(
-        cls, value: tuple[ZarrConventionMetadata, ...]
-    ) -> tuple[ZarrConventionMetadata, ...]:
+        cls, value: tuple[ConventionMetadataObject, ...]
+    ) -> tuple[ConventionMetadataObject, ...]:
         """
         Iterate over the elements of zarr_conventions and check that at least one of them is
         multiscales
         """
-        success: bool = False
-        errors: dict[int, ValueError] = {}
-        for idx, convention_meta in enumerate(value):
-            try:
-                MultiscaleConventionMetadata(**convention_meta.model_dump())
-                success = True
-            except ValueError as e:
-                errors[idx] = e
-        if not success:
-            raise ValueError("Multiscales convention not found. Errors: " + str(errors))
+        expected_uuid = multiscales_cm.CMO["uuid"]
+        if not any(c["uuid"] == expected_uuid for c in value):
+            raise ValueError(
+                f"Multiscales convention (uuid={expected_uuid}) not found in zarr_conventions"
+            )
         return value
-
-
-class MultiscalesAttrsJSON(TypedDict):
-    zarr_conventions: tuple[ZarrConventionMetadataJSON, ...]
-    multiscales: MultiscalesJSON
