@@ -84,10 +84,7 @@ def add_spatial_ref_to_group(group: zarr.Group, epsg_code: int | None = None) ->
 @pytest.mark.filterwarnings("ignore:.*:zarr.errors.ZarrUserWarning")
 def test_add_spatial_ref_matches_rasterio(tmp_path: pathlib.Path) -> None:
     """Test that our manual spatial_ref creation matches rasterio's output."""
-    try:
-        import rioxarray
-    except ImportError:
-        pytest.skip("rioxarray not available")
+    rioxarray = pytest.importorskip("rioxarray")  # noqa: F841
 
     if ProjCRS is None:
         pytest.skip("pyproj not available")
@@ -338,8 +335,6 @@ def test_convert_s2_optimized(
         s2_group_example.stem + ".json"
     )
 
-
-
     # Write out the observed structure for analysis
     observed_output_path = Path("/tmp/observed_structure.json")
     observed_output_path.write_text(json.dumps(observed_structure_json, indent=2, sort_keys=True))
@@ -352,7 +347,7 @@ def test_convert_s2_optimized(
     # This is useful when the expected structure needs to be updated
     # expected_structure_path.write_text(
     #    json.dumps(observed_structure_json, indent=2, sort_keys=True)
-    #)
+    # )
 
     # check that all multiscale levels have the same data type
     # this check is redundant with the later check, but it's expedient to check this here.
@@ -380,27 +375,39 @@ def test_convert_s2_optimized(
     # Write out the expected structure to the temporary test directory
     # This is useful when the expected structure needs to be updated
 
-    observed_tree_path = tmp_path/"observed_tree.json"
-    observed_flat_path = tmp_path/"observed_flat.json"
-    expected_flat_path = tmp_path/"expected_flat.json"
+    observed_tree_path = tmp_path / "observed_tree.json"
+    observed_flat_path = tmp_path / "observed_flat.json"
+    expected_flat_path = tmp_path / "expected_flat.json"
 
-    observed_tree_path.write_text(
-       json.dumps(observed_structure_json, indent=2, sort_keys=True)
+    observed_tree_path.write_text(json.dumps(observed_structure_json, indent=2, sort_keys=True))
+
+    observed_flat_path.write_text(
+        json.dumps({k: v.model_dump() for k, v in observed_structure_flat.items()})
     )
-
-    observed_flat_path.write_text(json.dumps({k: v.model_dump() for k,v in observed_structure_flat.items()}))
-    expected_flat_path.write_text(json.dumps({k: v.model_dump() for k,v in expected_structure_flat.items()}))
+    expected_flat_path.write_text(
+        json.dumps({k: v.model_dump() for k, v in expected_structure_flat.items()})
+    )
 
     # Check that all of the keys are the same
     if o_keys != e_keys:
-        (tmp_path / "extra_observed_keys.json").write_text(json.dumps({k: v.model_dump() for k, v in observed_structure_flat if k in o_keys - e_keys}, indent=2))
-        (tmp_path / "extra_expected_keys.json").write_text(json.dumps({k: v.model_dump() for k, v in expected_structure_flat if k in e_keys - o_keys}, indent=2))
+        (tmp_path / "extra_observed_keys.json").write_text(
+            json.dumps(
+                {k: v.model_dump() for k, v in observed_structure_flat if k in o_keys - e_keys},
+                indent=2,
+            )
+        )
+        (tmp_path / "extra_expected_keys.json").write_text(
+            json.dumps(
+                {k: v.model_dump() for k, v in expected_structure_flat if k in e_keys - o_keys},
+                indent=2,
+            )
+        )
 
         raise AssertionError(
-        f"Key mismatch.\n"
-        f"Extra in observed: {sorted(o_keys - e_keys)[:20]}\n"
-        f"Missing in observed: {sorted(e_keys - o_keys)[:20]}\n"
-        f"Check {observed_tree_path!s} to see the observed JSON structure."
+            f"Key mismatch.\n"
+            f"Extra in observed: {sorted(o_keys - e_keys)[:20]}\n"
+            f"Missing in observed: {sorted(e_keys - o_keys)[:20]}\n"
+            f"Check {observed_tree_path!s} to see the observed JSON structure."
         )
 
     # Check that all values are the same for common keys
@@ -410,10 +417,19 @@ def test_convert_s2_optimized(
     ]
 
     if mismatch_values != []:
-        mismatch_values_path = (tmp_path / "mismatch_values.json")
+        mismatch_values_path = tmp_path / "mismatch_values.json"
         mismatch_values_path.write_text(
             json.dumps(
-                {k: {"expected": expected_structure_flat[k].model_dump(), "observed": observed_structure_flat[k].model_dump()} for k in mismatch_values}, indent=2))
+                {
+                    k: {
+                        "expected": expected_structure_flat[k].model_dump(),
+                        "observed": observed_structure_flat[k].model_dump(),
+                    }
+                    for k in mismatch_values
+                },
+                indent=2,
+            )
+        )
         raise AssertionError(
             f"Value mismatches: {mismatch_values[:20]}\n"
             f"Check {mismatch_values_path!s} to see the observed JSON structure."

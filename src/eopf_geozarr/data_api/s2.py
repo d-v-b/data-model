@@ -282,7 +282,7 @@ class Sentinel2DataArrayAttrs(BaseDataArrayAttrs):
 class Sentinel2RootAttrs(BaseModel):
     """Root-level attributes for Sentinel-2 DataTree."""
 
-    other_metadata: OtherMetadataDict
+    other_metadata: dict[str, object]  # unvalidated — keys vary across CPM versions
     stac_discovery: dict[str, object]  # no validation
 
 
@@ -533,8 +533,18 @@ class Sentinel2Root(GroupSpec[Sentinel2RootAttrs, Sentinel2RootMembers]):  # typ
 
     @property
     def crs(self) -> CRS:
-        """Get the coordinate reference system (CRS) for this product"""
-        crs_code = self.attributes.other_metadata["horizontal_CRS_code"]
-        # Handle both "EPSG:32635" and "32635" formats
-        crs_code = crs_code.removeprefix("EPSG:")  # Remove "EPSG:" prefix
-        return CRS.from_epsg(int(crs_code))
+        """Get the coordinate reference system (CRS) for this product.
+
+        Handles both CPM >= 2.6.0 (horizontal_CRS_code) and older formats
+        (horizontal_crs_code), plus both "EPSG:32635" and "32635" string formats.
+        """
+        om = self.attributes.other_metadata
+        crs_code = om.get("horizontal_CRS_code") or om.get("horizontal_crs_code")
+        if crs_code is None:
+            raise ValueError(
+                f"No CRS code found in other_metadata. Available keys: {sorted(om.keys())}"
+            )
+        # Handle both "EPSG:32635" and "32635" formats, and integer values
+        if isinstance(crs_code, str):
+            return CRS.from_epsg(int(crs_code.split(":")[-1]))
+        return CRS.from_epsg(int(str(crs_code)))

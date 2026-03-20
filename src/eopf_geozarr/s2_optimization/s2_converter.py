@@ -5,6 +5,7 @@ Main S2 optimization converter.
 from __future__ import annotations
 
 import time
+from collections import defaultdict
 from functools import partial
 from pathlib import Path
 from typing import Any, Final, Literal, TypedDict
@@ -24,15 +25,14 @@ from eopf_geozarr.conversion.geozarr import get_zarr_group
 from eopf_geozarr.data_api.geozarr.common import extract_scale_offset
 from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
-from eopf_geozarr.zarrio import ArrayReencoderConfig, convert_compression, reencode_group
+from eopf_geozarr.zarrio import ArrayReencoderConfig, convert_compression
 
 from .s2_multiscale import (
     auto_chunks,
     calculate_simple_shard_dimensions,
-    create_multiscale_levels,
-    create_multiscales_metadata,
-    write_geo_metadata,
+    create_downsampled_resolution_group,
 )
+from .s2_plan import FillSpec, plan_s2_hierarchy
 
 log = structlog.get_logger()
 
@@ -157,31 +157,6 @@ class ConvertS2Params(TypedDict):
     max_retries: int
 
 
-def add_crs_and_grid_mapping(group: zarr.Group, crs: CRS) -> None:
-    """
-    Add crs and grid mapping elements to a dataset.
-    """
-    ds = xr.open_dataset(group.store, group=group.path, engine="zarr", consolidated=False)
-    write_geo_metadata(ds, crs=crs)
-
-    for var in ds.data_vars:
-        new_attrs = ds[var].attrs.copy()
-        new_attrs["coordinates"] = "spatial_ref"
-        group[var].attrs.update(new_attrs | {"grid_mapping": "spatial_ref"})
-
-    group.create_array(
-        "spatial_ref",
-        shape=ds["spatial_ref"].shape,
-        dtype=ds["spatial_ref"].dtype,
-        attributes=ds["spatial_ref"].attrs,
-        compressors=None,
-        filters=None,
-    )
-
-    # Set grid_mapping attribute on the group itself
-    group.attrs.update({"grid_mapping": "spatial_ref"})
-
-
 def array_reencoder(
     key: str,
     metadata: ArrayV2Metadata,
@@ -303,6 +278,94 @@ def array_reencoder(
     )
 
 
+def fill_s2_hierarchy(
+    tree: dict[str, zarr.Array | zarr.Group],
+    source_group: zarr.Group,
+    fill_specs: dict[str, FillSpec],
+) -> None:
+    """
+    Fill array data into a pre-created zarr hierarchy.
+
+    Processes fill specs in dependency order:
+    1. Copy source arrays (native data)
+    2. Write spatial_ref scalars
+    3. Write pre-computed coordinate values
+    4. Downsample derived level arrays (finest-to-coarsest)
+    """
+    # Phase 1: Copy source arrays and simple fills
+    for array_path, spec in fill_specs.items():
+        if spec.source_path is not None:
+            log.info("Copying array %s from source", array_path)
+            source_array = source_group[spec.source_path]
+            target_array = tree[array_path]
+            target_array[...] = source_array[...]
+        elif spec.is_spatial_ref:
+            log.info("Writing spatial_ref at %s", array_path)
+            tree[array_path][...] = 0
+        elif spec.computed_values is not None:
+            log.info("Writing pre-computed values at %s", array_path)
+            tree[array_path][...] = spec.computed_values
+
+    # Phase 2: Downsample derived level arrays (ordered by dependency)
+    # Group downsample specs by target level upfront
+    level_groups: dict[str, list[tuple[str, FillSpec]]] = defaultdict(list)
+    for path, spec in fill_specs.items():
+        if spec.downsample_from is not None:
+            target_group_path = path.rsplit("/", 1)[0]
+            level_groups[target_group_path].append((path, spec))
+
+    # Sort levels by resolution priority (finest to coarsest)
+    res_priority = {"r20m": -2, "r60m": -1, "r120m": 0, "r360m": 1, "r720m": 2}
+
+    def level_sort_key(group_path: str) -> int:
+        for res_name, priority in res_priority.items():
+            if f"/{res_name}" in group_path:
+                return priority
+        return 0
+
+    sorted_levels = sorted(level_groups.keys(), key=level_sort_key)
+
+    for target_group_path in sorted_levels:
+        specs_for_level = level_groups[target_group_path]
+        # All specs in a level share the same parent group and scale factor
+        first_spec = specs_for_level[0][1]
+        assert first_spec.downsample_from is not None
+        parent_group_path = first_spec.downsample_from.rsplit("/", 1)[0]
+
+        # Open parent as xarray Dataset for downsampling
+        parent_group = tree[parent_group_path]
+        assert isinstance(parent_group, zarr.Group)
+        parent_ds = xr.open_dataset(parent_group.store, group=parent_group.path, engine="zarr")
+
+        # Collect all arrays for this level
+        level_vars: dict[str, xr.DataArray] = {}
+        for array_path, spec in specs_for_level:
+            assert spec.downsample_from is not None
+            var_name = array_path.rsplit("/", 1)[1]
+            parent_var_name = spec.downsample_from.rsplit("/", 1)[1]
+            if parent_var_name in parent_ds.data_vars:
+                level_vars[var_name] = parent_ds[parent_var_name]
+
+        if level_vars:
+            log.info(
+                "Downsampling %d arrays into %s (factor=%d)",
+                len(level_vars),
+                target_group_path,
+                first_spec.scale_factor,
+            )
+            source_ds = xr.Dataset(data_vars=level_vars)
+            downsampled_ds = create_downsampled_resolution_group(
+                source_ds, factor=first_spec.scale_factor
+            )
+
+            # Write each downsampled variable into the pre-created arrays
+            for var_name in downsampled_ds.data_vars:
+                target_key = f"{target_group_path}/{var_name}"
+                if target_key in tree:
+                    log.info("Writing downsampled %s", target_key)
+                    tree[target_key][...] = downsampled_ds[var_name].values
+
+
 def convert_s2_optimized(
     dt_input: xr.DataTree,
     *,
@@ -354,8 +417,6 @@ def convert_s2_optimized(
 
     out_store = sync(make_store(output_path))
 
-    log.info("Re-encoding source data to Zarr V3")
-
     # Create a partial function by specifying parameters for our array encoder
     _array_reencoder = partial(
         array_reencoder,
@@ -367,36 +428,26 @@ def convert_s2_optimized(
         },
     )
 
-    out_group = reencode_group(
+    # Phase 1: Plan the entire output hierarchy
+    log.info("Planning output hierarchy")
+    nodes, fill_specs = plan_s2_hierarchy(
         zg,
-        out_store,
-        path="",
-        overwrite=True,
+        crs,
         array_reencoder=_array_reencoder,  # type: ignore[arg-type]
         omit_nodes=omit_nodes,
         allow_json_nan=allow_json_nan,
     )
-    if "measurements" in out_group:
-        log.info("Adding CRS elements to datasets in measurements")
-        for _, subgroup in out_group["measurements"].groups():
-            for _, dataset in subgroup.groups():
-                add_crs_and_grid_mapping(dataset, crs=crs)
 
-    if "quality" in out_group:
-        log.info("Adding CRS elements to quality datasets")
-        for _, subgroup in out_group["quality"].groups():
-            for _, dataset in subgroup.groups():
-                add_crs_and_grid_mapping(dataset, crs=crs)
+    # Phase 2: Create hierarchy (all zarr.json files in one call)
+    log.info("Creating zarr hierarchy (%d nodes)", len(nodes))
+    tree = dict(zarr.create_hierarchy(store=out_store, nodes=nodes, overwrite=True))
 
-    # Create multiscale pyramids for each group in the original structure
-    log.info("Adding multiscale levels")
+    # Phase 3: Fill data
+    log.info("Filling data (%d arrays)", len(fill_specs))
+    fill_s2_hierarchy(tree, zg, fill_specs)
 
-    # Create multiscale metadata
-    create_multiscale_levels(out_group, "measurements/reflectance")
-    create_multiscales_metadata(out_group["measurements/reflectance"])
-
-    log.info("Step 3: Final root-level metadata consolidation")
-    # Pass empty dict since all groups are already created by reencode_group
+    # Phase 4: Consolidation
+    log.info("Final root-level metadata consolidation")
     simple_root_consolidation(output_path, {})
 
     # Step 4: Validation

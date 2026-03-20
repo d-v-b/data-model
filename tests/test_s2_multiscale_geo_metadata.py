@@ -395,8 +395,11 @@ class TestWriteGeoMetadataEdgeCases:
         # Verify zarr_conventions is not initially present
         assert "zarr_conventions" not in sample_dataset_with_crs.attrs
 
+        crs = get_crs_from_dataset(sample_dataset_with_crs)
+        assert crs is not None
+
         # Call the method
-        write_geo_metadata(sample_dataset_with_crs)
+        write_geo_metadata(sample_dataset_with_crs, crs=crs)
 
         # Verify zarr_conventions was added
         assert "zarr_conventions" in sample_dataset_with_crs.attrs
@@ -431,8 +434,11 @@ class TestWriteGeoMetadataEdgeCases:
     ) -> None:
         """Test that spatial and proj attributes are added along with conventions."""
 
+        crs = get_crs_from_dataset(sample_dataset_with_crs)
+        assert crs is not None
+
         # Call the method
-        write_geo_metadata(sample_dataset_with_crs)
+        write_geo_metadata(sample_dataset_with_crs, crs=crs)
 
         # Verify spatial attributes
         assert "spatial:dimensions" in sample_dataset_with_crs.attrs
@@ -453,13 +459,7 @@ class TestWriteGeoMetadataEdgeCases:
         assert "spatial:" in convention_names
         assert "proj:" in convention_names
 
-    def test_write_geo_metadata_no_crs_no_conventions(
-        self, sample_dataset_no_crs: xr.Dataset
-    ) -> None:
-        """Test that zarr_conventions are not added when no CRS is available."""
-
-        # Call the method with no CRS
-        write_geo_metadata(sample_dataset_no_crs)
-
-        # Verify zarr_conventions was not added since no CRS was available
-        assert "zarr_conventions" not in sample_dataset_no_crs.attrs
+    def test_write_geo_metadata_requires_crs(self, sample_dataset_no_crs: xr.Dataset) -> None:
+        """Test that write_geo_metadata raises TypeError when crs is not provided."""
+        with pytest.raises(TypeError, match="missing 1 required positional argument"):
+            write_geo_metadata(sample_dataset_no_crs)
