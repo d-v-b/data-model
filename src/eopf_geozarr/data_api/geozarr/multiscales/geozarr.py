@@ -5,8 +5,7 @@ from typing import NotRequired, Self
 from pydantic import BaseModel, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
 from typing_extensions import TypedDict
-
-from eopf_geozarr.data_api.geozarr.common import ZarrConventionMetadata  # noqa: TC001
+from zarr_cm import ConventionMetadataObject  # noqa: TC002
 
 from . import tms, zcm
 
@@ -56,7 +55,7 @@ class MultiscaleGroupAttrs(BaseModel):
     multiscales: MultiscaleAttrs
     """
 
-    zarr_conventions: tuple[ZarrConventionMetadata, ...] | MISSING = MISSING
+    zarr_conventions: tuple[ConventionMetadataObject, ...] | MISSING = MISSING
     multiscales: MultiscaleMeta
 
     _zcm_multiscales: zcm.Multiscales | None = None

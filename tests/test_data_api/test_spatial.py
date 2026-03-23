@@ -5,39 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from eopf_geozarr.data_api.geozarr.spatial import Spatial, SpatialConventionMetadata
-
-
-class TestSpatialConventionMetadata:
-    """Test the SpatialConventionMetadata class."""
-
-    def test_default_values(self) -> None:
-        """Test that default values are correctly set."""
-        metadata = SpatialConventionMetadata()
-
-        assert metadata.uuid == "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4"
-        assert metadata.name == "spatial:"
-        assert (
-            metadata.schema_url
-            == "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json"
-        )
-        assert metadata.spec_url == "https://github.com/zarr-conventions/spatial/blob/v1/README.md"
-        assert metadata.description == "Spatial coordinate and transformation information"
-
-    def test_serialization(self) -> None:
-        """Test that metadata can be serialized correctly."""
-        metadata = SpatialConventionMetadata()
-        result = metadata.model_dump()
-
-        expected = {
-            "uuid": "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
-            "name": "spatial:",
-            "schema_url": "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json",
-            "spec_url": "https://github.com/zarr-conventions/spatial/blob/v1/README.md",
-            "description": "Spatial coordinate and transformation information",
-        }
-
-        assert result == expected
+from eopf_geozarr.data_api.geozarr.spatial import Spatial
 
 
 class TestSpatial:

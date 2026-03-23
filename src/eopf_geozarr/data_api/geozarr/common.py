@@ -12,7 +12,6 @@ from typing import (
     Any,
     Final,
     Literal,
-    NotRequired,
     Self,
     TypeGuard,
     TypeVar,
@@ -22,7 +21,7 @@ from urllib.error import URLError
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
-from typing_extensions import Protocol, TypedDict, runtime_checkable
+from typing_extensions import Protocol, runtime_checkable
 
 from eopf_geozarr.data_api.geozarr.projjson import ProjJSON  # noqa: TC001
 
@@ -38,29 +37,6 @@ class UNSET_TYPE:
 
 
 GEO_PROJ_VERSION: Final = "0.1"
-
-
-class ZarrConventionMetadata(BaseModel):
-    uuid: str | MISSING = MISSING
-    schema_url: str | MISSING = MISSING
-    spec_url: str | MISSING = MISSING
-    name: str | MISSING = MISSING
-    description: str | MISSING = MISSING
-
-    @model_validator(mode="after")
-    def ensure_identifiable(self) -> Self:
-        if self.uuid is MISSING and self.schema_url is MISSING and self.spec_url is MISSING:
-            raise ValueError("At least one of uuid, schema_url, or spec_url must be provided.")
-
-        return self
-
-
-class ZarrConventionMetadataJSON(TypedDict):
-    uuid: NotRequired[str]
-    schema_url: NotRequired[str]
-    name: NotRequired[str]
-    description: NotRequired[str]
-    spec_url: NotRequired[str]
 
 
 class ProjAttrs(BaseModel, extra="allow"):

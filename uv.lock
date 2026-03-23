@@ -773,6 +773,7 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "xarray" },
     { name = "zarr" },
+    { name = "zarr-cm" },
 ]
 
 [package.dev-dependencies]
@@ -819,6 +820,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.15.0" },
     { name = "xarray", specifier = ">=2025.7.1" },
     { name = "zarr", specifier = ">=3.1.1" },
+    { name = "zarr-cm", specifier = ">=0.2.0" },
 ]
 
 [package.metadata.requires-dev]
