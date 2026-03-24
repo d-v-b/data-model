@@ -1,10 +1,10 @@
 from collections.abc import Mapping
 from html import escape
-from typing import Any, TypeAlias
+from typing import Any
 
 from pydantic import BaseModel
 
-TBaseAttr: TypeAlias = Mapping[str, object] | BaseModel
+type TBaseAttr = Mapping[str, object] | BaseModel
 
 
 def get_member_names(members: Any) -> list[str]:
