@@ -15,6 +15,7 @@ from dask import delayed
 from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
 from pyproj import CRS
+from typing_extensions import Sentinel
 from zarr_cm import geo_proj
 from zarr_cm import multiscales as multiscales_cm
 from zarr_cm import spatial as spatial_cm
@@ -577,13 +578,13 @@ def add_multiscales_metadata_to_parent(
         return None
 
     multiscales: dict[str, Any] = {"multiscales": {}}
-    layout: list[zcm.ScaleLevel] | MISSING = MISSING
-    tile_matrix_set: tms.TileMatrixSet | MISSING = MISSING
-    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | MISSING = MISSING
+    layout: list[zcm.ScaleLevel] | Sentinel = MISSING
+    tile_matrix_set: tms.TileMatrixSet | Sentinel = MISSING
+    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | Sentinel = MISSING
 
     if "ogc_tms" in multiscales_flavor:
         # Create tile matrix set using geozarr function
-        tile_matrix_set = create_native_crs_tile_matrix_set(
+        tile_matrix_set = create_native_crs_tile_matrix_set(  # type: ignore[assignment]
             native_crs,
             native_bounds,
             overview_levels,
@@ -591,7 +592,7 @@ def add_multiscales_metadata_to_parent(
         )
 
         # Create tile matrix limits
-        tile_matrix_limits = _create_tile_matrix_limits(
+        tile_matrix_limits = _create_tile_matrix_limits(  # type: ignore[assignment]
             overview_levels,
             tile_width=256,
         )
@@ -649,7 +650,7 @@ def add_multiscales_metadata_to_parent(
             geo_proj.CMO,
         ),
         multiscales=MultiscaleMeta(
-            layout=layout,
+            layout=layout,  # type: ignore[arg-type]
             resampling_method="average",
             tile_matrix_set=tile_matrix_set,
             tile_matrix_limits=tile_matrix_limits,

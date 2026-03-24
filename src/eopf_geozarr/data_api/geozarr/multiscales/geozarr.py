@@ -4,7 +4,7 @@ from typing import NotRequired, Self
 
 from pydantic import BaseModel, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
-from typing_extensions import TypedDict
+from typing_extensions import Sentinel, TypedDict
 from zarr_cm import ConventionMetadataObject  # noqa: TC002
 
 from . import tms, zcm
@@ -16,10 +16,10 @@ class MultiscaleMeta(BaseModel):
     or ZCM multiscale metadata
     """
 
-    layout: tuple[zcm.ScaleLevel, ...] | MISSING = MISSING
-    resampling_method: str | MISSING = MISSING
-    tile_matrix_set: tms.TileMatrixSet | MISSING = MISSING
-    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | MISSING = MISSING
+    layout: tuple[zcm.ScaleLevel, ...] | Sentinel = MISSING
+    resampling_method: str | Sentinel = MISSING
+    tile_matrix_set: tms.TileMatrixSet | Sentinel = MISSING
+    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | Sentinel = MISSING
 
     @model_validator(mode="after")
     def valid_zcm(self) -> Self:
@@ -55,7 +55,7 @@ class MultiscaleGroupAttrs(BaseModel):
     multiscales: MultiscaleAttrs
     """
 
-    zarr_conventions: tuple[ConventionMetadataObject, ...] | MISSING = MISSING
+    zarr_conventions: tuple[ConventionMetadataObject, ...] | Sentinel = MISSING
     multiscales: MultiscaleMeta
 
     _zcm_multiscales: zcm.Multiscales | None = None
@@ -69,14 +69,14 @@ class MultiscaleGroupAttrs(BaseModel):
         """
         if self.zarr_conventions is not MISSING:
             self._zcm_multiscales = zcm.Multiscales(
-                layout=self.multiscales.layout,
+                layout=self.multiscales.layout,  # type: ignore[arg-type]
                 resampling_method=self.multiscales.resampling_method,
             )
         if self.multiscales.tile_matrix_limits is not MISSING:
             self._tms_multiscales = tms.Multiscales(
-                tile_matrix_limits=self.multiscales.tile_matrix_limits,
+                tile_matrix_limits=self.multiscales.tile_matrix_limits,  # type: ignore[arg-type]
                 resampling_method=self.multiscales.resampling_method,  # type: ignore[arg-type]
-                tile_matrix_set=self.multiscales.tile_matrix_set,
+                tile_matrix_set=self.multiscales.tile_matrix_set,  # type: ignore[arg-type]
             )
         if self._tms_multiscales is None and self._zcm_multiscales is None:
             raise ValueError("Either ZCM multiscales or TMS multiscales must be present")

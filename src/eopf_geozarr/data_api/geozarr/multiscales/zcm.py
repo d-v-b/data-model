@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, field_validator
 from pydantic.experimental.missing_sentinel import MISSING
+from typing_extensions import Sentinel
 from zarr_cm import ConventionMetadataObject
 from zarr_cm import multiscales as multiscales_cm
 
@@ -26,22 +27,22 @@ class ZarrConventionAttrs(BaseModel):
 
 
 class Transform(BaseModel):
-    scale: tuple[float, ...] | MISSING = MISSING
-    translation: tuple[float, ...] | MISSING = MISSING
+    scale: tuple[float, ...] | Sentinel = MISSING
+    translation: tuple[float, ...] | Sentinel = MISSING
 
 
 class ScaleLevel(BaseModel):
     asset: str
-    derived_from: str | MISSING = MISSING
-    transform: Transform | MISSING = MISSING
-    resampling_method: str | MISSING = MISSING
+    derived_from: str | Sentinel = MISSING
+    transform: Transform | Sentinel = MISSING
+    resampling_method: str | Sentinel = MISSING
 
     model_config = {"extra": "allow"}
 
 
 class Multiscales(BaseModel):
     layout: tuple[ScaleLevel, ...]
-    resampling_method: str | MISSING = MISSING
+    resampling_method: str | Sentinel = MISSING
 
     model_config = {"extra": "allow"}
 
