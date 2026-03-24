@@ -27,6 +27,7 @@ XARRAY_ENCODING_KEYS: Final[set[str]] = {
     "filters",
     "shards",
     "_FillValue",
+    "fill_value",
     "dtype",
 } | CF_SCALE_OFFSET_KEYS
 
@@ -57,6 +58,7 @@ class XarrayDataArrayEncoding(TypedDict):
     filters: NotRequired[tuple[object, ...]]
     shards: NotRequired[tuple[int, ...] | None]
     _FillValue: NotRequired[object]
+    fill_value: NotRequired[object]
     scale_factor: NotRequired[float]
     add_offset: NotRequired[float]
     dtype: NotRequired[object]

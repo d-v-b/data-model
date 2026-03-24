@@ -217,7 +217,11 @@ def array_reencoder(
     # Zarr v2 allows `None` as a fill value, but for Zarr v3 a fill value consistent with the
     # array's data type must be provided. We use the zarr-python model of the data type to get
     # a fill value here.
-    if metadata.fill_value is None:
+    if not keep_scale_offset and len(maybe_scale_offset) > 0:
+        # When stripping scale/offset, set fill_value to NaN so nodata regions are
+        # correctly identified as transparent by zarr-aware viewers (e.g. OpenLayers).
+        fill_value = float("nan")
+    elif metadata.fill_value is None:
         fill_value = metadata.dtype.default_scalar()
     else:
         fill_value = metadata.fill_value

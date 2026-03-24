@@ -173,8 +173,12 @@ def create_measurements_encoding(
         keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
 
         if not keep_scale_offset:
-            # Remove scale/offset keys AND dtype to prevent transformation
-            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"dtype"}
+            # When stripping scale/offset, also strip _FillValue since the original
+            # _FillValue is in raw integer units and meaningless for decoded float data.
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue"}
+            # Set zarr fill_value to NaN so nodata regions are correctly identified
+            # as transparent by zarr-aware viewers (e.g. OpenLayers GeoZarr source).
+            var_encoding["fill_value"] = float("nan")
 
         for key in keep_keys:
             if key in var_data.encoding:
