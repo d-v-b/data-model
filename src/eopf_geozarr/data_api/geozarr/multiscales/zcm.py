@@ -26,22 +26,22 @@ class ZarrConventionAttrs(BaseModel):
 
 
 class Transform(BaseModel):
-    scale: tuple[float, ...] | MISSING = MISSING
-    translation: tuple[float, ...] | MISSING = MISSING
+    scale: tuple[float, ...] | MISSING = MISSING  # type: ignore[valid-type]
+    translation: tuple[float, ...] | MISSING = MISSING  # type: ignore[valid-type]
 
 
 class ScaleLevel(BaseModel):
     asset: str
-    derived_from: str | MISSING = MISSING
-    transform: Transform | MISSING = MISSING
-    resampling_method: str | MISSING = MISSING
+    derived_from: str | MISSING = MISSING  # type: ignore[valid-type]
+    transform: Transform | MISSING = MISSING  # type: ignore[valid-type]
+    resampling_method: str | MISSING = MISSING  # type: ignore[valid-type]
 
     model_config = {"extra": "allow"}
 
 
 class Multiscales(BaseModel):
     layout: tuple[ScaleLevel, ...]
-    resampling_method: str | MISSING = MISSING
+    resampling_method: str | MISSING = MISSING  # type: ignore[valid-type]
 
     model_config = {"extra": "allow"}
 
