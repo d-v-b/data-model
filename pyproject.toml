@@ -172,6 +172,14 @@ warn_untyped_fields = true
 module = ["zarr.*", "xarray.*", "rioxarray.*", "cf_xarray.*", "dask.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = [
+    "eopf_geozarr.data_api.s1",
+    "eopf_geozarr.data_api.s2",
+    "eopf_geozarr.data_api.geozarr.v2",
+]
+disable_error_code = ["valid-type"]
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
