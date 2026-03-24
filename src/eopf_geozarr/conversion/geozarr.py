@@ -1523,8 +1523,8 @@ def _create_geozarr_encoding(
                 if len(data_shape) == 3:
                     # For 3D data (time, y, x), ensure shard dimensions are divisible by chunks
                     shard_time = data_shape[0]  # Keep full time dimension
-                    shard_y = _calculate_shard_dimension(data_shape[1], chunks[1])
-                    shard_x = _calculate_shard_dimension(data_shape[2], chunks[2])
+                    shard_y = _calculate_shard_dimension(data_shape[1], chunks[1])  # type: ignore[misc]
+                    shard_x = _calculate_shard_dimension(data_shape[2], chunks[2])  # type: ignore[misc]
                     shards = (shard_time, shard_y, shard_x)
                     log.info(
                         "Sharding config for variable %s: ",
@@ -1536,7 +1536,7 @@ def _create_geozarr_encoding(
                 elif len(data_shape) == 2:
                     # For 2D data (y, x), ensure shard dimensions are divisible by chunks
                     shard_y = _calculate_shard_dimension(data_shape[0], chunks[0])
-                    shard_x = _calculate_shard_dimension(data_shape[1], chunks[1])
+                    shard_x = _calculate_shard_dimension(data_shape[1], chunks[1])  # type: ignore[misc]
                     shards = (shard_y, shard_x)
                     log.info(
                         "  🔧 Sharding config",

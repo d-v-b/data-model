@@ -40,10 +40,7 @@ def test_datarraylike(obj: DataArray_V2 | DataArray_V3) -> None:
     assert isinstance(obj, DataArrayLike)
 
 
-@pytest.mark.parametrize(
-    "obj",
-    [GroupSpec_V2(attributes={}, members={}), GroupSpec_V3(attributes={}, members={})],
-)
+@pytest.mark.parametrize("obj", [GroupSpec_V2(attributes={}), GroupSpec_V3(attributes={})])
 def test_grouplike(obj: GroupSpec_V3[Any, Any] | GroupSpec_V2[Any, Any]) -> None:
     """
     Test that the GroupLike protocol works correctly
@@ -79,7 +76,6 @@ def test_check_standard_name_invalid() -> None:
         check_standard_name("invalid_standard_name")
 
 
-@pytest.mark.filterwarnings("ignore:.*:zarr.errors.UnstableSpecificationWarning")
 def test_multiscales_round_trip(s2_optimized_geozarr_group_example: zarr.Group) -> None:
     """
     Ensure that we can round-trip multiscale metadata through the `Multiscales` model.

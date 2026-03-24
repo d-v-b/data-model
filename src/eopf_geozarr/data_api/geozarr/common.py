@@ -13,6 +13,7 @@ from typing import (
     Any,
     Final,
     Literal,
+    Protocol,
     Self,
     TypeGuard,
     TypeVar,
@@ -22,7 +23,7 @@ from urllib.error import URLError
 from cf_xarray.utils import parse_cf_standard_name_table
 from pydantic import AfterValidator, BaseModel, Field, model_validator
 from pydantic.experimental.missing_sentinel import MISSING
-from typing_extensions import Protocol, runtime_checkable
+from typing_extensions import runtime_checkable
 
 from eopf_geozarr.data_api.geozarr.projjson import ProjJSON  # noqa: TC001
 from eopf_geozarr.data_api.geozarr.types import (
@@ -85,7 +86,7 @@ class BaseDataArrayAttrs(BaseModel, extra="allow"):
     ----------
     """
 
-    grid_mapping: str | MISSING = MISSING
+    grid_mapping: str | MISSING = MISSING  # type: ignore[valid-type]
 
 
 class GridMappingAttrs(BaseModel, extra="allow"):
@@ -181,7 +182,7 @@ class GroupLike(Protocol):
 TGroupLike = TypeVar("TGroupLike", bound=GroupLike)
 
 
-def check_valid_coordinates(model: TGroupLike) -> TGroupLike:
+def check_valid_coordinates[TGroupLike: GroupLike](model: TGroupLike) -> TGroupLike:
     """
     Check if the coordinates of the DataArrayLike objects listed in GroupLike objects are valid.
 
@@ -253,7 +254,7 @@ class DatasetLike(Protocol):
 TDataSetLike = TypeVar("TDataSetLike", bound=DatasetLike)
 
 
-def check_grid_mapping(model: TDataSetLike) -> TDataSetLike:
+def check_grid_mapping[TDataSetLike: DatasetLike](model: TDataSetLike) -> TDataSetLike:
     """
     Ensure that a grid mapping variable is present, and that it refers to a member of the model.
     """

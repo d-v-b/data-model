@@ -7,10 +7,13 @@ Uses the new pyz.GroupSpec with TypedDict members to enforce strict structure va
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from pydantic.experimental.missing_sentinel import MISSING as MISSING
 
 from eopf_geozarr.data_api.geozarr.common import (
     BaseDataArrayAttrs,

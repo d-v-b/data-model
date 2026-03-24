@@ -26,31 +26,31 @@ class ZarrConventionAttrs(BaseModel):
 
 
 class Transform(BaseModel):
-    scale: tuple[float, ...] | MISSING = MISSING
-    translation: tuple[float, ...] | MISSING = MISSING
+    scale: tuple[float, ...] | MISSING = MISSING  # type: ignore[valid-type]
+    translation: tuple[float, ...] | MISSING = MISSING  # type: ignore[valid-type]
 
     @model_serializer
     def serialize_model(self) -> dict[str, tuple[float, ...]]:
         result: dict[str, tuple[float, ...]] = {}
-        if self.scale is not MISSING:
+        if self.scale is not MISSING:  # type: ignore[comparison-overlap]
             result["scale"] = self.scale
-        if self.translation is not MISSING:
+        if self.translation is not MISSING:  # type: ignore[comparison-overlap]
             result["translation"] = self.translation
         return result
 
 
 class ScaleLevel(BaseModel):
     asset: str
-    derived_from: str | MISSING = MISSING
-    transform: Transform | MISSING = MISSING
-    resampling_method: str | MISSING = MISSING
+    derived_from: str | MISSING = MISSING  # type: ignore[valid-type]
+    transform: Transform | MISSING = MISSING  # type: ignore[valid-type]
+    resampling_method: str | MISSING = MISSING  # type: ignore[valid-type]
 
     model_config = {"extra": "allow"}
 
 
 class Multiscales(BaseModel):
     layout: tuple[ScaleLevel, ...]
-    resampling_method: str | MISSING = MISSING
+    resampling_method: str | MISSING = MISSING  # type: ignore[valid-type]
 
     model_config = {"extra": "allow"}
 

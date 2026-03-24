@@ -16,18 +16,18 @@ class MultiscaleMeta(BaseModel):
     or ZCM multiscale metadata
     """
 
-    layout: tuple[zcm.ScaleLevel, ...] | MISSING = MISSING
-    resampling_method: str | MISSING = MISSING
-    tile_matrix_set: tms.TileMatrixSet | MISSING = MISSING
-    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | MISSING = MISSING
+    layout: tuple[zcm.ScaleLevel, ...] | MISSING = MISSING  # type: ignore[valid-type]
+    resampling_method: str | MISSING = MISSING  # type: ignore[valid-type]
+    tile_matrix_set: tms.TileMatrixSet | MISSING = MISSING  # type: ignore[valid-type]
+    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | MISSING = MISSING  # type: ignore[valid-type]
 
     @model_validator(mode="after")
     def valid_zcm(self) -> Self:
         """
         Ensure that the ZCM metadata, if present, is valid
         """
-        if self.layout is not MISSING:
-            zcm.Multiscales(layout=self.layout, resampling_method=self.resampling_method)
+        if self.layout is not MISSING:  # type: ignore[comparison-overlap]
+            zcm.Multiscales(**self.model_dump())
 
         return self
 
@@ -36,12 +36,8 @@ class MultiscaleMeta(BaseModel):
         """
         Ensure that the TMS metadata, if present, is valid
         """
-        if self.tile_matrix_set is not MISSING:
-            tms.Multiscales(
-                tile_matrix_set=self.tile_matrix_set,
-                tile_matrix_limits=self.tile_matrix_limits,
-                resampling_method=self.resampling_method,  # type: ignore[arg-type]
-            )
+        if self.tile_matrix_set is not MISSING:  # type: ignore[comparison-overlap]
+            tms.Multiscales(**self.model_dump())
 
         return self
 
@@ -59,7 +55,7 @@ class MultiscaleGroupAttrs(BaseModel):
     multiscales: MultiscaleAttrs
     """
 
-    zarr_conventions: tuple[ConventionMetadataObject, ...] | MISSING = MISSING
+    zarr_conventions: tuple[ConventionMetadataObject, ...] | MISSING = MISSING  # type: ignore[valid-type]
     multiscales: MultiscaleMeta
 
     _zcm_multiscales: zcm.Multiscales | None = None
@@ -71,12 +67,12 @@ class MultiscaleGroupAttrs(BaseModel):
         Ensure that the ZCM metadata, if present, is valid, and that TMS metadata, if present,
         is valid, and that at least one of the two is present.
         """
-        if self.zarr_conventions is not MISSING:
+        if self.zarr_conventions is not MISSING:  # type: ignore[comparison-overlap]
             self._zcm_multiscales = zcm.Multiscales(
                 layout=self.multiscales.layout,
                 resampling_method=self.multiscales.resampling_method,
             )
-        if self.multiscales.tile_matrix_limits is not MISSING:
+        if self.multiscales.tile_matrix_limits is not MISSING:  # type: ignore[comparison-overlap]
             self._tms_multiscales = tms.Multiscales(
                 tile_matrix_limits=self.multiscales.tile_matrix_limits,
                 resampling_method=self.multiscales.resampling_method,  # type: ignore[arg-type]
