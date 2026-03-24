@@ -176,7 +176,7 @@
               "dimension_names": [
                 "angle"
               ],
-              "fill_value": 0.0,
+              "fill_value": "NaN",
               "node_type": "array",
               "shape": [
                 2
@@ -239,7 +239,7 @@
                 "band",
                 "angle"
               ],
-              "fill_value": 0.0,
+              "fill_value": "NaN",
               "node_type": "array",
               "shape": [
                 13,
@@ -306,7 +306,7 @@
                 "y",
                 "x"
               ],
-              "fill_value": 0.0,
+              "fill_value": "NaN",
               "node_type": "array",
               "shape": [
                 2,
@@ -382,7 +382,7 @@
                 "y",
                 "x"
               ],
-              "fill_value": 0.0,
+              "fill_value": "NaN",
               "node_type": "array",
               "shape": [
                 13,
@@ -2435,7 +2435,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2537,7 +2537,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2639,7 +2639,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2741,7 +2741,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2843,7 +2843,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2945,7 +2945,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3047,7 +3047,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3087,7 +3087,7 @@
                   ],
                   "data_type": "float64",
                   "dimension_names": null,
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [],
                   "storage_transformers": [],
@@ -3127,7 +3127,7 @@
                   "dimension_names": [
                     "latitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9
@@ -3168,7 +3168,7 @@
                   "dimension_names": [
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9
@@ -3303,7 +3303,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3405,7 +3405,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3542,7 +3542,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3579,7 +3579,7 @@
                   ],
                   "data_type": "float64",
                   "dimension_names": null,
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [],
                   "storage_transformers": [],
@@ -3748,7 +3748,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3803,7 +3803,7 @@
                   ],
                   "data_type": "float64",
                   "dimension_names": null,
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [],
                   "storage_transformers": [],
@@ -3843,7 +3843,7 @@
                   "dimension_names": [
                     "latitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9
@@ -3884,7 +3884,7 @@
                   "dimension_names": [
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9
@@ -3985,7 +3985,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4121,7 +4121,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4193,7 +4193,7 @@
                   ],
                   "data_type": "float64",
                   "dimension_names": null,
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [],
                   "storage_transformers": [],
@@ -4292,7 +4292,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4394,7 +4394,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4531,7 +4531,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4633,7 +4633,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": 0.0,
+                  "fill_value": "NaN",
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4936,7 +4936,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         10980,
@@ -5040,7 +5040,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         10980,
@@ -5144,7 +5144,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         10980,
@@ -5248,7 +5248,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         10980,
@@ -5450,7 +5450,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -5507,7 +5507,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -5564,7 +5564,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -5621,7 +5621,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -5823,7 +5823,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -5880,7 +5880,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -5937,7 +5937,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -5994,7 +5994,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -6196,7 +6196,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -6253,7 +6253,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -6310,7 +6310,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -6367,7 +6367,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -6569,7 +6569,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -6626,7 +6626,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -6683,7 +6683,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -6740,7 +6740,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -6942,7 +6942,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -6999,7 +6999,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -7056,7 +7056,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -7113,7 +7113,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -7487,7 +7487,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -7591,7 +7591,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -7695,7 +7695,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -7799,7 +7799,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -7903,7 +7903,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -8007,7 +8007,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -8111,7 +8111,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -8215,7 +8215,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -8319,7 +8319,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -8423,7 +8423,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         5490,
@@ -8625,7 +8625,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -8682,7 +8682,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -8739,7 +8739,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -8796,7 +8796,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -8853,7 +8853,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -8910,7 +8910,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -8967,7 +8967,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -9024,7 +9024,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -9081,7 +9081,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -9138,7 +9138,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         2745,
@@ -9340,7 +9340,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9397,7 +9397,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9454,7 +9454,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9511,7 +9511,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9568,7 +9568,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9625,7 +9625,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9682,7 +9682,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9739,7 +9739,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9796,7 +9796,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -9853,7 +9853,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1372,
@@ -10055,7 +10055,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10112,7 +10112,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10169,7 +10169,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10226,7 +10226,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10283,7 +10283,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10340,7 +10340,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10397,7 +10397,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10454,7 +10454,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10511,7 +10511,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10568,7 +10568,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         686,
@@ -10770,7 +10770,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -10827,7 +10827,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -10884,7 +10884,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -10941,7 +10941,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -10998,7 +10998,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -11055,7 +11055,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -11112,7 +11112,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -11169,7 +11169,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -11226,7 +11226,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -11283,7 +11283,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         343,
@@ -11617,7 +11617,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -11721,7 +11721,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -11825,7 +11825,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -11929,7 +11929,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -12033,7 +12033,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -12137,7 +12137,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -12241,7 +12241,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -12345,7 +12345,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -12449,7 +12449,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -12553,7 +12553,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -12657,7 +12657,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         1830,
@@ -12859,7 +12859,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -12916,7 +12916,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -12973,7 +12973,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13030,7 +13030,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13087,7 +13087,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13144,7 +13144,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13201,7 +13201,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13258,7 +13258,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13315,7 +13315,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13372,7 +13372,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13429,7 +13429,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         915,
@@ -13631,7 +13631,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -13688,7 +13688,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -13745,7 +13745,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -13802,7 +13802,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -13859,7 +13859,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -13916,7 +13916,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -13973,7 +13973,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -14030,7 +14030,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -14087,7 +14087,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -14144,7 +14144,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
@@ -14201,7 +14201,7 @@
                         "y",
                         "x"
                       ],
-                      "fill_value": 0.0,
+                      "fill_value": "NaN",
                       "node_type": "array",
                       "shape": [
                         457,
