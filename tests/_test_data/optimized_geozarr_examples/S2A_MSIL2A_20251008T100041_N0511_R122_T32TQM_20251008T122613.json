@@ -176,7 +176,7 @@
               "dimension_names": [
                 "angle"
               ],
-              "fill_value": "NaN",
+              "fill_value": 0.0,
               "node_type": "array",
               "shape": [
                 2
@@ -239,7 +239,7 @@
                 "band",
                 "angle"
               ],
-              "fill_value": "NaN",
+              "fill_value": 0.0,
               "node_type": "array",
               "shape": [
                 13,
@@ -306,7 +306,7 @@
                 "y",
                 "x"
               ],
-              "fill_value": "NaN",
+              "fill_value": 0.0,
               "node_type": "array",
               "shape": [
                 2,
@@ -382,7 +382,7 @@
                 "y",
                 "x"
               ],
-              "fill_value": "NaN",
+              "fill_value": 0.0,
               "node_type": "array",
               "shape": [
                 13,
@@ -2435,7 +2435,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2537,7 +2537,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2639,7 +2639,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2741,7 +2741,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2843,7 +2843,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -2945,7 +2945,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3047,7 +3047,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3087,7 +3087,7 @@
                   ],
                   "data_type": "float64",
                   "dimension_names": null,
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [],
                   "storage_transformers": [],
@@ -3127,7 +3127,7 @@
                   "dimension_names": [
                     "latitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9
@@ -3168,7 +3168,7 @@
                   "dimension_names": [
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9
@@ -3303,7 +3303,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3405,7 +3405,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3542,7 +3542,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3579,7 +3579,7 @@
                   ],
                   "data_type": "float64",
                   "dimension_names": null,
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [],
                   "storage_transformers": [],
@@ -3748,7 +3748,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -3803,7 +3803,7 @@
                   ],
                   "data_type": "float64",
                   "dimension_names": null,
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [],
                   "storage_transformers": [],
@@ -3843,7 +3843,7 @@
                   "dimension_names": [
                     "latitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9
@@ -3884,7 +3884,7 @@
                   "dimension_names": [
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9
@@ -3985,7 +3985,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4121,7 +4121,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4193,7 +4193,7 @@
                   ],
                   "data_type": "float64",
                   "dimension_names": null,
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [],
                   "storage_transformers": [],
@@ -4292,7 +4292,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4394,7 +4394,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4531,7 +4531,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -4633,7 +4633,7 @@
                     "latitude",
                     "longitude"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     9,
@@ -7080,7 +7080,7 @@
                   "dimension_names": [
                     "x"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     915
@@ -7118,7 +7118,7 @@
                   "dimension_names": [
                     "y"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     915
@@ -9975,7 +9975,7 @@
                   "dimension_names": [
                     "x"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     305
@@ -10013,7 +10013,7 @@
                   "dimension_names": [
                     "y"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     305
@@ -12992,7 +12992,7 @@
                   "dimension_names": [
                     "x"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     152
@@ -13030,7 +13030,7 @@
                   "dimension_names": [
                     "y"
                   ],
-                  "fill_value": "NaN",
+                  "fill_value": 0.0,
                   "node_type": "array",
                   "shape": [
                     152
