@@ -19,13 +19,13 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: GIS",
     "Topic :: Scientific/Engineering :: Atmospheric Science",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "pydantic-zarr>=0.8.0",
     "pydantic>=2.12",
@@ -147,7 +147,7 @@ ignore = [
 ]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -171,6 +171,14 @@ warn_untyped_fields = true
 [[tool.mypy.overrides]]
 module = ["zarr.*", "xarray.*", "rioxarray.*", "cf_xarray.*", "dask.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "eopf_geozarr.data_api.s1",
+    "eopf_geozarr.data_api.s2",
+    "eopf_geozarr.data_api.geozarr.v2",
+]
+disable_error_code = ["valid-type"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

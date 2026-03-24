@@ -20,7 +20,7 @@ class MyGroup(GroupSpec[Any, MyMembers])
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Generic, TypeAlias, TypeVar, Union
+from typing import Any, TypeAlias, TypeVar, Union
 
 from pydantic_zarr.v2 import ArraySpec as ArraySpecV2
 from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
@@ -33,7 +33,7 @@ from eopf_geozarr.pyz.common import (
     get_member_names,
 )
 
-TBaseMember: TypeAlias = Mapping[str, Union["GroupSpec[Any, Any]", "ArraySpec[Any]"]]
+TBaseMember: TypeAlias = Mapping[str, Union["GroupSpec[Any, Any]", "ArraySpec[Any]"]]  # noqa: UP040
 
 TAttr = TypeVar("TAttr", bound=TBaseAttr)
 TMembers = TypeVar("TMembers", bound=TBaseMember)
@@ -63,7 +63,7 @@ class GroupSpec(GroupSpecV2[TAttr, TMembers]):
         )
 
 
-class ArraySpec(ArraySpecV2[Any], Generic[TArraySpecType]):
+class ArraySpec[TArraySpecType](ArraySpecV2[Any]):
     """Zarr V2 ArraySpec with enhanced HTML representation for Jupyter/IPython."""
 
     def _repr_html_(self) -> str:

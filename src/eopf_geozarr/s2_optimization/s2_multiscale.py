@@ -577,9 +577,9 @@ def add_multiscales_metadata_to_parent(
         return None
 
     multiscales: dict[str, Any] = {"multiscales": {}}
-    layout: list[zcm.ScaleLevel] | MISSING = MISSING
-    tile_matrix_set: tms.TileMatrixSet | MISSING = MISSING
-    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | MISSING = MISSING
+    layout: list[zcm.ScaleLevel] | MISSING = MISSING  # type: ignore[valid-type]
+    tile_matrix_set: tms.TileMatrixSet | MISSING = MISSING  # type: ignore[valid-type]
+    tile_matrix_limits: dict[str, tms.TileMatrixLimit] | MISSING = MISSING  # type: ignore[valid-type]
 
     if "ogc_tms" in multiscales_flavor:
         # Create tile matrix set using geozarr function

@@ -20,6 +20,8 @@ from eopf_geozarr.data_api.geozarr.types import XARRAY_DIMS_KEY
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
+    from pydantic.experimental.missing_sentinel import MISSING as MISSING
+
 
 class DataArrayAttrs(BaseDataArrayAttrs):
     """
