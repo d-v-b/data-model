@@ -92,7 +92,7 @@ jobs:
         pip install bandit pip-audit
 
     - name: Run bandit (static security analysis)
-      run: bandit -r eopf_geozarr/ -f json -o bandit-report.json
+      run: bandit -r src/eopf_geozarr/ -f json -o bandit-report.json
 
     - name: Run pip-audit (dependency vulnerability scan)
       run: pip-audit
