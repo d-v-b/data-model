@@ -89,17 +89,18 @@ jobs:
       with:
         python-version: '3.12'
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
     - name: Install security tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install bandit pip-audit
+      run: pip install bandit pip-audit
 
     - name: Run bandit (static security analysis)
       run: bandit -r src/eopf_geozarr/ -f json -o bandit-report.json
       continue-on-error: true
 
     - name: Run pip-audit (dependency vulnerability scan)
-      run: pip-audit -f json -o pip-audit-report.json
+      run: uv export --no-dev --format requirements-txt | pip-audit -r /dev/stdin -f json -o pip-audit-report.json
       continue-on-error: true
 
     - name: Write security summary
