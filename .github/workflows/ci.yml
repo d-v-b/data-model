@@ -100,7 +100,7 @@ jobs:
       continue-on-error: true
 
     - name: Run pip-audit (dependency vulnerability scan)
-      run: uv export --no-dev --format requirements-txt | pip-audit -r /dev/stdin -f json -o pip-audit-report.json
+      run: uv export --no-dev --no-emit-project --format requirements-txt | pip-audit -r /dev/stdin -f json -o pip-audit-report.json
       continue-on-error: true
 
     - name: Write security summary
