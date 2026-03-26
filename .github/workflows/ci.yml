@@ -104,56 +104,10 @@ jobs:
 
     - name: Write security summary
       if: always()
-      run: |
-        python - <<'EOF'
-        import json, os
-
-        def build_markdown():
-            lines = ["## Security Scan Results\n"]
-
-            # --- bandit ---
-            lines.append("### Bandit — Static Security Analysis\n")
-            try:
-                report = json.load(open("bandit-report.json"))
-                issues = report.get("results", [])
-                if issues:
-                    lines.append(f"**:x: {len(issues)} issue(s) found**\n")
-                    lines.append("| Severity | Confidence | File | Line | Issue |")
-                    lines.append("|----------|------------|------|------|-------|")
-                    for i in issues:
-                        lines.append(f"| {i['issue_severity']} | {i['issue_confidence']} | `{i['filename']}` | {i['line_number']} | {i['issue_text']} |")
-                else:
-                    lines.append(":white_check_mark: No issues found")
-            except Exception as e:
-                lines.append(f":warning: Could not read bandit report: {e}")
-
-            # --- pip-audit ---
-            lines.append("\n### pip-audit — Dependency Vulnerability Scan\n")
-            try:
-                audit = json.load(open("pip-audit-report.json"))
-                vulnerable = [d for d in audit.get("dependencies", []) if d.get("vulns")]
-                if vulnerable:
-                    total = sum(len(d["vulns"]) for d in vulnerable)
-                    lines.append(f"**:x: {total} vulnerability/ies found**\n")
-                    lines.append("| Package | Version | ID | Fix versions | Description |")
-                    lines.append("|---------|---------|-----|-------------|-------------|")
-                    for dep in vulnerable:
-                        for v in dep["vulns"]:
-                            fixes = ", ".join(v.get("fix_versions") or []) or "none"
-                            desc = v.get("description", "")[:120]
-                            lines.append(f"| {dep['name']} | {dep['version']} | {v['id']} | {fixes} | {desc} |")
-                else:
-                    lines.append(":white_check_mark: No vulnerabilities found")
-            except Exception as e:
-                lines.append(f":warning: Could not read pip-audit report: {e}")
-
-            return "\n".join(lines) + "\n"
-
-        MARKER = "<!-- security-scan-results -->"
-        body = MARKER + "\n" + build_markdown()
-        open("security-summary.md", "w").write(body)
-        open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(body)
-        EOF
+      env:
+        REPO: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+      run: python .github/scripts/security_summary.py
 
     - name: Post PR comment
       if: always() && github.event_name == 'pull_request'
@@ -179,32 +133,7 @@ jobs:
 
     - name: Fail if security issues found
       if: always()
-      run: |
-        python - <<'EOF'
-        import json, sys
-        failed = False
-
-        try:
-            issues = json.load(open("bandit-report.json")).get("results", [])
-            if issues:
-                print(f"bandit: {len(issues)} issue(s) found")
-                failed = True
-        except Exception as e:
-            print(f"Could not read bandit report: {e}")
-            failed = True
-
-        try:
-            vulnerable = [d for d in json.load(open("pip-audit-report.json")).get("dependencies", []) if d.get("vulns")]
-            if vulnerable:
-                total = sum(len(d["vulns"]) for d in vulnerable)
-                print(f"pip-audit: {total} vulnerability/ies found")
-                failed = True
-        except Exception as e:
-            print(f"Could not read pip-audit report: {e}")
-            failed = True
-
-        sys.exit(1 if failed else 0)
-        EOF
+      run: python .github/scripts/security_check.py
 
     - name: Upload security reports
       if: always()
