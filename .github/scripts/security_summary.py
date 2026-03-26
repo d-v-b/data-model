@@ -40,9 +40,7 @@ def _bandit_section(artifact_url: str) -> list[str]:
     for issue in issues:
         by_sev.setdefault(issue["issue_severity"].upper(), []).append(issue)
 
-    summary = ", ".join(
-        f"{len(by_sev[k])} {k}" for k in ("HIGH", "MEDIUM", "LOW") if k in by_sev
-    )
+    summary = ", ".join(f"{len(by_sev[k])} {k}" for k in ("HIGH", "MEDIUM", "LOW") if k in by_sev)
     lines.append(f"**:x: {len(issues)} issue(s) found — {summary}**\n")
 
     high = by_sev.get("HIGH", [])
