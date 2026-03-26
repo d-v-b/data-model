@@ -93,9 +93,23 @@ jobs:
 
     - name: Run bandit (static security analysis)
       run: bandit -r src/eopf_geozarr/ -f json -o bandit-report.json
+      continue-on-error: true
 
     - name: Run pip-audit (dependency vulnerability scan)
       run: pip-audit
+
+    - name: Fail if bandit found issues
+      run: |
+        python -c "
+        import json, sys
+        with open('bandit-report.json') as f:
+            report = json.load(f)
+        issues = report.get('results', [])
+        if issues:
+            print(f'bandit found {len(issues)} issue(s)')
+            sys.exit(1)
+        print('bandit: no issues found')
+        "
 
     - name: Upload bandit report
       if: always()
