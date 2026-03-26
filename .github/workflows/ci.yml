@@ -78,6 +78,9 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
@@ -96,24 +99,118 @@ jobs:
       continue-on-error: true
 
     - name: Run pip-audit (dependency vulnerability scan)
-      run: pip-audit
+      run: pip-audit -f json -o pip-audit-report.json
+      continue-on-error: true
 
-    - name: Fail if bandit found issues
+    - name: Write security summary
+      if: always()
       run: |
-        python -c "
-        import json, sys
-        with open('bandit-report.json') as f:
-            report = json.load(f)
-        issues = report.get('results', [])
-        if issues:
-            print(f'bandit found {len(issues)} issue(s)')
-            sys.exit(1)
-        print('bandit: no issues found')
-        "
+        python - <<'EOF'
+        import json, os
 
-    - name: Upload bandit report
+        def build_markdown():
+            lines = ["## Security Scan Results\n"]
+
+            # --- bandit ---
+            lines.append("### Bandit — Static Security Analysis\n")
+            try:
+                report = json.load(open("bandit-report.json"))
+                issues = report.get("results", [])
+                if issues:
+                    lines.append(f"**:x: {len(issues)} issue(s) found**\n")
+                    lines.append("| Severity | Confidence | File | Line | Issue |")
+                    lines.append("|----------|------------|------|------|-------|")
+                    for i in issues:
+                        lines.append(f"| {i['issue_severity']} | {i['issue_confidence']} | `{i['filename']}` | {i['line_number']} | {i['issue_text']} |")
+                else:
+                    lines.append(":white_check_mark: No issues found")
+            except Exception as e:
+                lines.append(f":warning: Could not read bandit report: {e}")
+
+            # --- pip-audit ---
+            lines.append("\n### pip-audit — Dependency Vulnerability Scan\n")
+            try:
+                audit = json.load(open("pip-audit-report.json"))
+                vulnerable = [d for d in audit.get("dependencies", []) if d.get("vulns")]
+                if vulnerable:
+                    total = sum(len(d["vulns"]) for d in vulnerable)
+                    lines.append(f"**:x: {total} vulnerability/ies found**\n")
+                    lines.append("| Package | Version | ID | Fix versions | Description |")
+                    lines.append("|---------|---------|-----|-------------|-------------|")
+                    for dep in vulnerable:
+                        for v in dep["vulns"]:
+                            fixes = ", ".join(v.get("fix_versions") or []) or "none"
+                            desc = v.get("description", "")[:120]
+                            lines.append(f"| {dep['name']} | {dep['version']} | {v['id']} | {fixes} | {desc} |")
+                else:
+                    lines.append(":white_check_mark: No vulnerabilities found")
+            except Exception as e:
+                lines.append(f":warning: Could not read pip-audit report: {e}")
+
+            return "\n".join(lines) + "\n"
+
+        MARKER = "<!-- security-scan-results -->"
+        body = MARKER + "\n" + build_markdown()
+        open("security-summary.md", "w").write(body)
+        open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(body)
+        EOF
+
+    - name: Post PR comment
+      if: always() && github.event_name == 'pull_request'
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        MARKER="<!-- security-scan-results -->"
+        BODY=$(cat security-summary.md)
+
+        COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR}/comments" \
+          --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" \
+          | head -1)
+
+        if [ -n "$COMMENT_ID" ]; then
+          gh api "repos/${REPO}/issues/comments/${COMMENT_ID}" \
+            -X PATCH -f body="${BODY}"
+        else
+          gh api "repos/${REPO}/issues/${PR}/comments" \
+            -X POST -f body="${BODY}"
+        fi
+
+    - name: Fail if security issues found
+      if: always()
+      run: |
+        python - <<'EOF'
+        import json, sys
+        failed = False
+
+        try:
+            issues = json.load(open("bandit-report.json")).get("results", [])
+            if issues:
+                print(f"bandit: {len(issues)} issue(s) found")
+                failed = True
+        except Exception as e:
+            print(f"Could not read bandit report: {e}")
+            failed = True
+
+        try:
+            vulnerable = [d for d in json.load(open("pip-audit-report.json")).get("dependencies", []) if d.get("vulns")]
+            if vulnerable:
+                total = sum(len(d["vulns"]) for d in vulnerable)
+                print(f"pip-audit: {total} vulnerability/ies found")
+                failed = True
+        except Exception as e:
+            print(f"Could not read pip-audit report: {e}")
+            failed = True
+
+        sys.exit(1 if failed else 0)
+        EOF
+
+    - name: Upload security reports
       if: always()
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: security-reports
-        path: bandit-report.json
+        path: |
+          bandit-report.json
+          pip-audit-report.json
