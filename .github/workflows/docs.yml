@@ -8,14 +8,19 @@ on:
     paths:
       - "docs/**"
 
+permissions:
+  contents: read
+
 jobs:
   build-docs:
     permissions:
-      contents: write
-      pages: write   
+      contents: write  # mkdocs gh-deploy pushes the site branch
+      pages: write  # GitHub Pages deployment
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      with:
+        persist-credentials: false
 
     - name: Set up Python
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
@@ -38,4 +43,10 @@ jobs:
 
     - name: Deploy docs
       if: github.event_name == 'push'
-      run: uv run -- mkdocs gh-deploy --force
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        uv run -- mkdocs gh-deploy --force
