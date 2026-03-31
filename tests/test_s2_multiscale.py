@@ -16,6 +16,7 @@ from pydantic_zarr.v3 import GroupSpec
 from structlog.testing import capture_logs
 
 from eopf_geozarr.s2_optimization.s2_multiscale import (
+    _coarsen_variable,
     calculate_aligned_chunk_size,
     calculate_simple_shard_dimensions,
     create_downsampled_resolution_group,
@@ -220,6 +221,31 @@ def test_create_multiscale_from_datatree(
 
 
 # ---------------------------------------------------------------------------
+# _coarsen_variable
+# ---------------------------------------------------------------------------
+
+
+def test_coarsen_variable_classification() -> None:
+    """Classification variables should be downsampled via subsample."""
+    data = np.arange(16, dtype="uint8").reshape(4, 4)
+    var = xr.DataArray(data, dims=["y", "x"], coords={"y": np.arange(4.0), "x": np.arange(4.0)})
+    result = _coarsen_variable("scl", var, factor=2)
+    assert result.shape == (2, 2)
+    assert result.dtype == np.uint8
+    # subsample picks top-left of each 2x2 block
+    np.testing.assert_array_equal(result.values, data[::2, ::2])
+
+
+def test_coarsen_variable_quality_mask() -> None:
+    """Quality mask variables should be downsampled via max."""
+    data = np.array([[0, 1], [2, 3]], dtype="uint8")
+    var = xr.DataArray(data, dims=["y", "x"], coords={"y": np.arange(2.0), "x": np.arange(2.0)})
+    result = _coarsen_variable("quality_cirrus", var, factor=2)
+    assert result.shape == (1, 1)
+    assert result.values.item() == 3
+
+
+# ---------------------------------------------------------------------------
 # inject_missing_bands
 # ---------------------------------------------------------------------------
 
@@ -274,12 +300,16 @@ def test_inject_missing_bands_respects_bands_filter() -> None:
 def test_inject_missing_bands_skips_existing() -> None:
     """Bands already present in the dataset should not be overwritten."""
     dt = _make_reflectance_datatree()
-    r10m_ds = dt["measurements/reflectance/r10m"].to_dataset()
+    r20m_ds = dt["measurements/reflectance/r20m"].to_dataset()
 
-    result = inject_missing_bands(r10m_ds, dt, target_resolution=10)
+    # Pre-populate b08 with a sentinel value so we can verify it is NOT replaced.
+    sentinel = np.full((60, 60), 999, dtype="uint16")
+    r20m_ds["b08"] = (["y", "x"], sentinel)
 
-    # No bands have a native resolution finer than 10m, so nothing changes
-    assert set(result.data_vars) == set(r10m_ds.data_vars)
+    result = inject_missing_bands(r20m_ds, dt, target_resolution=20, bands={"b08"})
+
+    # b08 was already present — inject_missing_bands must leave it untouched.
+    np.testing.assert_array_equal(result["b08"].values, sentinel)
 
 
 def test_inject_missing_bands_noop_when_no_source() -> None:

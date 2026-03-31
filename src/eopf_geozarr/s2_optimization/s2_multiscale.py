@@ -855,8 +855,8 @@ def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int)
 
 def subsample_2(a: xr.DataArray, axis: tuple[int, ...] | None = None) -> xr.DataArray:
     if axis is None:
-        return a[((slice(None, None, 2),) * a.ndim)]
-    indexer = [slice(None, None, 2) if i in axis else slice(None) for i in range(a.ndim)]
+        return a[((0,) * a.ndim)]
+    indexer = [0 if i in axis else slice(None) for i in range(a.ndim)]
     return a[tuple(indexer)]
 
 
