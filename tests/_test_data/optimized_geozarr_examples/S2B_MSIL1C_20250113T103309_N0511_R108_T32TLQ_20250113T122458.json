@@ -5362,6 +5362,124 @@
                   "storage_transformers": [],
                   "zarr_format": 3
                 },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "fill_value": 0,
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "TOA reflectance from MSI acquisition at spectral band b08 833.0 nm",
+                    "proj:bbox": [
+                      300000.0,
+                      4890240.0,
+                      409800.0,
+                      5000040.0
+                    ],
+                    "proj:epsg": 32632,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      300000.0,
+                      0.0,
+                      -10.0,
+                      5000040.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        915,
+                        915
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 4
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
+                      },
+                      "name": "sharding_indexed"
+                    }
+                  ],
+                  "data_type": "float32",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    915,
+                    915
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
                 "b09": {
                   "attributes": {
                     "_FillValue": "AAAAAAAA+H8=",
@@ -6117,6 +6235,124 @@
                   "storage_transformers": [],
                   "zarr_format": 3
                 },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "fill_value": 0,
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "TOA reflectance from MSI acquisition at spectral band b08 833.0 nm",
+                    "proj:bbox": [
+                      300000.0,
+                      4890240.0,
+                      409800.0,
+                      5000040.0
+                    ],
+                    "proj:epsg": 32632,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      300000.0,
+                      0.0,
+                      -10.0,
+                      5000040.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        5490,
+                        5490
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 4
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
+                      },
+                      "name": "sharding_indexed"
+                    }
+                  ],
+                  "data_type": "float32",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    5490,
+                    5490
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
                 "b11": {
                   "attributes": {
                     "_FillValue": "AAAAAAAA+H8=",
@@ -6757,6 +6993,124 @@
                   "storage_transformers": [],
                   "zarr_format": 3
                 },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "fill_value": 0,
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "TOA reflectance from MSI acquisition at spectral band b08 833.0 nm",
+                    "proj:bbox": [
+                      300000.0,
+                      4890240.0,
+                      409800.0,
+                      5000040.0
+                    ],
+                    "proj:epsg": 32632,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      300000.0,
+                      0.0,
+                      -10.0,
+                      5000040.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        256,
+                        256
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "chunk_shape": [
+                          256,
+                          256
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 4
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
+                      },
+                      "name": "sharding_indexed"
+                    }
+                  ],
+                  "data_type": "float32",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    305,
+                    305
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
                 "b09": {
                   "attributes": {
                     "_FillValue": "AAAAAAAA+H8=",
@@ -7196,6 +7550,124 @@
                       300000.0,
                       0.0,
                       -60.0,
+                      5000040.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        1830,
+                        1830
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "chunk_shape": [
+                          183,
+                          183
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 4
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
+                      },
+                      "name": "sharding_indexed"
+                    }
+                  ],
+                  "data_type": "float32",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    1830,
+                    1830
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "fill_value": 0,
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "TOA reflectance from MSI acquisition at spectral band b08 833.0 nm",
+                    "proj:bbox": [
+                      300000.0,
+                      4890240.0,
+                      409800.0,
+                      5000040.0
+                    ],
+                    "proj:epsg": 32632,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      300000.0,
+                      0.0,
+                      -10.0,
                       5000040.0,
                       0.0,
                       0.0,
@@ -7718,6 +8190,124 @@
                       300000.0,
                       0.0,
                       -60.0,
+                      5000040.0,
+                      0.0,
+                      0.0,
+                      1.0
+                    ],
+                    "proj:wkt2": "PROJCS[\"WGS 84 / UTM zone 32N\",GEOGCS[\"WGS 84\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AUTHORITY[\"EPSG\",\"4326\"]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"latitude_of_origin\",0],PARAMETER[\"central_meridian\",9],PARAMETER[\"scale_factor\",0.9996],PARAMETER[\"false_easting\",500000],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],AUTHORITY[\"EPSG\",\"32632\"]]",
+                    "units": "digital_counts",
+                    "valid_max": 65535,
+                    "valid_min": 1
+                  },
+                  "chunk_grid": {
+                    "configuration": {
+                      "chunk_shape": [
+                        152,
+                        152
+                      ]
+                    },
+                    "name": "regular"
+                  },
+                  "chunk_key_encoding": {
+                    "configuration": {
+                      "separator": "/"
+                    },
+                    "name": "default"
+                  },
+                  "codecs": [
+                    {
+                      "configuration": {
+                        "chunk_shape": [
+                          152,
+                          152
+                        ],
+                        "codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "configuration": {
+                              "blocksize": 0,
+                              "clevel": 3,
+                              "cname": "zstd",
+                              "shuffle": "shuffle",
+                              "typesize": 4
+                            },
+                            "name": "blosc"
+                          }
+                        ],
+                        "index_codecs": [
+                          {
+                            "configuration": {
+                              "endian": "little"
+                            },
+                            "name": "bytes"
+                          },
+                          {
+                            "name": "crc32c"
+                          }
+                        ],
+                        "index_location": "end"
+                      },
+                      "name": "sharding_indexed"
+                    }
+                  ],
+                  "data_type": "float32",
+                  "dimension_names": [
+                    "y",
+                    "x"
+                  ],
+                  "fill_value": "NaN",
+                  "node_type": "array",
+                  "shape": [
+                    152,
+                    152
+                  ],
+                  "storage_transformers": [],
+                  "zarr_format": 3
+                },
+                "b08": {
+                  "attributes": {
+                    "_FillValue": "AAAAAAAA+H8=",
+                    "_eopf_attrs": {
+                      "add_offset": -0.1,
+                      "coordinates": [
+                        "x",
+                        "y"
+                      ],
+                      "dimensions": [
+                        "y",
+                        "x"
+                      ],
+                      "fill_value": 0,
+                      "scale_factor": 0.0001,
+                      "units": "digital_counts"
+                    },
+                    "dtype": "<u2",
+                    "fill_value": 0,
+                    "grid_mapping": "spatial_ref",
+                    "long_name": "TOA reflectance from MSI acquisition at spectral band b08 833.0 nm",
+                    "proj:bbox": [
+                      300000.0,
+                      4890240.0,
+                      409800.0,
+                      5000040.0
+                    ],
+                    "proj:epsg": 32632,
+                    "proj:shape": [
+                      10980,
+                      10980
+                    ],
+                    "proj:transform": [
+                      10.0,
+                      0.0,
+                      300000.0,
+                      0.0,
+                      -10.0,
                       5000040.0,
                       0.0,
                       0.0,

@@ -35,6 +35,7 @@ from eopf_geozarr.data_api.geozarr.types import (
     XarrayDataArrayEncoding,
 )
 from eopf_geozarr.s2_optimization.common import DISTRIBUTED_AVAILABLE
+from eopf_geozarr.s2_optimization.s2_band_mapping import BAND_INFO
 
 from .s2_resampling import determine_variable_type, downsample_variable
 
@@ -64,6 +65,101 @@ def get_grid_spacing(ds: xr.DataArray, coords: tuple[Hashable, ...]) -> tuple[fl
     Get the grid spacing of a regularly-gridded DataArray along the specified coordinates.
     """
     return tuple(np.abs(ds.coords[coord][0].data - ds.coords[coord][1].data) for coord in coords)
+
+
+def _coarsen_variable(var_name: str, var_data: xr.DataArray, factor: int) -> xr.DataArray:
+    """Coarsen a single variable using type-aware resampling.
+
+    Dispatches to the appropriate coarsen reduction (mean, max, subsample)
+    based on `determine_variable_type`.  Preserves encoding and dtype.
+    """
+    var_type = determine_variable_type(var_name, var_data)
+    coarsened = var_data.coarsen({"x": factor, "y": factor}, boundary="trim")
+    if var_type in ("reflectance", "probability"):
+        result = coarsened.mean()
+    elif var_type == "classification":
+        result = coarsened.reduce(subsample_2)
+    elif var_type == "quality_mask":
+        result = coarsened.max()
+    else:
+        raise ValueError(f"Unknown variable type {var_type}")
+
+    result.encoding = var_data.encoding
+    return result.astype(var_data.dtype)
+
+
+def inject_missing_bands(
+    dataset: xr.Dataset,
+    dt_input: xr.DataTree,
+    target_resolution: int,
+    *,
+    bands: set[str] | None = None,
+) -> xr.Dataset:
+    """Inject bands whose native resolution is finer than `target_resolution`.
+
+    For each spectral band defined in `BAND_INFO` whose native resolution is
+    finer than `target_resolution`, this function checks whether the band is
+    already present in `dataset`.  If not, it looks for the band in the
+    appropriate source group (e.g. `/measurements/reflectance/r10m`),
+    downsamples it to the target grid using the type-aware resampling from
+    `determine_variable_type`, and merges it into `dataset`.
+
+    Args:
+        dataset: The target-resolution dataset (e.g. the r20m or r60m
+            reflectance group).
+        dt_input: The full input DataTree (used to locate finer-resolution
+            source bands).
+        target_resolution: Target resolution in metres (e.g. 20 or 60).
+        bands: If provided, only inject these band names.  If `None`
+            (default), inject every eligible band from `BAND_INFO`.
+
+    Returns:
+        `dataset` with any missing finer-resolution bands added.
+    """
+    for band_name, info in BAND_INFO.items():
+        if bands is not None and band_name not in bands:
+            continue
+        native_res = info.native_resolution  # type: ignore[attr-defined]
+        if native_res >= target_resolution:
+            continue
+        if band_name in dataset.data_vars:
+            continue
+
+        source_path = f"/measurements/reflectance/r{native_res}m"
+        if source_path not in dt_input.groups:
+            continue
+
+        source_ds = dt_input[source_path].to_dataset()
+        if band_name not in source_ds.data_vars:
+            continue
+
+        band_src = source_ds[band_name]
+        factor = target_resolution // native_res
+        band_ds = _coarsen_variable(band_name, band_src, factor)
+
+        # Replace coordinates with the target dataset's coordinates so that
+        # xarray.Dataset.assign does not try to align on mismatched values.
+        band_ds = xr.DataArray(
+            band_ds.values,
+            dims=band_ds.dims,
+            coords={d: dataset.coords[d] for d in band_ds.dims if d in dataset.coords},
+            attrs=band_ds.attrs,
+            name=band_name,
+        )
+
+        # Preserve source encoding so downstream encoding logic can inspect it
+        band_ds.encoding = band_src.encoding.copy()
+
+        dataset = dataset.assign({band_name: band_ds})
+        log.info(
+            "Injected downsampled band from finer resolution",
+            band=band_name,
+            source=f"r{native_res}m",
+            target=f"r{target_resolution}m",
+            shape=band_ds.shape,
+        )
+
+    return dataset
 
 
 def create_multiscale_from_datatree(
@@ -121,6 +217,22 @@ def create_multiscale_from_datatree(
         )
 
         if is_measurement_group:
+            # Inject bands whose native resolution is finer than this group's
+            # (e.g. b08 native at 10m into r20m/r60m) so they propagate through
+            # the full overview chain (r120m … r720m).
+            if group_path.startswith("/measurements/reflectance/"):
+                try:
+                    group_resolution = int(group_name[1:-1])
+                except ValueError:
+                    group_resolution = 0
+                if group_resolution > 10:
+                    dataset = inject_missing_bands(
+                        dataset,
+                        dt_input,
+                        group_resolution,
+                        bands={"b08"},
+                    )
+
             # Measurement groups: apply custom encoding
             encoding = create_measurements_encoding(
                 dataset,
@@ -732,24 +844,7 @@ def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int)
     for var_name, var_data in source_dataset.data_vars.items():
         if var_data.ndim < 2:
             continue
-        var_typ = determine_variable_type(var_name, var_data)
-        if var_typ == "quality_mask":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").max()
-        elif var_typ == "reflectance":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").mean()
-        elif var_typ == "classification":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").reduce(
-                subsample_2
-            )
-        elif var_typ == "probability":
-            lazy_downsampled = var_data.coarsen({"x": factor, "y": factor}, boundary="trim").mean()
-        else:
-            raise ValueError(f"Unknown variable type {var_typ}")
-
-        # preserve encoding
-        lazy_downsampled.encoding = var_data.encoding
-        # Ensure that dtype is preserved
-        lazy_vars[var_name] = lazy_downsampled.astype(var_data.dtype)
+        lazy_vars[var_name] = _coarsen_variable(var_name, var_data, factor)
 
     if not lazy_vars:
         return xr.Dataset()
