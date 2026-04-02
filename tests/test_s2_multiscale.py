@@ -16,11 +16,13 @@ from pydantic_zarr.v3 import GroupSpec
 from structlog.testing import capture_logs
 
 from eopf_geozarr.s2_optimization.s2_multiscale import (
+    _coarsen_variable,
     calculate_aligned_chunk_size,
     calculate_simple_shard_dimensions,
     create_downsampled_resolution_group,
     create_measurements_encoding,
     create_multiscale_from_datatree,
+    inject_missing_bands,
 )
 
 
@@ -216,3 +218,155 @@ def test_create_multiscale_from_datatree(
     assert o_keys == e_keys
     # Check that all values are the same
     assert [k for k in o_keys if expected_structure_flat[k] != observed_structure_flat[k]] == []
+
+
+# ---------------------------------------------------------------------------
+# _coarsen_variable
+# ---------------------------------------------------------------------------
+
+
+def test_coarsen_variable_classification() -> None:
+    """Classification variables should be downsampled via subsample."""
+    data = np.arange(16, dtype="uint8").reshape(4, 4)
+    var = xr.DataArray(data, dims=["y", "x"], coords={"y": np.arange(4.0), "x": np.arange(4.0)})
+    result = _coarsen_variable("scl", var, factor=2)
+    assert result.shape == (2, 2)
+    assert result.dtype == np.uint8
+    # subsample picks top-left of each 2x2 block
+    np.testing.assert_array_equal(result.values, data[::2, ::2])
+
+
+def test_coarsen_variable_quality_mask() -> None:
+    """Quality mask variables should be downsampled via max."""
+    data = np.array([[0, 1], [2, 3]], dtype="uint8")
+    var = xr.DataArray(data, dims=["y", "x"], coords={"y": np.arange(2.0), "x": np.arange(2.0)})
+    result = _coarsen_variable("quality_cirrus", var, factor=2)
+    assert result.shape == (1, 1)
+    assert result.values.item() == 3
+
+
+# ---------------------------------------------------------------------------
+# inject_missing_bands
+# ---------------------------------------------------------------------------
+
+
+def _make_reflectance_datatree() -> xr.DataTree:
+    """Build a minimal DataTree with /measurements/reflectance/r10m and r20m."""
+    size_10m = 120  # must be divisible by 2 (→60) and 6 (→20)
+    x10 = np.arange(size_10m, dtype="float64")
+    y10 = np.arange(size_10m, dtype="float64")
+
+    r10m_ds = xr.Dataset(
+        {
+            "b02": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b03": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b04": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b08": (["y", "x"], np.full((size_10m, size_10m), 42, dtype="uint16")),
+        },
+        coords={"x": x10, "y": y10},
+    )
+
+    size_20m = size_10m // 2
+    x20 = np.arange(size_20m, dtype="float64")
+    y20 = np.arange(size_20m, dtype="float64")
+    r20m_ds = xr.Dataset(
+        {
+            "b05": (["y", "x"], np.ones((size_20m, size_20m), dtype="uint16")),
+        },
+        coords={"x": x20, "y": y20},
+    )
+
+    dt = xr.DataTree()
+    dt["measurements/reflectance/r10m"] = xr.DataTree(r10m_ds)
+    dt["measurements/reflectance/r20m"] = xr.DataTree(r20m_ds)
+    return dt
+
+
+def test_inject_missing_bands_respects_bands_filter() -> None:
+    """With bands={"b08"}, only b08 should be injected even when others are eligible."""
+    dt = _make_reflectance_datatree()
+    r20m_ds = dt["measurements/reflectance/r20m"].to_dataset()
+
+    result = inject_missing_bands(r20m_ds, dt, target_resolution=20, bands={"b08"})
+
+    assert "b08" in result.data_vars
+    assert result["b08"].shape == (60, 60)
+    assert result["b08"].dtype == np.uint16
+    # b02/b03/b04 are also eligible (10m native, missing from r20m) but excluded
+    for excluded in ("b02", "b03", "b04"):
+        assert excluded not in result.data_vars
+
+
+def test_inject_missing_bands_skips_existing() -> None:
+    """Bands already present in the dataset should not be overwritten."""
+    dt = _make_reflectance_datatree()
+    r20m_ds = dt["measurements/reflectance/r20m"].to_dataset()
+
+    # Pre-populate b08 with a sentinel value so we can verify it is NOT replaced.
+    sentinel = np.full((60, 60), 999, dtype="uint16")
+    r20m_ds["b08"] = (["y", "x"], sentinel)
+
+    result = inject_missing_bands(r20m_ds, dt, target_resolution=20, bands={"b08"})
+
+    # b08 was already present — inject_missing_bands must leave it untouched.
+    np.testing.assert_array_equal(result["b08"].values, sentinel)
+
+
+def test_inject_missing_bands_noop_when_no_source() -> None:
+    """If the source group is missing from the DataTree, return dataset unchanged."""
+    dt = xr.DataTree()
+    ds = xr.Dataset({"b05": (["y", "x"], np.ones((60, 60)))})
+
+    result = inject_missing_bands(ds, dt, target_resolution=20)
+
+    assert "b08" not in result.data_vars
+
+
+def test_inject_missing_bands_default_injects_all() -> None:
+    """With bands=None (default), all eligible finer bands should be injected."""
+    size_10m = 120
+    x10 = np.arange(size_10m, dtype="float64")
+    y10 = np.arange(size_10m, dtype="float64")
+
+    r10m_ds = xr.Dataset(
+        {
+            "b02": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b03": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b04": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b08": (["y", "x"], np.full((size_10m, size_10m), 42, dtype="uint16")),
+        },
+        coords={"x": x10, "y": y10},
+    )
+
+    size_20m = 60
+    x20 = np.arange(size_20m, dtype="float64")
+    y20 = np.arange(size_20m, dtype="float64")
+    r20m_ds = xr.Dataset(
+        {
+            "b05": (["y", "x"], np.ones((size_20m, size_20m), dtype="uint16")),
+            "b06": (["y", "x"], np.ones((size_20m, size_20m), dtype="uint16")),
+        },
+        coords={"x": x20, "y": y20},
+    )
+
+    size_60m = 20
+    x60 = np.arange(size_60m, dtype="float64")
+    y60 = np.arange(size_60m, dtype="float64")
+    r60m_ds = xr.Dataset(
+        {
+            "b01": (["y", "x"], np.ones((size_60m, size_60m), dtype="uint16")),
+        },
+        coords={"x": x60, "y": y60},
+    )
+
+    dt = xr.DataTree()
+    dt["measurements/reflectance/r10m"] = xr.DataTree(r10m_ds)
+    dt["measurements/reflectance/r20m"] = xr.DataTree(r20m_ds)
+    dt["measurements/reflectance/r60m"] = xr.DataTree(r60m_ds)
+
+    result = inject_missing_bands(r60m_ds, dt, target_resolution=60)
+
+    # All 10m bands (b02, b03, b04, b08) and 20m bands (b05, b06) should be injected
+    for band in ("b02", "b03", "b04", "b08", "b05", "b06"):
+        assert band in result.data_vars, f"{band} missing from r60m"
+        assert result[band].shape == (size_60m, size_60m)
