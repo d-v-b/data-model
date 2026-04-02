@@ -5,11 +5,14 @@
 # this case.
 
 import numpy as np
+import pytest
 import zarr
 import zarr.storage
-from cast_value.zarr_compat.v1 import CastValueRust
 
-from eopf_geozarr.codecs.scale_offset import ScaleOffset, scale_offset_from_cf
+cast_value = pytest.importorskip("cast_value")
+from cast_value.zarr_compat.v1 import CastValueRust  # noqa: E402
+
+from eopf_geozarr.codecs.scale_offset import ScaleOffset, scale_offset_from_cf  # noqa: E402
 
 
 def test_scale_offset_with_cast_value() -> None:

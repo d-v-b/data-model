@@ -60,6 +60,8 @@ test = [
     "pytest-xdist>=3.0.0",
     "jsondiff>=2.0.0",
     "pytest-examples>=0.0.18",
+    "cast-value>=0.1.0",
+    "cast-value-rs>=0.4.0",
 ]
 downstream-titiler = [
     "titiler-xarray>=2.0.0",
