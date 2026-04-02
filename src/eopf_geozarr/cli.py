@@ -1166,6 +1166,11 @@ def add_s2_optimization_commands(subparsers: argparse._SubParsersAction) -> None
         """,
     )
     s2_parser.add_argument(
+        "--experimental-scale-offset-codec",
+        action="store_true",
+        help="Push CF scale-offset encoding into zarr codec pipeline instead of decoding to float.",
+    )
+    s2_parser.add_argument(
         "--dask-cluster",
         action="store_true",
         help="Start a local dask cluster for parallel processing and progress bars",
@@ -1197,6 +1202,7 @@ def convert_s2_optimized_command(args: argparse.Namespace) -> None:
             compression_level=args.compression_level,
             validate_output=not args.skip_validation,
             keep_scale_offset=args.keep_scale_offset,
+            experimental_scale_offset_codec=args.experimental_scale_offset_codec,
         )
 
         log.info("✅ S2 optimization completed", output_path=args.output_path)

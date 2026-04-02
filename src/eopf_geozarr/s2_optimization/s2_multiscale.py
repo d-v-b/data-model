@@ -170,6 +170,7 @@ def create_multiscale_from_datatree(
     spatial_chunk: int,
     crs: CRS | None = None,
     keep_scale_offset: bool,
+    experimental_scale_offset_codec: bool = False,
 ) -> dict[str, dict]:
     """
     Create multiscale versions preserving original structure.
@@ -239,6 +240,7 @@ def create_multiscale_from_datatree(
                 spatial_chunk=spatial_chunk,
                 enable_sharding=enable_sharding,
                 keep_scale_offset=keep_scale_offset,
+                experimental_scale_offset_codec=experimental_scale_offset_codec,
             )
             # convert float64 arrays to float32
             for data_var in dataset.data_vars:
@@ -300,6 +302,7 @@ def create_multiscale_from_datatree(
             spatial_chunk=spatial_chunk,
             enable_sharding=enable_sharding,
             keep_scale_offset=keep_scale_offset,
+            experimental_scale_offset_codec=experimental_scale_offset_codec,
         )
 
         # Strip _FillValue from DataArray encoding for downsampled levels too
@@ -343,6 +346,7 @@ def create_measurements_encoding(
     spatial_chunk: int,
     enable_sharding: bool = True,
     keep_scale_offset: bool = True,
+    experimental_scale_offset_codec: bool = False,
 ) -> dict[str, XarrayDataArrayEncoding]:
     """
     Create optimized encoding for a pyramid level with advanced chunking and sharding.
@@ -390,7 +394,32 @@ def create_measurements_encoding(
         # Forward-propagate the existing encoding, minus keys that should be omitted
         keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
 
-        if not keep_scale_offset:
+        if experimental_scale_offset_codec and not keep_scale_offset:
+            # Push CF scale-offset into the zarr codec pipeline instead of
+            # decoding to float. The data stays as packed integers on disk,
+            # but zarr transparently decodes on read.
+            scale_factor = var_data.encoding.get("scale_factor")
+            add_offset = var_data.encoding.get("add_offset")
+            packed_dtype = var_data.encoding.get("dtype")
+
+            if scale_factor is not None and add_offset is not None and packed_dtype is not None:
+                from cast_value.zarr_compat.v1 import CastValueRust
+
+                import eopf_geozarr.codecs  # noqa: F401
+                from eopf_geozarr.codecs.scale_offset import scale_offset_from_cf
+
+                so_codec = scale_offset_from_cf(
+                    scale_factor=float(scale_factor), add_offset=float(add_offset)
+                )
+                cv_codec = CastValueRust(
+                    data_type=np.dtype(packed_dtype).name, rounding="nearest-even"
+                )
+                var_encoding["filters"] = (so_codec, cv_codec)
+
+            # Strip CF keys — the codecs handle encoding/decoding now
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue"}
+            var_encoding["fill_value"] = float("nan")
+        elif not keep_scale_offset:
             # When stripping scale/offset, also strip _FillValue since the original
             # _FillValue is in raw integer units and meaningless for decoded float data.
             keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue"}
