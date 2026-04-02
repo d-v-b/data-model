@@ -1,4 +1,4 @@
-# Test that the ScaleOffset codec combined with the CastValueRust codec from the
+# Test that the ScaleOffset codec combined with the CastValueRustV1 codec from the
 # cast_value library works correctly. Correctness is measured by the ability of
 # these two codecs to define a procedure that saves an array of floats ranging from -1000 to 1000
 # as uint16 array. The offset should be the minimum value of the array, but the scale can be 1 in
@@ -10,14 +10,14 @@ import zarr
 import zarr.storage
 
 cast_value = pytest.importorskip("cast_value")
-from cast_value.zarr_compat.v1 import CastValueRust  # noqa: E402
+from cast_value.zarr_compat.v1 import CastValueRustV1  # noqa: E402
 
 from eopf_geozarr.codecs.scale_offset import ScaleOffset, scale_offset_from_cf  # noqa: E402
 
 
 def test_scale_offset_with_cast_value() -> None:
     """
-    Round-trip test: write float64 data through ScaleOffset + CastValueRust,
+    Round-trip test: write float64 data through ScaleOffset + CastValueRustV1,
     verify it is stored as uint16, and read back as the original float64 values.
     """
     data = np.linspace(-1000, 1000, 2001, dtype="float64")
@@ -32,7 +32,7 @@ def test_scale_offset_with_cast_value() -> None:
         dtype="float64",
         codecs=[
             ScaleOffset(offset=offset, scale=scale),
-            CastValueRust(data_type="uint16", rounding="nearest-even"),
+            CastValueRustV1(data_type="uint16", rounding="nearest-even"),
             zarr.codecs.BytesCodec(),
         ],
     )
@@ -47,7 +47,7 @@ def test_cf_scale_offset_pushed_into_codecs() -> None:
     """
     Given CF-convention scale_factor and add_offset, generate a ScaleOffset codec
     that replicates the CF behavior at the zarr chunk level, paired with a
-    CastValueRust codec for the packed integer dtype.
+    CastValueRustV1 codec for the packed integer dtype.
 
     CF convention: unpacked = packed * scale_factor + add_offset
     """
@@ -61,7 +61,7 @@ def test_cf_scale_offset_pushed_into_codecs() -> None:
 
     # Generate the ScaleOffset codec from CF parameters
     so_codec = scale_offset_from_cf(scale_factor=scale_factor, add_offset=add_offset)
-    cv_codec = CastValueRust(data_type=packed_dtype, rounding="nearest-even")
+    cv_codec = CastValueRustV1(data_type=packed_dtype, rounding="nearest-even")
 
     # Write the unpacked float data through the codec pipeline
     store = zarr.storage.MemoryStore()

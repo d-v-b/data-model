@@ -403,7 +403,7 @@ def create_measurements_encoding(
             packed_dtype = var_data.encoding.get("dtype")
 
             if scale_factor is not None and add_offset is not None and packed_dtype is not None:
-                from cast_value.zarr_compat.v1 import CastValueRust
+                from cast_value.zarr_compat.v1 import CastValueRustV1
 
                 import eopf_geozarr.codecs  # noqa: F401
                 from eopf_geozarr.codecs.scale_offset import scale_offset_from_cf
@@ -411,7 +411,7 @@ def create_measurements_encoding(
                 so_codec = scale_offset_from_cf(
                     scale_factor=float(scale_factor), add_offset=float(add_offset)
                 )
-                cv_codec = CastValueRust(
+                cv_codec = CastValueRustV1(
                     data_type=np.dtype(packed_dtype).name, rounding="nearest-even"
                 )
                 var_encoding["filters"] = (so_codec, cv_codec)
