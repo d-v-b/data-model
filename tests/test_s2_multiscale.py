@@ -79,6 +79,43 @@ def test_calculate_simple_shard_dimensions() -> None:
     assert shard_dims[1] == 768  # 3 * 256 = 768
 
 
+def test_create_measurements_encoding_experimental_scale_offset_codec() -> None:
+    """Test that experimental_scale_offset_codec adds ScaleOffset + CastValue filters."""
+    # Create a dataset with CF-style scale-offset encoding, as xarray would
+    # produce when reading a CF-encoded zarr/netCDF variable.
+    data = xr.DataArray(
+        np.arange(0, 100, dtype="float64").reshape(10, 10),
+        dims=["y", "x"],
+    )
+    data.encoding = {
+        "scale_factor": 0.01,
+        "add_offset": 273.15,
+        "dtype": np.dtype("int16"),
+    }
+    ds = xr.Dataset({"temperature": data})
+
+    encoding = create_measurements_encoding(
+        ds,
+        enable_sharding=True,
+        spatial_chunk=256,
+        keep_scale_offset=False,
+        experimental_scale_offset_codec=True,
+    )
+
+    from eopf_geozarr.codecs.scale_offset import ScaleOffset
+
+    var_encoding = encoding["temperature"]
+    assert "filters" in var_encoding
+    filters = var_encoding["filters"]
+    assert len(filters) == 2
+    assert isinstance(filters[0], ScaleOffset)
+    assert filters[0].offset == 273.15
+    assert filters[0].scale == 1.0 / 0.01
+    # CF keys should be stripped from the encoding
+    assert "scale_factor" not in var_encoding
+    assert "add_offset" not in var_encoding
+
+
 @pytest.mark.parametrize("keep_scale_offset", [True, False])
 def test_create_measurements_encoding(keep_scale_offset: bool, sample_dataset: xr.Dataset) -> None:
     """Test measurements encoding creation with xy-aligned sharding."""

@@ -75,3 +75,12 @@ def test_cf_scale_offset_pushed_into_codecs() -> None:
 
     # The round-trip should recover the original unpacked floats
     np.testing.assert_array_almost_equal(result, unpacked_values)
+
+
+def test_scale_offset_from_dict_round_trip() -> None:
+    """ScaleOffset.to_dict / from_dict should round-trip."""
+    codec = ScaleOffset(offset=273.15, scale=100.0)
+    d = codec.to_dict()
+    restored = ScaleOffset.from_dict(d)
+    assert restored.offset == codec.offset
+    assert restored.scale == codec.scale
