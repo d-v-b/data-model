@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import structlog
 import xarray as xr
+from cast_value import CastValueRustV1
 from dask import delayed
 from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
@@ -403,9 +404,6 @@ def create_measurements_encoding(
             packed_dtype = var_data.encoding.get("dtype")
 
             if scale_factor is not None and add_offset is not None and packed_dtype is not None:
-                from cast_value.zarr_compat.v1 import CastValueRustV1
-
-                import eopf_geozarr.codecs  # noqa: F401
                 from eopf_geozarr.codecs.scale_offset import scale_offset_from_cf
 
                 so_codec = scale_offset_from_cf(
