@@ -85,8 +85,14 @@ def _coarsen_variable(var_name: str, var_data: xr.DataArray, factor: int) -> xr.
     else:
         raise ValueError(f"Unknown variable type {var_type}")
 
-    result.encoding = var_data.encoding
-    return result.astype(var_data.dtype)
+    # `xr.DataArray.astype` clears `.encoding`, so we capture it first and
+    # restore it on the cast result. Without this, downstream code that
+    # inspects encoding (e.g. to push CF scale-offset into a codec pipeline)
+    # would see an empty encoding on every coarsened level.
+    encoding = var_data.encoding
+    result = result.astype(var_data.dtype)
+    result.encoding = encoding
+    return result
 
 
 def inject_missing_bands(
@@ -243,10 +249,15 @@ def create_multiscale_from_datatree(
                 keep_scale_offset=keep_scale_offset,
                 experimental_scale_offset_codec=experimental_scale_offset_codec,
             )
-            # convert float64 arrays to float32
+            # convert float64 arrays to float32. `xr.DataArray.astype` clears
+            # encoding, so we capture and restore it — downstream pyramid
+            # levels are coarsened from this dataset and rely on the encoding
+            # to drive CF packing / codec filter generation.
             for data_var in dataset.data_vars:
                 if dataset[data_var].dtype in (np.dtype("<f8"), np.dtype(">f8")):
+                    var_encoding = dataset[data_var].encoding
                     dataset[data_var] = dataset[data_var].astype("float32")
+                    dataset[data_var].encoding = var_encoding
             # Clear _FillValue from the DataArray's own encoding to prevent
             # xarray from raising "Zarr does not support _FillValue in encoding".
             if not keep_scale_offset:
@@ -409,14 +420,33 @@ def create_measurements_encoding(
                 so_codec = scale_offset_from_cf(
                     scale_factor=float(scale_factor), add_offset=float(add_offset)
                 )
+                # CastValue refuses to cast NaN to integer without an explicit
+                # mapping, so we need a packed-dtype sentinel for NaN. Prefer
+                # the source's existing `_FillValue` (it already encodes the
+                # "no data" semantic via xarray's CF mask_and_scale loop), and
+                # fall back to the dtype's lowest representable integer.
+                packed_np_dtype = np.dtype(packed_dtype)
+                source_fill = var_data.encoding.get("_FillValue")
+                if source_fill is not None:
+                    nan_sentinel = int(source_fill)
+                else:
+                    nan_sentinel = int(np.iinfo(packed_np_dtype).min)
                 cv_codec = CastValueRustV1(
-                    data_type=np.dtype(packed_dtype).name, rounding="nearest-even"
+                    data_type=packed_np_dtype.name,
+                    rounding="nearest-even",
+                    scalar_map={
+                        "encode": [("NaN", nan_sentinel)],
+                        "decode": [(nan_sentinel, "NaN")],
+                    },
                 )
                 var_encoding["filters"] = (so_codec, cv_codec)
 
-            # Strip CF keys — the codecs handle encoding/decoding now
-            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue"}
-            var_encoding["fill_value"] = float("nan")
+            # Strip CF keys and `filters` from `keep_keys` — the codecs handle
+            # encoding/decoding now, and we don't want the forward-propagation
+            # loop below to overwrite our freshly-set filters with whatever was
+            # on the source variable.
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue", "filters"}
+            var_encoding["fill_value"] = "NaN"
         elif not keep_scale_offset:
             # When stripping scale/offset, also strip _FillValue since the original
             # _FillValue is in raw integer units and meaningless for decoded float data.
@@ -426,7 +456,7 @@ def create_measurements_encoding(
             # xarray's zarr backend uses "fill_value" (no underscore) in encoding
             # to set the zarr-level fill value, distinct from "_FillValue" which
             # controls CF-convention attribute masking.
-            var_encoding["fill_value"] = float("nan")
+            var_encoding["fill_value"] = "NaN"
 
         for key in keep_keys:
             if key in var_data.encoding:
