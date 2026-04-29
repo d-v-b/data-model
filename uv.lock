@@ -307,15 +307,15 @@ wheels = [
 
 [[package]]
 name = "cast-value"
-version = "0.1.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/57/f1/0f68bbc9290e038d89ecac338026b203da3a38353d77d842a3358d9c8094/cast_value-0.1.0.tar.gz", hash = "sha256:6f43ecc24b7083613e92d0e06bbba0872fb50e44e54d058ad6ca6a8513c34673", size = 28221, upload-time = "2026-03-31T17:52:03.996Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/80/d486892982a81ba344193c7bd29b85d3cb353375a2e13a2db2be59e34c62/cast_value-0.2.1.tar.gz", hash = "sha256:38173b6fc7e75aaf4f62bf7c46cd506309156a4b988a7ee4dd9f77569f410f1d", size = 99415, upload-time = "2026-04-02T19:26:47.088Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6d/cb/5324d5cc9f74f10abce041e84f398c61e8caaae6c2e150d0be643452840e/cast_value-0.1.0-py3-none-any.whl", hash = "sha256:0a64ef4196079dbe590e7e8d5e948c6888b534e57fe6bfb3f3d23dedcbade610", size = 12022, upload-time = "2026-03-31T17:52:02.388Z" },
+    { url = "https://files.pythonhosted.org/packages/59/b1/8a0793034fc781b092b2c7827115f5fe63175f985dc246d54d5ea2845353/cast_value-0.2.1-py3-none-any.whl", hash = "sha256:1b32e9cccbcac63210f41774942ef4dc92a3b2ddbbc0342642e0b114a373894c", size = 15571, upload-time = "2026-04-02T19:26:45.926Z" },
 ]
 
 [[package]]
@@ -671,6 +671,8 @@ source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "boto3" },
+    { name = "cast-value" },
+    { name = "cast-value-rs" },
     { name = "cf-xarray" },
     { name = "dask", extra = ["array", "distributed"] },
     { name = "numpy" },
@@ -705,8 +707,6 @@ downstream-titiler = [
     { name = "titiler-xarray" },
 ]
 test = [
-    { name = "cast-value" },
-    { name = "cast-value-rs" },
     { name = "jsondiff" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -719,6 +719,8 @@ test = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.3" },
     { name = "boto3", specifier = ">=1.34.0" },
+    { name = "cast-value", specifier = ">=0.2.1" },
+    { name = "cast-value-rs", specifier = ">=0.4.0" },
     { name = "cf-xarray", specifier = ">=0.8.0" },
     { name = "dask", extras = ["array", "distributed"], specifier = ">=2026.1.0" },
     { name = "numpy", specifier = ">=2.3.1" },
@@ -753,8 +755,6 @@ downstream-titiler = [
     { name = "titiler-xarray", specifier = ">=2.0.0" },
 ]
 test = [
-    { name = "cast-value", specifier = ">=0.1.0" },
-    { name = "cast-value-rs", specifier = ">=0.4.0" },
     { name = "jsondiff", specifier = ">=2.0.0" },
     { name = "jsondiff", specifier = ">=2.2.1" },
     { name = "pytest", specifier = ">=7.0.0" },
