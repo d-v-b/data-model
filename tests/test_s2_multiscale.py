@@ -11,14 +11,12 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
-from cast_value import CastValueRustV1
 from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.v3 import GroupSpec
 from structlog.testing import capture_logs
-from zarr.codecs import BloscCodec
+from zarr.codecs import BloscCodec, CastValue, ScaleOffset
 from zarr.core.dtype import Int16
 
-from eopf_geozarr.codecs import ScaleOffset
 from eopf_geozarr.s2_optimization.s2_multiscale import (
     _coarsen_variable,
     calculate_aligned_chunk_size,
@@ -114,7 +112,7 @@ def test_create_measurements_encoding_experimental_scale_offset_codec() -> None:
             "shards": (10, 10),
             "filters": (
                 ScaleOffset(offset=273.15, scale=100.0),
-                CastValueRustV1(
+                CastValue(
                     data_type=Int16(endianness="little"),
                     rounding="nearest-even",
                     out_of_range=None,
@@ -396,16 +394,14 @@ def test_create_multiscale_from_datatree_behavior(
                 f"{group_path}/{var_name}: expected float32 logical dtype, got {arr.dtype}"
             )
             assert "ScaleOffset" in codec_names, f"{group_path}/{var_name}: codecs={codec_names}"
-            assert "CastValueRustV1" in codec_names, (
-                f"{group_path}/{var_name}: codecs={codec_names}"
-            )
+            assert "CastValue" in codec_names, f"{group_path}/{var_name}: codecs={codec_names}"
         else:
             # CF encoding is stripped; data is written as decoded floats.
             assert arr.dtype == np.float32, (
                 f"{group_path}/{var_name}: expected float32, got {arr.dtype}"
             )
             assert "ScaleOffset" not in codec_names
-            assert "CastValueRustV1" not in codec_names
+            assert "CastValue" not in codec_names
 
     # ------------------------------------------------------------------
     # Downsampled groups: `_coarsen_variable` preserves the source variable's
@@ -430,21 +426,19 @@ def test_create_multiscale_from_datatree_behavior(
                     f"{group_path}/{name}: expected uint16 on disk, got {arr.dtype}"
                 )
                 assert "ScaleOffset" not in codec_names
-                assert "CastValueRustV1" not in codec_names
+                assert "CastValue" not in codec_names
             elif experimental_scale_offset_codec:
                 assert arr.dtype == np.float32, (
                     f"{group_path}/{name}: expected float32 logical dtype, got {arr.dtype}"
                 )
                 assert "ScaleOffset" in codec_names, f"{group_path}/{name}: codecs={codec_names}"
-                assert "CastValueRustV1" in codec_names, (
-                    f"{group_path}/{name}: codecs={codec_names}"
-                )
+                assert "CastValue" in codec_names, f"{group_path}/{name}: codecs={codec_names}"
             else:
                 assert arr.dtype == np.float32, (
                     f"{group_path}/{name}: expected float32, got {arr.dtype}"
                 )
                 assert "ScaleOffset" not in codec_names
-                assert "CastValueRustV1" not in codec_names
+                assert "CastValue" not in codec_names
 
     # ------------------------------------------------------------------
     # Decoded-value invariance: regardless of which storage path the

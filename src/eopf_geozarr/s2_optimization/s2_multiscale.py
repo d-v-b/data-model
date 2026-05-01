@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import structlog
 import xarray as xr
-from cast_value import CastValueRustV1
 from dask import delayed
 from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
 from pyproj import CRS
+from zarr.codecs import CastValue
 from zarr_cm import geo_proj
 from zarr_cm import multiscales as multiscales_cm
 from zarr_cm import spatial as spatial_cm
@@ -431,7 +431,7 @@ def create_measurements_encoding(
                     nan_sentinel = int(source_fill)
                 else:
                     nan_sentinel = int(np.iinfo(packed_np_dtype).min)
-                cv_codec = CastValueRustV1(
+                cv_codec = CastValue(
                     data_type=packed_np_dtype.name,
                     rounding="nearest-even",
                     scalar_map={
