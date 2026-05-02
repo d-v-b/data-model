@@ -15,10 +15,12 @@ from dask import delayed
 from dask.array import from_delayed
 from pydantic.experimental.missing_sentinel import MISSING
 from pyproj import CRS
+from zarr.codecs import CastValue
 from zarr_cm import geo_proj
 from zarr_cm import multiscales as multiscales_cm
 from zarr_cm import spatial as spatial_cm
 
+from eopf_geozarr.conversion import utils
 from eopf_geozarr.conversion.fs_utils import sanitize_dataset_attributes
 from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
@@ -84,8 +86,14 @@ def _coarsen_variable(var_name: str, var_data: xr.DataArray, factor: int) -> xr.
     else:
         raise ValueError(f"Unknown variable type {var_type}")
 
-    result.encoding = var_data.encoding
-    return result.astype(var_data.dtype)
+    # `xr.DataArray.astype` clears `.encoding`, so we capture it first and
+    # restore it on the cast result. Without this, downstream code that
+    # inspects encoding (e.g. to push CF scale-offset into a codec pipeline)
+    # would see an empty encoding on every coarsened level.
+    encoding = var_data.encoding
+    result = result.astype(var_data.dtype)
+    result.encoding = encoding
+    return result
 
 
 def inject_missing_bands(
@@ -170,6 +178,7 @@ def create_multiscale_from_datatree(
     spatial_chunk: int,
     crs: CRS | None = None,
     keep_scale_offset: bool,
+    experimental_scale_offset_codec: bool = False,
 ) -> dict[str, dict]:
     """
     Create multiscale versions preserving original structure.
@@ -239,11 +248,17 @@ def create_multiscale_from_datatree(
                 spatial_chunk=spatial_chunk,
                 enable_sharding=enable_sharding,
                 keep_scale_offset=keep_scale_offset,
+                experimental_scale_offset_codec=experimental_scale_offset_codec,
             )
-            # convert float64 arrays to float32
+            # convert float64 arrays to float32. `xr.DataArray.astype` clears
+            # encoding, so we capture and restore it — downstream pyramid
+            # levels are coarsened from this dataset and rely on the encoding
+            # to drive CF packing / codec filter generation.
             for data_var in dataset.data_vars:
                 if dataset[data_var].dtype in (np.dtype("<f8"), np.dtype(">f8")):
+                    var_encoding = dataset[data_var].encoding
                     dataset[data_var] = dataset[data_var].astype("float32")
+                    dataset[data_var].encoding = var_encoding
             # Clear _FillValue from the DataArray's own encoding to prevent
             # xarray from raising "Zarr does not support _FillValue in encoding".
             if not keep_scale_offset:
@@ -300,6 +315,7 @@ def create_multiscale_from_datatree(
             spatial_chunk=spatial_chunk,
             enable_sharding=enable_sharding,
             keep_scale_offset=keep_scale_offset,
+            experimental_scale_offset_codec=experimental_scale_offset_codec,
         )
 
         # Strip _FillValue from DataArray encoding for downsampled levels too
@@ -343,6 +359,7 @@ def create_measurements_encoding(
     spatial_chunk: int,
     enable_sharding: bool = True,
     keep_scale_offset: bool = True,
+    experimental_scale_offset_codec: bool = False,
 ) -> dict[str, XarrayDataArrayEncoding]:
     """
     Create optimized encoding for a pyramid level with advanced chunking and sharding.
@@ -390,7 +407,48 @@ def create_measurements_encoding(
         # Forward-propagate the existing encoding, minus keys that should be omitted
         keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
 
-        if not keep_scale_offset:
+        if experimental_scale_offset_codec and not keep_scale_offset:
+            # Push CF scale-offset into the zarr codec pipeline instead of
+            # decoding to float. The data stays as packed integers on disk,
+            # but zarr transparently decodes on read.
+            scale_factor = var_data.encoding.get("scale_factor")
+            add_offset = var_data.encoding.get("add_offset")
+            packed_dtype = var_data.encoding.get("dtype")
+
+            if scale_factor is not None and add_offset is not None and packed_dtype is not None:
+                from eopf_geozarr.codecs.scale_offset import scale_offset_from_cf
+
+                so_codec = scale_offset_from_cf(
+                    scale_factor=float(scale_factor), add_offset=float(add_offset)
+                )
+                # CastValue refuses to cast NaN to integer without an explicit
+                # mapping, so we need a packed-dtype sentinel for NaN. Prefer
+                # the source's existing `_FillValue` (it already encodes the
+                # "no data" semantic via xarray's CF mask_and_scale loop), and
+                # fall back to the dtype's lowest representable integer.
+                packed_np_dtype = np.dtype(packed_dtype)
+                source_fill = var_data.encoding.get("_FillValue")
+                if source_fill is not None:
+                    nan_sentinel = int(source_fill)
+                else:
+                    nan_sentinel = int(np.iinfo(packed_np_dtype).min)
+                cv_codec = CastValue(
+                    data_type=packed_np_dtype.name,
+                    rounding="nearest-even",
+                    scalar_map={
+                        "encode": [("NaN", nan_sentinel)],
+                        "decode": [(nan_sentinel, "NaN")],
+                    },
+                )
+                var_encoding["filters"] = (so_codec, cv_codec)
+
+            # Strip CF keys and `filters` from `keep_keys` — the codecs handle
+            # encoding/decoding now, and we don't want the forward-propagation
+            # loop below to overwrite our freshly-set filters with whatever was
+            # on the source variable.
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue", "filters"}
+            var_encoding["fill_value"] = "NaN"
+        elif not keep_scale_offset:
             # When stripping scale/offset, also strip _FillValue since the original
             # _FillValue is in raw integer units and meaningless for decoded float data.
             keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue"}
@@ -399,7 +457,7 @@ def create_measurements_encoding(
             # xarray's zarr backend uses "fill_value" (no underscore) in encoding
             # to set the zarr-level fill value, distinct from "_FillValue" which
             # controls CF-convention attribute masking.
-            var_encoding["fill_value"] = float("nan")
+            var_encoding["fill_value"] = "NaN"
 
         for key in keep_keys:
             if key in var_data.encoding:
@@ -805,9 +863,15 @@ def create_original_encoding(dataset: xr.Dataset) -> dict[str, XarrayDataArrayEn
         var_data = dataset.data_vars[var_name]
         var_encoding: XarrayDataArrayEncoding = {}
         var_encoding["compressors"] = (compressor,)
-        for key in XARRAY_ENCODING_KEYS - {"compressors"}:
+        for key in XARRAY_ENCODING_KEYS - {"compressors", "fill_value"}:
             if key in var_data.encoding:
                 var_encoding[key] = var_data.encoding[key]  # type: ignore[literal-required]
+        # Set the zarr-level `fill_value` explicitly rather than letting xarray
+        # decide — different xarray versions infer different defaults from the
+        # variable's `_FillValue`. See `explicit_fill_value` for the rationale.
+        fv = utils.explicit_fill_value(var_data)
+        if fv is not utils.UNSET:
+            var_encoding["fill_value"] = fv
         if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
             log.warning(
                 "Unknown encoding keys in %s: %s",

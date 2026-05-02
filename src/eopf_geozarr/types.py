@@ -12,6 +12,7 @@ class TileMatrixLimitJSON(TypedDict):
 
 
 class XarrayEncodingJSON(TypedDict):
+    fill_value: NotRequired[object]
     chunks: NotRequired[tuple[int, ...]]
     compressors: Any
     shards: NotRequired[Any]

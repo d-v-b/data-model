@@ -186,6 +186,7 @@ def convert_s2_optimized(
     compression_level: int,
     validate_output: bool,
     keep_scale_offset: bool,
+    experimental_scale_offset_codec: bool = False,
     max_retries: int = 3,
 ) -> xr.DataTree:
     """
@@ -199,6 +200,7 @@ def convert_s2_optimized(
         compression_level: Compression level 1-9
         validate_output: Whether to validate the output
         keep_scale_offset: Whether to preserve scale-offset encoding of the source data.
+        experimental_scale_offset_codec: Push CF scale-offset into zarr codec pipeline.
         max_retries: Maximum number of retries for network operations
 
     Returns:
@@ -234,6 +236,7 @@ def convert_s2_optimized(
         enable_sharding=enable_sharding,
         crs=crs,
         keep_scale_offset=keep_scale_offset,
+        experimental_scale_offset_codec=experimental_scale_offset_codec,
     )
 
     log.info("Created multiscale pyramids", num_groups=len(datasets))
