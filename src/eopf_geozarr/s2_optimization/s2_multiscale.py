@@ -20,6 +20,7 @@ from zarr_cm import geo_proj
 from zarr_cm import multiscales as multiscales_cm
 from zarr_cm import spatial as spatial_cm
 
+from eopf_geozarr.conversion import utils
 from eopf_geozarr.conversion.fs_utils import sanitize_dataset_attributes
 from eopf_geozarr.conversion.geozarr import (
     _create_tile_matrix_limits,
@@ -862,9 +863,15 @@ def create_original_encoding(dataset: xr.Dataset) -> dict[str, XarrayDataArrayEn
         var_data = dataset.data_vars[var_name]
         var_encoding: XarrayDataArrayEncoding = {}
         var_encoding["compressors"] = (compressor,)
-        for key in XARRAY_ENCODING_KEYS - {"compressors"}:
+        for key in XARRAY_ENCODING_KEYS - {"compressors", "fill_value"}:
             if key in var_data.encoding:
                 var_encoding[key] = var_data.encoding[key]  # type: ignore[literal-required]
+        # Set the zarr-level `fill_value` explicitly rather than letting xarray
+        # decide — different xarray versions infer different defaults from the
+        # variable's `_FillValue`. See `explicit_fill_value` for the rationale.
+        fv = utils.explicit_fill_value(var_data)
+        if fv is not utils.UNSET:
+            var_encoding["fill_value"] = fv
         if len(set(var_data.encoding.keys()) - XARRAY_ENCODING_KEYS) > 0:
             log.warning(
                 "Unknown encoding keys in %s: %s",
