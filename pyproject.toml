@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eopf-geozarr"
-version = "0.8.0"
+version = "0.9.0"
 description = "GeoZarr compliant data model for EOPF datasets"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -180,6 +180,7 @@ module = [
     "eopf_geozarr.data_api.s1",
     "eopf_geozarr.data_api.s2",
     "eopf_geozarr.data_api.geozarr.v2",
+    "eopf_geozarr.data_api.geozarr.store",
 ]
 disable_error_code = ["valid-type"]
 
