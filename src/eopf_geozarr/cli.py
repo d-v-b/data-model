@@ -184,14 +184,14 @@ def convert_command(args: argparse.Namespace) -> None:
 
         # Convert to GeoZarr compliant format
         log.info("Converting to GeoZarr compliant format...")
-        if _is_sentinel2_input(dt):
+        if _is_sentinel2_input(dt) and not getattr(args, "no_s2_optimized", False):
             # Sentinel-2 inputs use the optimized flat multiscale layout
             # (sibling r{N}m levels), shared with `convert-s2-optimized`. The
             # generic per-group options below do not apply to that layout.
             log.info(
                 "Detected Sentinel-2 input; using optimized flat multiscale layout "
                 "(per-group options such as --groups/--crs-groups/--gcp-group/--min-dimension "
-                "do not apply)"
+                "do not apply; pass --no-s2-optimized to force the generic path)"
             )
             dt_geozarr = convert_s2_optimized(
                 dt_input=dt,
@@ -1081,7 +1081,8 @@ def create_parser() -> argparse.ArgumentParser:
             "auto-detected and converted with the optimized flat multiscale layout "
             "(equivalent to convert-s2-optimized with keep_scale_offset disabled); for "
             "those inputs the per-group options --groups, --crs-groups, --gcp-group and "
-            "--min-dimension do not apply."
+            "--min-dimension do not apply. Pass --no-s2-optimized to force the generic "
+            "conversion path, which honors all options."
         ),
     )
     convert_parser.add_argument(
@@ -1148,6 +1149,14 @@ def create_parser() -> argparse.ArgumentParser:
         "--enable-sharding",
         action="store_true",
         help="Enable zarr sharding for spatial dimensions of each variable",
+    )
+    convert_parser.add_argument(
+        "--no-s2-optimized",
+        action="store_true",
+        help=(
+            "Disable Sentinel-2 auto-detection and use the generic conversion path, "
+            "honoring --groups/--crs-groups/--gcp-group/--min-dimension"
+        ),
     )
     convert_parser.set_defaults(func=convert_command)
 
