@@ -1074,7 +1074,15 @@ def create_parser() -> argparse.ArgumentParser:
 
     # Convert command
     convert_parser = subparsers.add_parser(
-        "convert", help="Convert EOPF dataset to GeoZarr compliant format"
+        "convert",
+        help="Convert EOPF dataset to GeoZarr compliant format",
+        description=(
+            "Convert EOPF dataset to GeoZarr compliant format. Sentinel-2 inputs are "
+            "auto-detected and converted with the optimized flat multiscale layout "
+            "(equivalent to convert-s2-optimized with keep_scale_offset disabled); for "
+            "those inputs the per-group options --groups, --crs-groups, --gcp-group and "
+            "--min-dimension do not apply."
+        ),
     )
     convert_parser.add_argument(
         "input_path", type=str, help="Path to input EOPF dataset (Zarr format)"
@@ -1089,7 +1097,7 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         nargs="+",
         default=["/measurements/r10m", "/measurements/r20m", "/measurements/r60m"],
-        help="Groups to convert (default: Sentinel-2 resolution groups)",
+        help="Groups to convert (ignored for auto-detected Sentinel-2 inputs)",
     )
     convert_parser.add_argument(
         "--spatial-chunk",
@@ -1101,7 +1109,10 @@ def create_parser() -> argparse.ArgumentParser:
         "--min-dimension",
         type=int,
         default=256,
-        help="Minimum dimension for overview levels (default: 256)",
+        help=(
+            "Minimum dimension for overview levels (default: 256; ignored for "
+            "auto-detected Sentinel-2 inputs)"
+        ),
     )
     convert_parser.add_argument(
         "--max-retries",
@@ -1113,12 +1124,19 @@ def create_parser() -> argparse.ArgumentParser:
         "--crs-groups",
         type=str,
         nargs="*",
-        help="Groups that need CRS information added on best-effort basis (e.g., /conditions/geometry)",
+        help=(
+            "Groups that need CRS information added on best-effort basis "
+            "(e.g., /conditions/geometry; ignored for auto-detected Sentinel-2 inputs)"
+        ),
     )
     convert_parser.add_argument(
         "--gcp-group",
         type=str,
-        help="Groups where Ground Control Points (GCPs) are located (e.g., /conditions/gcp) (Sentinel-1)",
+        help=(
+            "Groups where Ground Control Points (GCPs) are located "
+            "(e.g., /conditions/gcp) (Sentinel-1; ignored for auto-detected "
+            "Sentinel-2 inputs)"
+        ),
     )
     convert_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     convert_parser.add_argument(
