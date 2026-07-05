@@ -525,7 +525,10 @@ def write_geozarr_group(
             enable_sharding=enable_sharding,
         )
     except Exception as e:
-        log.warning(
+        # Deliberately continue with the remaining groups, but surface the
+        # failure loudly (with traceback): the output store is missing its
+        # multiscales metadata for this group.
+        log.exception(
             "Failed to create GeoZarr-spec compliant multiscales",
             group_name=group_name,
             error=str(e),
