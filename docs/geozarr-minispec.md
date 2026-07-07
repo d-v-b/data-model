@@ -37,7 +37,7 @@ Conventions are composable: a single Zarr group can declare and use all three si
 ### Array and Group attributes
 
 This document only defines rules for a finite subset of the keys in Zarr array
-and group attributes. Unless otherwise stated, any external keys in Zarr array and group attributes are consistent with this specification. This means this specification composes with the presence of, e.g., [CF metadata](https://cfconventions.org/), at different levels of the Zarr hierarchy. CF metadata is no longer required by this specification but remains fully compatible and may be included alongside the Zarr conventions described here.
+and group attributes. Unless otherwise stated, any external keys in Zarr array and group attributes are consistent with this specification. CF metadata (e.g. `standard_name`, coordinate variable attributes) is outside the scope of this specification; its presence in a Zarr store alongside these conventions is neither required nor precluded.
 
 Convention properties are placed at the root `attributes` level of the Zarr node, following the [Zarr Conventions Specification](https://github.com/zarr-conventions/zarr-conventions-spec).
 
@@ -48,6 +48,107 @@ their attributes. This document defines that hierarchy from the bottom-up, start
 and their attributes before moving to higher-level structures like groups and their attributes.
 
 This specification targets **Zarr V3** exclusively. The geo-proj, spatial, and multiscales conventions are all Zarr V3.
+
+## Store Root
+
+A GeoZarr Store is the outermost Zarr group of a dataset — the group located at the root of the Zarr store (e.g. `my_dataset.zarr/zarr.json`). It sits above any [Dataset](#dataset) or [Multiscale Dataset](#multiscale-dataset) nodes in the hierarchy and is intended to give clients a single place to read a **summary spatial footprint** for the whole store without having to walk into child groups.
+
+> [!Note]
+> The hierarchy and identification rules below are local choices made for this implementation. They are subject to revision once the OGC GeoZarr Standards Working Group decides on canonical wording. A follow-up to surface these rules upstream is tracked in [zarr-developers/geozarr-spec#132](https://github.com/zarr-developers/geozarr-spec/issues/132). See also [GeoZarr Specification Contribution](geozarr-specification-contribution.md).
+
+### Hierarchy & Identification
+
+A GeoZarr hierarchy has these properties:
+
+- **Single root**: every GeoZarr store has exactly one root group.
+- **Root naming**: the root group is stored under a prefix ending with `.zarr` (e.g. `my_dataset.zarr/`). Clients given any sub-path inside a GeoZarr store MAY recover the root by walking up the path until they hit a segment ending in `.zarr`.
+- **No nested stores**: the `.zarr` suffix SHOULD occur exactly once in any path within the hierarchy. Nesting GeoZarr stores (e.g. `a.zarr/b/c.zarr/`) is strongly discouraged because it breaks the root-recovery rule above.
+- **Terminal paths**: a path `p` within the hierarchy is *terminal* (a leaf) when any of the following holds:
+  - an array node is reached at `p`,
+  - a group with no members is reached at `p`,
+  - `p` ends with a `zarr.json` file.
+
+### Attributes
+
+The store root carries a top-level spatial footprint. This is **informative**: it helps clients place the store spatially (STAC-style discovery) but is not authoritative — per-Dataset / per-Multiscale Dataset `spatial:` and `proj:` attributes remain the source of truth for reading individual variables.
+
+| key | type | required | notes |
+| --- | ---- | -------- | ----- |
+| `zarr_conventions` | array | yes | MUST declare the `spatial:` and `proj:` conventions used at the root |
+| `spatial:bbox` | number[4] | yes | Bounding box `[xmin, ymin, xmax, ymax]` covering the union of all spatial assets in the store, expressed in the CRS named by `proj:code` (or `proj:wkt2` / `proj:projjson`) |
+| `proj:code` | string | conditional* | Authority:code identifier of the bbox CRS, e.g. `"EPSG:4326"` |
+| `proj:wkt2` | string | conditional* | WKT2 representation of the bbox CRS |
+| `proj:projjson` | object | conditional* | PROJJSON representation of the bbox CRS |
+
+\* At least one of `proj:code`, `proj:wkt2`, `proj:projjson` MUST be provided. Use `"EPSG:4326"` (longitude/latitude, degrees) when no other CRS is meaningful — the store-root CRS is always declared explicitly; there is no implicit default.
+
+> [!Note]
+> The store-root `spatial:bbox` is **a summary** — e.g. the union of footprints from all nested Datasets / Multiscale Datasets. It is not a substitute for the per-group `spatial:bbox` defined by the [spatial convention](https://github.com/zarr-conventions/spatial).
+
+> [!Note]
+> A future extension may carry a list-of-bboxes at the root (one global + one per child group), STAC-style. This is tracked in [zarr-developers/geozarr-spec#133](https://github.com/zarr-developers/geozarr-spec/issues/133).
+
+### Example — store root in EPSG:4326
+
+```json
+{
+    "zarr.json": {
+        "node_type": "group",
+        "zarr_format": 3,
+        "attributes": {
+            "zarr_conventions": [
+                {
+                    "uuid": "f17cb550-5864-4468-aeb7-f3180cfb622f",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-experimental/geo-proj/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-experimental/geo-proj/blob/v1/README.md",
+                    "name": "proj:",
+                    "description": "Coordinate reference system information for geospatial data"
+                },
+                {
+                    "uuid": "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-conventions/spatial/blob/v1/README.md",
+                    "name": "spatial:",
+                    "description": "Spatial coordinate information"
+                }
+            ],
+            "proj:code": "EPSG:4326",
+            "spatial:bbox": [6.45686, 44.13800, 7.87192, 45.14807]
+        }
+    }
+}
+```
+
+### Example — store root in a non-4326 CRS
+
+```json
+{
+    "zarr.json": {
+        "node_type": "group",
+        "zarr_format": 3,
+        "attributes": {
+            "zarr_conventions": [
+                {
+                    "uuid": "f17cb550-5864-4468-aeb7-f3180cfb622f",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-experimental/geo-proj/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-experimental/geo-proj/blob/v1/README.md",
+                    "name": "proj:",
+                    "description": "Coordinate reference system information for geospatial data"
+                },
+                {
+                    "uuid": "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
+                    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v1/schema.json",
+                    "spec_url": "https://github.com/zarr-conventions/spatial/blob/v1/README.md",
+                    "name": "spatial:",
+                    "description": "Spatial coordinate information"
+                }
+            ],
+            "proj:code": "EPSG:32632",
+            "spatial:bbox": [296577.1, 4887794.6, 413081.4, 5004299.4]
+        }
+    }
+}
+```
 
 ## DataArray
 
@@ -82,8 +183,7 @@ DataArrays must have at least 1 dimension — scalar arrays are not allowed. The
         "chunk_key_encoding": {"name": "default", "configuration": {"separator" : "/"}},
         "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10,11,12]}},
         "codecs": [{"name": "bytes"}],
-        "dimension_names": ["lat", "lon", "time"],
-        "storage_transformers": []
+        "dimension_names": ["lat", "lon", "time"]
         }
 }
 ```
@@ -95,7 +195,7 @@ as well as arbitrary sub-groups.
 
 ### Attributes
 
-There are no required attributes for Datasets. To qualify as a GeoZarr Dataset, the group must carry geospatial metadata via the `proj:` and `spatial:` conventions declared in its `zarr_conventions` attribute.
+To qualify as a GeoZarr Dataset, the group must carry geospatial metadata via the `proj:` and `spatial:` conventions declared in its `zarr_conventions` attribute.
 
 #### Geospatial Metadata
 
@@ -125,17 +225,16 @@ Geospatial reference information is encoded through two complementary convention
 > The `spatial:transform` uses **Rasterio/Affine coefficient ordering** `[a, b, c, d, e, f]`, which differs from GDAL's `GetGeoTransform` ordering `[c, a, b, f, d, e]`. Converting from GDAL: `spatial_transform = [GT(1), GT(2), GT(0), GT(4), GT(5), GT(3)]`.
 
 > [!Note]
-> CF metadata (`standard_name`, `grid_mapping` variables, coordinate variable attributes) is no longer required by this specification but remains compatible and may be included alongside the Zarr conventions. See [CF conventions](https://cfconventions.org) for reference.
+> CF metadata (`standard_name`, coordinate variable attributes, etc.) is outside the scope of this specification. Its presence in a Zarr store alongside these conventions is neither required nor precluded.
 
 ### Members
 
 If any member of a GeoZarr Dataset is an array, then it must comply with the [DataArray](#dataarray) definition.
 
 If the Dataset contains a DataArray `D`, then for each dimension name `N` in the list of `D`'s named dimensions, 
-the Dataset must contain a one-dimensional DataArray named `N` with a shape that matches the the length 
-of `D` along the axis named by `N`. In this case, `D` is called a "data variable", and the each 
-of `D` along the axis named by `N`. In this case, `D` is called a "data variable", and each 
-DataArray matching a dimension names of `D` is called a "coordinate variable". 
+the Dataset must contain a one-dimensional DataArray named `N` with a shape that matches the length
+of `D` along the axis named by `N`. In this case, `D` is called a "data variable", and each
+DataArray matching a dimension name of `D` is called a "coordinate variable".
 
 > [!Note]
 > These two definitions are not mutually exclusive, as a 1-dimensional DataArray named `D` with
@@ -246,7 +345,7 @@ The `zarr_conventions` array at the Multiscale Dataset's root group MUST declare
 | `multiscales` | [MultiscalesMetadata](#multiscalesmetadata) | yes | Pyramid layout for this group |
 | `proj:code` | string | conditional* | CRS for all resolution levels (group-level inheritance) |
 | `spatial:dimensions` | string[] | yes | Names of spatial dimensions, e.g. `["Y", "X"]` |
-| `spatial:bbox` | number[] | no | Overall bounding box in the CRS coordinate space |
+| `spatial:bbox` | number[4] | yes | Overall bounding box `[xmin, ymin, xmax, ymax]` in the CRS coordinate space, covering every level in the pyramid |
 
 \* At least one of `proj:code`, `proj:wkt2`, or `proj:projjson` must be provided for geospatial datasets.
 
@@ -269,8 +368,8 @@ Each object in the `layout` array represents one resolution level:
 | `derived_from` | string | no | Path to the source level from which this level was generated. Required to define the transform |
 | `transform` | [TransformObject](#transformobject) | conditional | Required when `derived_from` is present. Describes the relative coordinate transformation from the source level |
 | `resampling_method` | string | no | Per-level override of the default resampling method |
-| `spatial:shape` | integer[] | no | Shape of the spatial dimensions at this level `[height, width]` |
-| `spatial:transform` | number[6] | no | Affine transform coefficients for this level, in Rasterio/Affine ordering `[a, b, c, d, e, f]` |
+| `spatial:shape` | integer[2] | yes | Shape of the spatial dimensions at this level `[height, width]` |
+| `spatial:transform` | number[6] | yes | Absolute affine transform coefficients for this level, in Rasterio/Affine ordering `[a, b, c, d, e, f]` |
 
 #### TransformObject
 
@@ -498,8 +597,8 @@ Key aspects:
 | `derived_from` | string | no | Relative path to the source level |
 | `transform` | TransformObject | conditional | Required when `derived_from` is present |
 | `resampling_method` | string | no | Per-level resampling override |
-| `spatial:shape` | integer[] | no | Spatial dimensions shape `[height, width]` at this level |
-| `spatial:transform` | number[6] | no | Absolute affine transform for this level (Rasterio/Affine ordering) |
+| `spatial:shape` | integer[2] | yes | Spatial dimensions shape `[height, width]` at this level |
+| `spatial:transform` | number[6] | yes | Absolute affine transform for this level (Rasterio/Affine ordering) |
 
 #### TransformObject
 

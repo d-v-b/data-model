@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eopf-geozarr"
-version = "0.8.0"
+version = "0.9.0"
 description = "GeoZarr compliant data model for EOPF datasets"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -29,15 +29,15 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic-zarr>=0.9.1",
     "pydantic>=2.12",
-    "zarr>=3.1.4",
+    "zarr[cast-value-rs]>=3.2.0",
     "xarray>=2025.7.1",
-    "dask[array,distributed]>=2025.5.1",
+    "dask[array,distributed]>=2026.1.0",
     "numpy>=2.3.1",
     "rioxarray>=0.13.0",
     "cf-xarray>=0.8.0",
     "typing-extensions>=4.15.0",
     "zarr-cm>=0.2.0",
-    "aiohttp>=3.8.1",
+    "aiohttp>=3.13.3",
     "s3fs>=2024.6.0",
     "boto3>=1.34.0",
     "pyproj>=3.7.0",
@@ -51,7 +51,6 @@ dev = [
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
     "bandit[toml]>=1.7.0",
-    "safety>=2.0.0",
 ]
 test = [
     "jsondiff>=2.2.1",
@@ -181,6 +180,7 @@ module = [
     "eopf_geozarr.data_api.s1",
     "eopf_geozarr.data_api.s2",
     "eopf_geozarr.data_api.geozarr.v2",
+    "eopf_geozarr.data_api.geozarr.store",
 ]
 disable_error_code = ["valid-type"]
 
@@ -223,5 +223,15 @@ skips = ["B101", "B601"]
 
 [tool.uv]
 default-groups = ["dev", "test"]
+constraint-dependencies = [
+    "urllib3>=2.7.0",
+    "requests>=2.33.0",
+    "cryptography>=46.0.6",
+    "tornado>=6.5.5",
+    "filelock>=3.20.3",
+    "virtualenv>=20.36.1",
+    "black>=26.3.1",
+    "pygments>=2.20.0",
+]
 
 

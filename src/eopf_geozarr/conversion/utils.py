@@ -1,11 +1,46 @@
 """Utility functions for GeoZarr conversion."""
 
+from typing import Any
+
 import numpy as np
 import rasterio  # noqa: F401  # Import to enable .rio accessor
 import structlog
 import xarray as xr
 
 log = structlog.get_logger()
+
+
+# Sentinel: distinguish "no explicit fill_value" from a legitimate `None`.
+UNSET: Any = object()
+
+
+def explicit_fill_value(var: xr.DataArray) -> Any:
+    """Pick a zarr-level `fill_value` for `var` based on its source `_FillValue`.
+
+    Different xarray versions infer different on-disk fill values when the
+    encoding dict doesn't pin it: older xarray defaults floats to 0.0; newer
+    xarray honours the source `_FillValue`. Setting `fill_value` explicitly
+    via this helper removes that degree of freedom so the on-disk metadata is
+    stable across xarray versions.
+
+    Returns
+    -------
+    object
+        The value to assign to `encoding["fill_value"]`. The sentinel `UNSET`
+        is returned when the source has no `_FillValue` (caller should leave
+        the encoding entry alone). For non-finite floats, returns the
+        JSON-canonical string form (`"NaN"` / `"Infinity"` / `"-Infinity"`)
+        that zarr-python serialises.
+    """
+    source_fill = var.encoding.get("_FillValue")
+    if source_fill is None:
+        return UNSET
+    fill_arr = np.asarray(source_fill)
+    if np.issubdtype(fill_arr.dtype, np.floating) and not np.isfinite(fill_arr):
+        if np.isnan(fill_arr):
+            return "NaN"
+        return "Infinity" if fill_arr > 0 else "-Infinity"
+    return source_fill
 
 
 def downsample_2d_array(

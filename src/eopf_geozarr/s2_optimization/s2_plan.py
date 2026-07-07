@@ -15,7 +15,6 @@ import numpy as np
 import structlog
 import zarr
 from zarr.codecs import ShardingCodec
-from zarr.core.chunk_grids import RegularChunkGrid
 from zarr.core.group import GroupMetadata
 from zarr.core.metadata.v3 import ArrayV3Metadata
 from zarr.dtype import Int64
@@ -79,6 +78,17 @@ class FillSpec:
     scale_factor: int = 1
     is_spatial_ref: bool = False
     computed_values: np.ndarray | None = None
+
+
+def _regular_chunk_grid(chunk_shape: tuple[int, ...]) -> dict[str, Any]:
+    """
+    Build a regular chunk-grid metadata dict for ``ArrayV3Metadata``.
+
+    ``ArrayV3Metadata.chunk_grid`` is parsed from the named-configuration dict
+    form, which is the stable public representation across zarr-python
+    versions (the concrete class has moved/renamed between releases).
+    """
+    return {"name": "regular", "configuration": {"chunk_shape": chunk_shape}}
 
 
 def compute_transform_from_coords(
@@ -214,7 +224,7 @@ def _derive_array_metadata(
     return replace(
         meta,
         shape=new_shape,
-        chunk_grid=RegularChunkGrid(chunk_shape=new_chunks),
+        chunk_grid=_regular_chunk_grid(new_chunks),
         codecs=new_codecs,
     )
 
@@ -481,7 +491,7 @@ def plan_derived_levels(
             derived_coord_meta = replace(
                 parent_coord_meta,
                 shape=(new_length,),
-                chunk_grid=RegularChunkGrid(chunk_shape=(new_chunk,)),
+                chunk_grid=_regular_chunk_grid((new_chunk,)),
             )
             nodes[target_key] = derived_coord_meta
             coord_val = coord_values.get(f"{next_prefix}/{coord_name}")

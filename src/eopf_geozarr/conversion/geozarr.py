@@ -1105,7 +1105,7 @@ def write_dataset_band_by_band_with_validation(
         try:
             fs.rm(target_path, recursive=True)
         except FileNotFoundError:
-            pass
+            log.debug("Target not found, skipping removal", target_path=target_path)
         except Exception as cleanup_error:
             log.info(
                 "    ⚠️ Failed to remove",
@@ -1480,7 +1480,14 @@ def _create_encoding(
             else:
                 chunking = (min(spatial_chunk, data_shape[-1]),)
 
-        encoding[var] = {"compressors": [compressor], "chunks": chunking}
+        var_encoding: XarrayEncodingJSON = {
+            "compressors": [compressor],
+            "chunks": chunking,
+        }
+        fv = utils.explicit_fill_value(ds[var])
+        if fv is not utils.UNSET:
+            var_encoding["fill_value"] = fv
+        encoding[var] = var_encoding
 
     # Add coordinate encoding
     for coord in ds.coords:
@@ -1566,11 +1573,15 @@ def _create_geozarr_encoding(
                             axis=i,
                         )
 
-            encoding[var] = {
+            var_encoding: XarrayEncodingJSON = {
                 "chunks": chunks,
                 "compressors": compressor,
                 "shards": shards,
             }
+            fv = utils.explicit_fill_value(ds[var])
+            if fv is not utils.UNSET:
+                var_encoding["fill_value"] = fv
+            encoding[var] = var_encoding
 
     # Add coordinate encoding
     for coord in ds.coords:

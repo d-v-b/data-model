@@ -1,0 +1,26 @@
+name: Security Audit
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write  # action-python-security-auditing posts and updates PR comments
+    steps:
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      with:
+        persist-credentials: false
+    - uses: developmentseed/action-python-security-auditing@8ebea22ea75dfba2244ed9883c2aa6cb4df8d9a9 # v0.6.0
+      with:
+        package_manager: uv
+        bandit_scan_dirs: 'src/eopf_geozarr/'
+        artifact_name: security-reports

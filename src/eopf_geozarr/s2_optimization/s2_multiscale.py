@@ -12,7 +12,7 @@ import structlog
 import xarray as xr
 from dask import delayed
 from dask.array import from_delayed
-from zarr.codecs import BloscCodec
+from zarr.codecs import BloscCodec, CastValue
 from zarr_cm import geo_proj
 from zarr_cm import spatial as spatial_cm
 
@@ -23,6 +23,7 @@ from eopf_geozarr.data_api.geozarr.types import (
     XarrayDataArrayEncoding,
 )
 from eopf_geozarr.s2_optimization.common import DISTRIBUTED_AVAILABLE
+from eopf_geozarr.s2_optimization.s2_band_mapping import BAND_INFO
 
 from .s2_resampling import determine_variable_type, downsample_variable
 
@@ -93,6 +94,107 @@ def update_encoding(
     return new_encoding
 
 
+def _coarsen_variable(var_name: str, var_data: xr.DataArray, factor: int) -> xr.DataArray:
+    """Coarsen a single variable using type-aware resampling.
+
+    Dispatches to the appropriate coarsen reduction (mean, max, subsample)
+    based on `determine_variable_type`.  Preserves encoding and dtype.
+    """
+    var_type = determine_variable_type(var_name, var_data)
+    coarsened = var_data.coarsen({"x": factor, "y": factor}, boundary="trim")
+    if var_type in ("reflectance", "probability"):
+        result = coarsened.mean()
+    elif var_type == "classification":
+        result = coarsened.reduce(subsample_2)
+    elif var_type == "quality_mask":
+        result = coarsened.max()
+    else:
+        raise ValueError(f"Unknown variable type {var_type}")
+
+    # `xr.DataArray.astype` clears `.encoding`, so we capture it first and
+    # restore it on the cast result. Without this, downstream code that
+    # inspects encoding (e.g. to push CF scale-offset into a codec pipeline)
+    # would see an empty encoding on every coarsened level.
+    encoding = var_data.encoding
+    result = result.astype(var_data.dtype)
+    result.encoding = encoding
+    return result
+
+
+def inject_missing_bands(
+    dataset: xr.Dataset,
+    dt_input: xr.DataTree,
+    target_resolution: int,
+    *,
+    bands: set[str] | None = None,
+) -> xr.Dataset:
+    """Inject bands whose native resolution is finer than `target_resolution`.
+
+    For each spectral band defined in `BAND_INFO` whose native resolution is
+    finer than `target_resolution`, this function checks whether the band is
+    already present in `dataset`.  If not, it looks for the band in the
+    appropriate source group (e.g. `/measurements/reflectance/r10m`),
+    downsamples it to the target grid using the type-aware resampling from
+    `determine_variable_type`, and merges it into `dataset`.
+
+    Args:
+        dataset: The target-resolution dataset (e.g. the r20m or r60m
+            reflectance group).
+        dt_input: The full input DataTree (used to locate finer-resolution
+            source bands).
+        target_resolution: Target resolution in metres (e.g. 20 or 60).
+        bands: If provided, only inject these band names.  If `None`
+            (default), inject every eligible band from `BAND_INFO`.
+
+    Returns:
+        `dataset` with any missing finer-resolution bands added.
+    """
+    for band_name, info in BAND_INFO.items():
+        if bands is not None and band_name not in bands:
+            continue
+        native_res = info.native_resolution  # type: ignore[attr-defined]
+        if native_res >= target_resolution:
+            continue
+        if band_name in dataset.data_vars:
+            continue
+
+        source_path = f"/measurements/reflectance/r{native_res}m"
+        if source_path not in dt_input.groups:
+            continue
+
+        source_ds = dt_input[source_path].to_dataset()
+        if band_name not in source_ds.data_vars:
+            continue
+
+        band_src = source_ds[band_name]
+        factor = target_resolution // native_res
+        band_ds = _coarsen_variable(band_name, band_src, factor)
+
+        # Replace coordinates with the target dataset's coordinates so that
+        # xarray.Dataset.assign does not try to align on mismatched values.
+        band_ds = xr.DataArray(
+            band_ds.values,
+            dims=band_ds.dims,
+            coords={d: dataset.coords[d] for d in band_ds.dims if d in dataset.coords},
+            attrs=band_ds.attrs,
+            name=band_name,
+        )
+
+        # Preserve source encoding so downstream encoding logic can inspect it
+        band_ds.encoding = band_src.encoding.copy()
+
+        dataset = dataset.assign({band_name: band_ds})
+        log.info(
+            "Injected downsampled band from finer resolution",
+            band=band_name,
+            source=f"r{native_res}m",
+            target=f"r{target_resolution}m",
+            shape=band_ds.shape,
+        )
+
+    return dataset
+
+
 def auto_chunks(shape: tuple[int, ...], target_chunk_size: int) -> tuple[int, ...]:
     """
     Compute a chunk size from a shape and a target chunk size. This logic is application-specific.
@@ -125,6 +227,7 @@ def create_measurements_encoding(
     spatial_chunk: int,
     enable_sharding: bool = True,
     keep_scale_offset: bool = True,
+    experimental_scale_offset_codec: bool = False,
 ) -> dict[str, XarrayDataArrayEncoding]:
     """
     Create optimized encoding for a pyramid level with advanced chunking and sharding.
@@ -172,7 +275,48 @@ def create_measurements_encoding(
         # Forward-propagate the existing encoding, minus keys that should be omitted
         keep_keys = XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks"}
 
-        if not keep_scale_offset:
+        if experimental_scale_offset_codec and not keep_scale_offset:
+            # Push CF scale-offset into the zarr codec pipeline instead of
+            # decoding to float. The data stays as packed integers on disk,
+            # but zarr transparently decodes on read.
+            scale_factor = var_data.encoding.get("scale_factor")
+            add_offset = var_data.encoding.get("add_offset")
+            packed_dtype = var_data.encoding.get("dtype")
+
+            if scale_factor is not None and add_offset is not None and packed_dtype is not None:
+                from eopf_geozarr.codecs.scale_offset import scale_offset_from_cf
+
+                so_codec = scale_offset_from_cf(
+                    scale_factor=float(scale_factor), add_offset=float(add_offset)
+                )
+                # CastValue refuses to cast NaN to integer without an explicit
+                # mapping, so we need a packed-dtype sentinel for NaN. Prefer
+                # the source's existing `_FillValue` (it already encodes the
+                # "no data" semantic via xarray's CF mask_and_scale loop), and
+                # fall back to the dtype's lowest representable integer.
+                packed_np_dtype = np.dtype(packed_dtype)
+                source_fill = var_data.encoding.get("_FillValue")
+                if source_fill is not None:
+                    nan_sentinel = int(source_fill)
+                else:
+                    nan_sentinel = int(np.iinfo(packed_np_dtype).min)
+                cv_codec = CastValue(
+                    data_type=packed_np_dtype.name,
+                    rounding="nearest-even",
+                    scalar_map={
+                        "encode": [("NaN", nan_sentinel)],
+                        "decode": [(nan_sentinel, "NaN")],
+                    },
+                )
+                var_encoding["filters"] = (so_codec, cv_codec)
+
+            # Strip CF keys and `filters` from `keep_keys` — the codecs handle
+            # encoding/decoding now, and we don't want the forward-propagation
+            # loop below to overwrite our freshly-set filters with whatever was
+            # on the source variable.
+            keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue", "filters"}
+            var_encoding["fill_value"] = "NaN"
+        elif not keep_scale_offset:
             # When stripping scale/offset, also strip _FillValue since the original
             # _FillValue is in raw integer units and meaningless for decoded float data.
             keep_keys = keep_keys - CF_SCALE_OFFSET_KEYS - {"_FillValue"}
@@ -322,8 +466,8 @@ def create_downsampled_resolution_group(source_dataset: xr.Dataset, factor: int)
 
 def subsample_2(a: xr.DataArray, axis: tuple[int, ...] | None = None) -> xr.DataArray:
     if axis is None:
-        return a[((slice(None, None, 2),) * a.ndim)]
-    indexer = [slice(None, None, 2) if i in axis else slice(None) for i in range(a.ndim)]
+        return a[((0,) * a.ndim)]
+    indexer = [0 if i in axis else slice(None) for i in range(a.ndim)]
     return a[tuple(indexer)]
 
 

@@ -14,13 +14,17 @@ import zarr
 from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.v3 import GroupSpec
 from structlog.testing import capture_logs
+from zarr.codecs import BloscCodec, CastValue, ScaleOffset
+from zarr.core.dtype import Int16
 
 from eopf_geozarr.s2_optimization.s2_converter import convert_s2_optimized
 from eopf_geozarr.s2_optimization.s2_multiscale import (
+    _coarsen_variable,
     calculate_aligned_chunk_size,
     calculate_simple_shard_dimensions,
     create_downsampled_resolution_group,
     create_measurements_encoding,
+    inject_missing_bands,
 )
 
 try:
@@ -232,6 +236,52 @@ def test_calculate_simple_shard_dimensions() -> None:
     assert shard_dims[1] == 768  # 3 * 256 = 768
 
 
+def test_create_measurements_encoding_experimental_scale_offset_codec() -> None:
+    """Test that experimental_scale_offset_codec adds ScaleOffset + CastValue filters."""
+    # Create a dataset with CF-style scale-offset encoding, as xarray would
+    # produce when reading a CF-encoded zarr/netCDF variable.
+    data = xr.DataArray(
+        np.arange(0, 100, dtype="float64").reshape(10, 10),
+        dims=["y", "x"],
+    )
+    data.encoding = {
+        "scale_factor": 0.01,
+        "add_offset": 273.15,
+        "dtype": np.dtype("int16"),
+    }
+    ds = xr.Dataset({"temperature": data})
+
+    encoding = create_measurements_encoding(
+        ds,
+        enable_sharding=True,
+        spatial_chunk=256,
+        keep_scale_offset=False,
+        experimental_scale_offset_codec=True,
+    )
+
+    int16_min = int(np.iinfo(np.int16).min)
+    assert encoding == {
+        "temperature": {
+            "chunks": (10, 10),
+            "compressors": (BloscCodec(cname="zstd", clevel=3, shuffle="shuffle", blocksize=0),),
+            "shards": (10, 10),
+            "filters": (
+                ScaleOffset(offset=273.15, scale=100.0),
+                CastValue(
+                    data_type=Int16(endianness="little"),
+                    rounding="nearest-even",
+                    out_of_range=None,
+                    scalar_map={
+                        "encode": [("NaN", int16_min)],
+                        "decode": [(int16_min, "NaN")],
+                    },
+                ),
+            ),
+            "fill_value": "NaN",
+        }
+    }
+
+
 @pytest.mark.filterwarnings("ignore:.*:zarr.errors.ZarrUserWarning")
 @pytest.mark.parametrize("keep_scale_offset", [True, False])
 def test_create_measurements_encoding(keep_scale_offset: bool, sample_dataset: xr.Dataset) -> None:
@@ -307,7 +357,8 @@ def test_convert_s2_optimized(
     s2_group_example: Path,
     tmp_path: pathlib.Path,
 ) -> None:
-    """Test multiscale creation from DataTree."""
+    """Snapshot test: convert an S2 example and compare the output structure
+    against a stored fixture."""
     input_group = zarr.open_group(s2_group_example)
 
     output_path = tmp_path / "output.zarr"
@@ -322,6 +373,7 @@ def test_convert_s2_optimized(
             compression_level=1,
             validate_output=False,
             keep_scale_offset=False,
+            experimental_scale_offset_codec=False,
         )
     observed_group = zarr.open_group(output_path)
     observed_structure = GroupSpec.from_zarr(observed_group)
@@ -392,13 +444,13 @@ def test_convert_s2_optimized(
     if o_keys != e_keys:
         (tmp_path / "extra_observed_keys.json").write_text(
             json.dumps(
-                {k: v.model_dump() for k, v in observed_structure_flat if k in o_keys - e_keys},
+                {k: observed_structure_flat[k].model_dump() for k in o_keys - e_keys},
                 indent=2,
             )
         )
         (tmp_path / "extra_expected_keys.json").write_text(
             json.dumps(
-                {k: v.model_dump() for k, v in expected_structure_flat if k in e_keys - o_keys},
+                {k: expected_structure_flat[k].model_dump() for k in e_keys - o_keys},
                 indent=2,
             )
         )
@@ -434,3 +486,155 @@ def test_convert_s2_optimized(
             f"Value mismatches: {mismatch_values[:20]}\n"
             f"Check {mismatch_values_path!s} to see the observed JSON structure."
         )
+
+
+# ---------------------------------------------------------------------------
+# _coarsen_variable
+# ---------------------------------------------------------------------------
+
+
+def test_coarsen_variable_classification() -> None:
+    """Classification variables should be downsampled via subsample."""
+    data = np.arange(16, dtype="uint8").reshape(4, 4)
+    var = xr.DataArray(data, dims=["y", "x"], coords={"y": np.arange(4.0), "x": np.arange(4.0)})
+    result = _coarsen_variable("scl", var, factor=2)
+    assert result.shape == (2, 2)
+    assert result.dtype == np.uint8
+    # subsample picks top-left of each 2x2 block
+    np.testing.assert_array_equal(result.values, data[::2, ::2])
+
+
+def test_coarsen_variable_quality_mask() -> None:
+    """Quality mask variables should be downsampled via max."""
+    data = np.array([[0, 1], [2, 3]], dtype="uint8")
+    var = xr.DataArray(data, dims=["y", "x"], coords={"y": np.arange(2.0), "x": np.arange(2.0)})
+    result = _coarsen_variable("quality_cirrus", var, factor=2)
+    assert result.shape == (1, 1)
+    assert result.values.item() == 3
+
+
+# ---------------------------------------------------------------------------
+# inject_missing_bands
+# ---------------------------------------------------------------------------
+
+
+def _make_reflectance_datatree() -> xr.DataTree:
+    """Build a minimal DataTree with /measurements/reflectance/r10m and r20m."""
+    size_10m = 120  # must be divisible by 2 (→60) and 6 (→20)
+    x10 = np.arange(size_10m, dtype="float64")
+    y10 = np.arange(size_10m, dtype="float64")
+
+    r10m_ds = xr.Dataset(
+        {
+            "b02": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b03": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b04": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b08": (["y", "x"], np.full((size_10m, size_10m), 42, dtype="uint16")),
+        },
+        coords={"x": x10, "y": y10},
+    )
+
+    size_20m = size_10m // 2
+    x20 = np.arange(size_20m, dtype="float64")
+    y20 = np.arange(size_20m, dtype="float64")
+    r20m_ds = xr.Dataset(
+        {
+            "b05": (["y", "x"], np.ones((size_20m, size_20m), dtype="uint16")),
+        },
+        coords={"x": x20, "y": y20},
+    )
+
+    dt = xr.DataTree()
+    dt["measurements/reflectance/r10m"] = xr.DataTree(r10m_ds)
+    dt["measurements/reflectance/r20m"] = xr.DataTree(r20m_ds)
+    return dt
+
+
+def test_inject_missing_bands_respects_bands_filter() -> None:
+    """With bands={"b08"}, only b08 should be injected even when others are eligible."""
+    dt = _make_reflectance_datatree()
+    r20m_ds = dt["measurements/reflectance/r20m"].to_dataset()
+
+    result = inject_missing_bands(r20m_ds, dt, target_resolution=20, bands={"b08"})
+
+    assert "b08" in result.data_vars
+    assert result["b08"].shape == (60, 60)
+    assert result["b08"].dtype == np.uint16
+    # b02/b03/b04 are also eligible (10m native, missing from r20m) but excluded
+    for excluded in ("b02", "b03", "b04"):
+        assert excluded not in result.data_vars
+
+
+def test_inject_missing_bands_skips_existing() -> None:
+    """Bands already present in the dataset should not be overwritten."""
+    dt = _make_reflectance_datatree()
+    r20m_ds = dt["measurements/reflectance/r20m"].to_dataset()
+
+    # Pre-populate b08 with a sentinel value so we can verify it is NOT replaced.
+    sentinel = np.full((60, 60), 999, dtype="uint16")
+    r20m_ds["b08"] = (["y", "x"], sentinel)
+
+    result = inject_missing_bands(r20m_ds, dt, target_resolution=20, bands={"b08"})
+
+    # b08 was already present — inject_missing_bands must leave it untouched.
+    np.testing.assert_array_equal(result["b08"].values, sentinel)
+
+
+def test_inject_missing_bands_noop_when_no_source() -> None:
+    """If the source group is missing from the DataTree, return dataset unchanged."""
+    dt = xr.DataTree()
+    ds = xr.Dataset({"b05": (["y", "x"], np.ones((60, 60)))})
+
+    result = inject_missing_bands(ds, dt, target_resolution=20)
+
+    assert "b08" not in result.data_vars
+
+
+def test_inject_missing_bands_default_injects_all() -> None:
+    """With bands=None (default), all eligible finer bands should be injected."""
+    size_10m = 120
+    x10 = np.arange(size_10m, dtype="float64")
+    y10 = np.arange(size_10m, dtype="float64")
+
+    r10m_ds = xr.Dataset(
+        {
+            "b02": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b03": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b04": (["y", "x"], np.ones((size_10m, size_10m), dtype="uint16")),
+            "b08": (["y", "x"], np.full((size_10m, size_10m), 42, dtype="uint16")),
+        },
+        coords={"x": x10, "y": y10},
+    )
+
+    size_20m = 60
+    x20 = np.arange(size_20m, dtype="float64")
+    y20 = np.arange(size_20m, dtype="float64")
+    r20m_ds = xr.Dataset(
+        {
+            "b05": (["y", "x"], np.ones((size_20m, size_20m), dtype="uint16")),
+            "b06": (["y", "x"], np.ones((size_20m, size_20m), dtype="uint16")),
+        },
+        coords={"x": x20, "y": y20},
+    )
+
+    size_60m = 20
+    x60 = np.arange(size_60m, dtype="float64")
+    y60 = np.arange(size_60m, dtype="float64")
+    r60m_ds = xr.Dataset(
+        {
+            "b01": (["y", "x"], np.ones((size_60m, size_60m), dtype="uint16")),
+        },
+        coords={"x": x60, "y": y60},
+    )
+
+    dt = xr.DataTree()
+    dt["measurements/reflectance/r10m"] = xr.DataTree(r10m_ds)
+    dt["measurements/reflectance/r20m"] = xr.DataTree(r20m_ds)
+    dt["measurements/reflectance/r60m"] = xr.DataTree(r60m_ds)
+
+    result = inject_missing_bands(r60m_ds, dt, target_resolution=60)
+
+    # All 10m bands (b02, b03, b04, b08) and 20m bands (b05, b06) should be injected
+    for band in ("b02", "b03", "b04", "b08", "b05", "b06"):
+        assert band in result.data_vars, f"{band} missing from r60m"
+        assert result[band].shape == (size_60m, size_60m)
