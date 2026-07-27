@@ -37,6 +37,7 @@
 Create `tests/test_olci_reproject.py`:
 
 ```python
+# test: skip
 """Tests for OLCI swath -> regular grid reprojection."""
 
 from __future__ import annotations

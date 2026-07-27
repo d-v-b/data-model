@@ -297,9 +297,10 @@ via /2 downsampling.
 
 Sentinel-3 OLCI (Ocean and Land Colour Instrument) Level-1 EFR (Full Resolution)
 products are detected automatically by `eopf-geozarr convert` and routed to the
-dedicated OLCI converter.  Unlike Sentinel-2, OLCI data uses **native swath geometry**:
-measurements are stored on a per-pixel 2-D lat/lon grid with no reprojection to a
-projected CRS.  The exporter preserves this curvilinear geometry intact.
+dedicated OLCI converter.  Unlike Sentinel-2, OLCI data starts out on **native
+swath geometry**: measurements are stored on a per-pixel 2-D lat/lon grid.  The
+exporter warps this curvilinear swath once onto a regular grid (default
+`EPSG:4326`) so that the output is a standard GeoZarr raster.
 
 #### Auto-detection
 
@@ -324,16 +325,22 @@ Key flags:
   dimension would drop below this value (default: 256)
 - `--enable-sharding` — accepted but not yet wired into encoding (follow-up task)
 - `--keep-scale-offset` — accepted but not yet wired into encoding (follow-up task)
+- `--target-crs` — target CRS for the reprojected output grid (default: `EPSG:4326`)
 
 #### What is converted
 
-- **`/measurements/r0`**: all 21 OLCI radiance bands at native full resolution,
-  with per-pixel 2-D `latitude`/`longitude` coordinate arrays; the parent
-  `measurements/` group carries the GeoZarr `spatial:` and `multiscales`
-  convention metadata.
-- **Overview subgroups** (`r2`, `r4`, …): /2-decimated copies of the measurements
-  stored as sibling Zarr groups next to `r0` under `measurements/`.
+- **`/measurements/r0`**: all 21 OLCI radiance bands warped once from the
+  native swath onto a regular grid (default `EPSG:4326`, ~300 m preserved),
+  with 1-D `y`/`x` coordinates, a `spatial_ref` variable, and `grid_mapping`
+  on every band; the parent `measurements/` group carries the GeoZarr
+  `multiscales`, `spatial:`, and `proj:` convention metadata.
+- **Overview subgroups** (`r2`, `r4`, …): /2 fill-aware block-averaged copies
+  stored as sibling Zarr groups next to `r0`, each with its own CRS metadata.
 - **`/conditions` and `/quality`**: copied through unmodified.
+
+> **Note:** per-scan-line `time_stamp` is not representable on a regular grid
+> and is dropped from the converted measurements (it remains in the source
+> product).
 
 > **Note:** OLCI support is initial/measurements-focused (v1).  Tie-point grid
 > groups (`conditions/geometry`, `meteorology`, `instrument`) are copied through but

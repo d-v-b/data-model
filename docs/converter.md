@@ -180,10 +180,11 @@ The result is a space-efficient multiscale pyramid: `/measurements/reflectance/{
 ## Sentinel-3 OLCI L1 EFR Conversion
 
 Sentinel-3 OLCI (Ocean and Land Colour Instrument) Level-1 EFR (Full Resolution)
-products are supported.  OLCI uses **native swath geometry**: measurements are stored
-on a per-pixel 2-D lat/lon grid, with no reprojection to a projected CRS.  The
-exporter preserves this curvilinear geometry intact and generates /2-decimated
-overview subgroups for multi-resolution access.
+products are supported.  OLCI measurements start out on **native swath geometry**:
+a per-pixel 2-D lat/lon grid.  The converter reprojects (warps) the swath measurements
+once onto a regular grid (default `EPSG:4326`) using the swath geolocation arrays,
+then generates /2 fill-aware block-averaged overview subgroups for multi-resolution
+access.
 
 ### Auto-detection
 
@@ -211,14 +212,15 @@ eopf-geozarr convert-s3-olci-optimized S3A_OL_1_EFR.zarr output.zarr \
 | `--min-dimension` | 256 | Minimum spatial dimension for overview levels |
 | `--enable-sharding` | off | Accepted but not yet wired into encoding (follow-up task) |
 | `--keep-scale-offset` | off | Accepted but not yet wired into encoding (follow-up task) |
+| `--target-crs` | EPSG:4326 | Target CRS for the reprojected output grid |
 
 ### Output layout
 
 ```
 output.zarr/
-├── measurements/        # Carries multiscales + spatial: convention metadata
-│   ├── r0/             # Native-resolution OLCI bands (oa01_radiance … oa21_radiance)
-│   │                   # with per-pixel latitude/longitude coordinates
+├── measurements/        # Carries multiscales + spatial: + proj: convention metadata
+│   ├── r0/             # Warped native-resolution OLCI bands (oa01_radiance … oa21_radiance)
+│   │                   # with 1-D y/x coordinates and spatial_ref
 │   ├── r2/             # 1/2-resolution overview
 │   ├── r4/             # 1/4-resolution overview
 │   └── ...
@@ -226,8 +228,10 @@ output.zarr/
 └── quality/             # Copied through unmodified (quality flags)
 ```
 
-Each measurement group carries GeoZarr `spatial:` convention metadata and
-references the per-pixel 2-D coordinate arrays `latitude` and `longitude`.
+Each measurement group carries GeoZarr `spatial:` and `proj:` convention metadata,
+with 1-D `y`/`x` dimension coordinates and a `spatial_ref` variable referenced by
+`grid_mapping` on every band.  Per-scan-line `time_stamp` is dropped, since it has
+no representation on a regular grid.
 
 > **Note:** OLCI support is initial/measurements-focused (v1).  Tie-point grid
 > groups in `conditions/geometry`, `meteorology`, and `instrument` are copied

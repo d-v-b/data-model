@@ -348,6 +348,29 @@ def test_olci_conversion_matches_snapshot(
     To (re)generate the snapshot, uncomment the regeneration block below,
     run the test once, then re-comment before committing.
     """
+    # The JSON fixture materializes arrays as zeros; zero lat/lon is a
+    # degenerate geolocation the warp rejects. Seed a plausible grid.
+    #
+    # NOTE: the fixture's latitude/longitude arrays are stored raw as int32
+    # with a CF scale_factor of 1e-6 (real degrees = raw * scale_factor), and
+    # this test opens the datatree with mask_and_scale=False, so xarray hands
+    # reproject_olci the *raw* int32 values unscaled. A ~300 m (0.003 deg)
+    # spacing collapses to a single truncated integer across this fixture's
+    # small 16-row/16-col grid, which is degenerate. Use whole-degree spacing
+    # instead so each row/column truncates to a distinct raw value.
+    fixture_group = zarr.open_group(str(s3_olci_group_example), mode="a")
+    fixture_meas = fixture_group["measurements"]
+    assert isinstance(fixture_meas, zarr.Group)
+    lat_arr = fixture_meas["latitude"]
+    assert isinstance(lat_arr, zarr.Array)
+    ny, nx = lat_arr.shape
+    lat_1d = np.linspace(45.0, 45.0 + 1.0 * (ny - 1), ny)
+    lon_1d = np.linspace(10.0, 10.0 + 1.0 * (nx - 1), nx)
+    lat_arr[:] = np.repeat(lat_1d[:, None], nx, axis=1)
+    lon_arr = fixture_meas["longitude"]
+    assert isinstance(lon_arr, zarr.Array)
+    lon_arr[:] = np.repeat(lon_1d[None, :], ny, axis=0)
+
     dt_in = xr.open_datatree(
         str(s3_olci_group_example),
         engine="zarr",

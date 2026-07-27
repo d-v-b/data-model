@@ -1302,6 +1302,12 @@ def add_s3_olci_optimization_commands(subparsers: argparse._SubParsersAction) ->
         action="store_true",
         help="Preserve scale-offset encoding instead of decoding to float",
     )
+    p.add_argument(
+        "--target-crs",
+        type=str,
+        default="EPSG:4326",
+        help="Target CRS for the reprojected output grid (default: EPSG:4326)",
+    )
     p.add_argument("--verbose", action="store_true", help="Enable verbose output")
     p.set_defaults(func=convert_s3_olci_optimized_command)
 
@@ -1324,6 +1330,7 @@ def convert_s3_olci_optimized_command(args: argparse.Namespace) -> None:
         compression_level=args.compression_level,
         min_dimension=args.min_dimension,
         keep_scale_offset=args.keep_scale_offset,
+        target_crs=args.target_crs,
     )
     log.info("S3 OLCI optimization completed", output_path=args.output_path)
 
