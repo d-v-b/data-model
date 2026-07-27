@@ -29,8 +29,10 @@ if TYPE_CHECKING:
 SWATH_DIMS = ("rows", "columns")
 
 
-def decimate_swath(ds: xr.Dataset, factor: int = 2) -> xr.Dataset:
-    """Return *ds* with every (rows, columns) array subsampled by *factor*.
+def decimate_swath(
+    ds: xr.Dataset, factor: int = 2, *, dims: tuple[str, str] = SWATH_DIMS
+) -> xr.Dataset:
+    """Return *ds* with every array spanning the *dims* spatial dimensions (default ``(rows, columns)``) subsampled by *factor*.
 
     Both data variables and coordinate variables that span exactly the swath
     dims are decimated ``[::factor, ::factor]``; everything else is passed
@@ -40,19 +42,24 @@ def decimate_swath(ds: xr.Dataset, factor: int = 2) -> xr.Dataset:
         raise ValueError(f"factor must be >= 1, got {factor}")
     if factor == 1:
         return ds
-    indexers = {dim: slice(None, None, factor) for dim in SWATH_DIMS if dim in ds.sizes}
+    indexers = {dim: slice(None, None, factor) for dim in dims if dim in ds.sizes}
     if not indexers:
         return ds
     return ds.isel(indexers)
 
 
-def reduce_swath(ds: xr.Dataset, factor: int = 2) -> xr.Dataset:
+def reduce_swath(
+    ds: xr.Dataset, factor: int = 2, *, dims: tuple[str, str] = SWATH_DIMS
+) -> xr.Dataset:
     """Return *ds* with radiance bands block-averaged and 2-D coordinates decimated.
 
     Overviews are an unweighted index-block mean that ASSUMES locally-uniform
     pixel spacing; intended for visualization, not quantitative analysis at
     reduced resolution.  Coordinates are decimated (real sub-pixels), radiance
     is fill-aware block-averaged.
+
+    Parameters spanning the *dims* spatial dimensions (default ``(rows, columns)``)
+    are processed; other variables pass through unchanged.
 
     Radiance variables (those named in :data:`OLCI_BANDS`) are averaged over
     ``factor x factor`` pixel blocks with fill-value awareness: fill pixels
@@ -110,13 +117,13 @@ def reduce_swath(ds: xr.Dataset, factor: int = 2) -> xr.Dataset:
     # producing a store where coordinate arrays are longer than the data they
     # describe, which makes xr.open_dataset raise a conflicting-sizes error.
     dim_trim: dict[str, int] = {
-        dim: (ds.sizes[dim] // factor) * factor for dim in SWATH_DIMS if dim in ds.sizes
+        dim: (ds.sizes[dim] // factor) * factor for dim in dims if dim in ds.sizes
     }
 
     all_names: list[str] = [str(k) for k in ds.data_vars] + [str(k) for k in ds.coords]
     for name in all_names:
         var: xr.DataArray = ds[name] if name in ds.data_vars else ds.coords[name]
-        is_swath_2d: bool = tuple(str(d) for d in var.dims) == SWATH_DIMS
+        is_swath_2d: bool = tuple(str(d) for d in var.dims) == dims
 
         if name in olci_band_set and is_swath_2d:
             # Fill-aware block averaging for radiance bands.
@@ -131,7 +138,7 @@ def reduce_swath(ds: xr.Dataset, factor: int = 2) -> xr.Dataset:
 
             # coarsen().mean() is available at runtime; pyright stubs don't expose .mean()
             # on DataArrayCoarsen, so we suppress the type-check on the reduction call.
-            coarsened = float_var.coarsen({"rows": factor, "columns": factor}, boundary="trim")
+            coarsened = float_var.coarsen({dims[0]: factor, dims[1]: factor}, boundary="trim")
             averaged: xr.DataArray = coarsened.mean()  # type: ignore[attr-defined,assignment]
 
             if fill_value is not None:
@@ -153,7 +160,7 @@ def reduce_swath(ds: xr.Dataset, factor: int = 2) -> xr.Dataset:
             # so that an odd-length dimension N yields floor(N / factor) elements,
             # matching the output length of coarsen(boundary="trim").mean().
             indexers: dict[str, slice] = {
-                dim: slice(0, dim_trim[dim], factor) for dim in SWATH_DIMS if dim in dim_trim
+                dim: slice(0, dim_trim[dim], factor) for dim in dims if dim in dim_trim
             }
             decimated = var.isel(indexers)
             if name in coord_names:
@@ -161,13 +168,13 @@ def reduce_swath(ds: xr.Dataset, factor: int = 2) -> xr.Dataset:
             else:
                 result_vars[name] = decimated
 
-        elif any(dim in (str(d) for d in var.dims) for dim in SWATH_DIMS):
+        elif any(dim in (str(d) for d in var.dims) for dim in dims):
             # 1-D (or higher) variable sharing a swath dim but not 2-D swath:
             # decimate along whichever swath dims it carries.
             var_dims = {str(d) for d in var.dims}
             idx: dict[str, slice] = {
                 dim: slice(0, dim_trim[dim], factor)
-                for dim in SWATH_DIMS
+                for dim in dims
                 if dim in var_dims and dim in dim_trim
             }
             decimated = var.isel(idx)

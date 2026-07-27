@@ -290,3 +290,39 @@ def test_swath_spatial_attrs_has_no_transform() -> None:
     assert attrs.get("spatial:registration") == "pixel"
     assert "spatial:transform" not in attrs
     assert "spatial:bbox" not in attrs
+
+
+# ---------------------------------------------------------------------------
+# grid dims tests (for Task 4: reprojected pyramid)
+# ---------------------------------------------------------------------------
+
+
+def test_reduce_swath_on_grid_dims() -> None:
+    """reduce_swath(dims=("y","x")) block-averages bands and strides 1-D coords.
+
+    After reprojection the pyramid dims are (y, x): bands average fill-aware,
+    the 1-D dimension coordinates decimate by trimmed stride, and non-spatial
+    variables (spatial_ref) pass through unchanged.
+    """
+    ny, nx = 6, 5  # odd x exercises the coarsen-trim alignment
+    band = np.arange(ny * nx, dtype="uint16").reshape(ny, nx)
+    ds = xr.Dataset(
+        {"oa01_radiance": (("y", "x"), band, {"_FillValue": 65535})},
+        coords={
+            "y": ("y", np.linspace(46.0, 45.0, ny)),
+            "x": ("x", np.linspace(10.0, 11.0, nx)),
+            "spatial_ref": ((), 0, {"crs_wkt": "stub"}),
+        },
+    )
+    out = reduce_swath(ds, factor=2, dims=("y", "x"))
+    assert dict(out.sizes) == {"y": 3, "x": 2}
+    # block mean of the top-left 2x2 block, rounded
+    expected00 = round((band[0, 0] + band[0, 1] + band[1, 0] + band[1, 1]) / 4)
+    assert int(out["oa01_radiance"].values[0, 0]) == expected00
+    # 1-D coords: trimmed stride, lengths match the data
+    assert out["y"].size == 3
+    assert out["x"].size == 2
+    np.testing.assert_allclose(out["x"].values, ds["x"].values[0:4:2])
+    # scalar passthrough survives
+    assert "spatial_ref" in out.coords
+    assert out["spatial_ref"].attrs["crs_wkt"] == "stub"
