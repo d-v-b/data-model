@@ -64,10 +64,13 @@ def test_convert_olci_writes_measurements(tmp_path: object) -> None:
     g = zarr.open_group(out, mode="r")
     # native measurements present
     assert "measurements" in g
-    # all 21 bands at native res
+    # all 21 bands at native res, in the r0 base-level group
     meas = g["measurements"]
+    assert isinstance(meas, zarr.Group)
+    r0 = meas["r0"]
+    assert isinstance(r0, zarr.Group)
     for i in range(1, 22):
-        assert f"oa{i:02d}_radiance" in meas
+        assert f"oa{i:02d}_radiance" in r0
 
 
 def test_convert_olci_creates_overviews(tmp_path: object) -> None:
@@ -92,9 +95,9 @@ def test_convert_olci_creates_overviews(tmp_path: object) -> None:
     g1 = zarr.open_group(out1, mode="r")
     meas1 = g1["measurements"]
     assert isinstance(meas1, zarr.Group)
-    subgroups1 = list(meas1.group_keys())
-    assert len(subgroups1) == 0, (
-        f"Expected 0 overview levels for 512x480 at min_dimension=256, got {subgroups1}"
+    subgroups1 = sorted(meas1.group_keys())
+    assert subgroups1 == ["r0"], (
+        f"Expected only the r0 base level for 512x480 at min_dimension=256, got {subgroups1}"
     )
 
     # --- Case 2: 1024x1024, min_dimension=256 → exactly two valid levels ---
@@ -106,11 +109,12 @@ def test_convert_olci_creates_overviews(tmp_path: object) -> None:
     meas2 = g2["measurements"]
     assert isinstance(meas2, zarr.Group)
     subgroups2 = sorted(meas2.group_keys())
-    assert len(subgroups2) == 2, (
-        f"Expected exactly 2 overview levels for 1024x1024 at min_dimension=256, got {subgroups2}"
+    assert subgroups2 == ["r0", "r2", "r4"], (
+        f"Expected r0 + exactly 2 overview levels for 1024x1024 at min_dimension=256, "
+        f"got {subgroups2}"
     )
 
-    # Every overview level must have BOTH spatial dims >= min_dimension.
+    # Every level must have BOTH spatial dims >= min_dimension.
     for sg_name in subgroups2:
         sg = meas2[sg_name]
         assert isinstance(sg, zarr.Group)
@@ -141,6 +145,55 @@ def test_convert_olci_returns_datatree(tmp_path: object) -> None:
     result = convert_olci_optimized(dt, output_path=out, min_dimension=256)
     assert isinstance(result, xr.DataTree)
     assert "/measurements" in result.groups
+
+
+def test_convert_olci_output_opens_as_datatree(tmp_path: object) -> None:
+    """Acceptance: ``xr.open_datatree`` must open the exported store cleanly.
+
+    Full-resolution arrays live in ``measurements/r0`` as a named sibling of
+    the overview groups (``r2``, …), so no child group inherits mismatched
+    parent coordinates. The multiscales layout references the base level by
+    name (``"asset": "r0"``), not ``"."``. This is the layout generic GeoZarr
+    readers (e.g. titiler) require; see the discussion on PR #212.
+    """
+    dt = build_synthetic_olci(rows=1024, cols=1024)
+    out = str(tmp_path / "olci_geozarr.zarr")  # type: ignore[operator]
+    result = convert_olci_optimized(dt, output_path=out, min_dimension=256)
+
+    opened = xr.open_datatree(out, engine="zarr", consolidated=False, chunks={})
+
+    r0 = opened["/measurements/r0"].to_dataset()
+    assert dict(r0.sizes) == {"rows": 1024, "columns": 1024}
+    for i in range(1, 22):
+        assert f"oa{i:02d}_radiance" in r0
+    assert "latitude" in r0.coords
+    assert "longitude" in r0.coords
+
+    r2 = opened["/measurements/r2"].to_dataset()
+    assert dict(r2.sizes) == {"rows": 512, "columns": 512}
+    r4 = opened["/measurements/r4"].to_dataset()
+    assert dict(r4.sizes) == {"rows": 256, "columns": 256}
+
+    # The measurements group itself holds only convention metadata: no arrays,
+    # so children with differing sizes inherit nothing conflicting.
+    meas = opened["/measurements"].to_dataset()
+    assert len(meas.data_vars) == 0
+    assert len(meas.coords) == 0
+
+    meas_attrs = dict(zarr.open_group(out, mode="r")["measurements"].attrs)
+    multiscales = meas_attrs["multiscales"]
+    assert isinstance(multiscales, dict)
+    layout = multiscales["layout"]
+    assert isinstance(layout, list)
+    assert layout[0] == {"asset": "r0"}
+    first_overview = layout[1]
+    assert isinstance(first_overview, dict)
+    assert first_overview["asset"] == "r2"
+    assert first_overview["derived_from"] == "r0"
+
+    # The returned DataTree must expose the same structure as the store.
+    assert "/measurements/r0" in result.groups
+    assert "/measurements/r2" in result.groups
 
 
 def test_convert_olci_conditions_quality_passthrough(tmp_path: object) -> None:
@@ -317,7 +370,9 @@ def test_olci_conversion_matches_snapshot(
     # scale_factor preserved and stale source attrs absent.
     meas_g = observed_group["measurements"]
     assert isinstance(meas_g, zarr.Group)
-    _assert_radiance_dtype_and_attrs(meas_g, "oa01_radiance", level_label="native")
+    r0_g = meas_g["r0"]
+    assert isinstance(r0_g, zarr.Group)
+    _assert_radiance_dtype_and_attrs(r0_g, "oa01_radiance", level_label="r0")
     if "r2" in meas_g:
         r2_g = meas_g["r2"]
         assert isinstance(r2_g, zarr.Group)
@@ -347,13 +402,14 @@ def test_convert_olci_odd_dims_overview_no_conflicting_sizes(tmp_path: object) -
     g = _zarr.open_group(out, mode="r")
     meas = g["measurements"]
     assert isinstance(meas, _zarr.Group)
-    overview_keys = sorted(meas.group_keys())
+    level_keys = sorted(meas.group_keys())
     # With rows=10, cols=9, min_dimension=4:
     #   floor(9/2)=4 >= 4 → r2 generated
     #   floor(4/2)=2 < 4 → stop
-    assert overview_keys == ["r2"], (
-        f"Expected exactly ['r2'] for 10x9 at min_dimension=4, got {overview_keys}"
+    assert level_keys == ["r0", "r2"], (
+        f"Expected exactly ['r0', 'r2'] for 10x9 at min_dimension=4, got {level_keys}"
     )
+    overview_keys = [k for k in level_keys if k != "r0"]
 
     # Open each overview level; this must NOT raise a conflicting-sizes error.
     for lvl in overview_keys:

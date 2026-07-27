@@ -216,8 +216,9 @@ eopf-geozarr convert-s3-olci-optimized S3A_OL_1_EFR.zarr output.zarr \
 
 ```
 output.zarr/
-├── measurements/        # Native-resolution OLCI bands (oa01_radiance … oa21_radiance)
-│   │                    # with per-pixel latitude/longitude coordinates
+├── measurements/        # Carries multiscales + spatial: convention metadata
+│   ├── r0/             # Native-resolution OLCI bands (oa01_radiance … oa21_radiance)
+│   │                   # with per-pixel latitude/longitude coordinates
 │   ├── r2/             # 1/2-resolution overview
 │   ├── r4/             # 1/4-resolution overview
 │   └── ...

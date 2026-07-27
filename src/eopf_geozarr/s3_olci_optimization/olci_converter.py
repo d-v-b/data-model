@@ -171,9 +171,10 @@ def convert_olci_optimized(
 ) -> xr.DataTree:
     """Convert an EOPF OLCI L1 EFR DataTree to a GeoZarr multiscale store.
 
-    Writes the native-resolution ``measurements`` group with GeoZarr
-    convention metadata, then writes /2-reduced overview subgroups
-    (``r2``, ``r4``, …) down to *min_dimension*.  Any ``conditions`` or
+    Writes the native-resolution arrays to ``measurements/r0``, then writes
+    /2-reduced overview subgroups (``r2``, ``r4``, …) as siblings of ``r0``
+    down to *min_dimension*; the ``measurements`` group carries the GeoZarr
+    convention metadata tying the levels together.  Any ``conditions`` or
     ``quality`` groups present in *dt_input* are copied through unchanged,
     along with any child subgroups of ``measurements`` (e.g. ``orphans``).
 
@@ -208,13 +209,10 @@ def convert_olci_optimized(
     -------
     xr.DataTree
         The opened output DataTree (lazy; backed by the written Zarr store).
-        Overview subgroups (``r2``, ``r4``, …) are written to the Zarr store
-        but are **not** represented as children of the returned DataTree,
-        because xarray enforces dimension consistency between parent and child
-        nodes and the overview subgroups have smaller spatial dimensions than
-        the parent ``measurements`` group.  To read them, open the store
-        directly with ``zarr.open_group(output_path)["measurements"]["r2"]``
-        etc.
+        Native-resolution arrays live at ``measurements/r0`` with overview
+        levels (``r2``, ``r4``, …) as sibling groups; ``measurements`` itself
+        holds only the multiscales/spatial convention metadata, so the whole
+        store opens cleanly with ``xr.open_datatree``.
 
     Notes
     -----
@@ -237,10 +235,16 @@ def convert_olci_optimized(
     # correctly with raw integer data.
     measurements = _sanitize_data_vars(measurements)
 
+    # The native-resolution arrays go in a named child group (r0) alongside the
+    # overview groups (r2, r4, …) rather than directly in ``measurements``.
+    # If the parent held the full-res coordinates itself, every overview child
+    # would inherit them over the shared rows/columns dims at mismatched sizes
+    # and ``xr.open_datatree`` (and any generic GeoZarr reader) would reject
+    # the store with an alignment error.
     log.info("Writing native-resolution measurements", shape=dict(measurements.sizes))
     measurements.to_zarr(
         output_path,
-        group="measurements",
+        group="measurements/r0",
         mode="w",
         consolidated=False,
         zarr_format=3,
@@ -270,12 +274,12 @@ def convert_olci_optimized(
 
     # Build and attach GeoZarr convention metadata (spatial + multiscales CMO)
     # to the measurements group attrs.
-    layout: list[LayoutObject] = [{"asset": "."}]
+    layout: list[LayoutObject] = [{"asset": "r0"}]
     for lvl in range(1, n_levels + 1):
         transform: Transform = {"scale": [2.0, 2.0], "translation": [0.0, 0.0]}
         lo: LayoutObject = {
             "asset": f"r{2**lvl}",
-            "derived_from": "." if lvl == 1 else f"r{2 ** (lvl - 1)}",
+            "derived_from": f"r{2 ** (lvl - 1)}" if lvl > 1 else "r0",
             "transform": transform,
             "resampling_method": "average",
         }
@@ -314,23 +318,9 @@ def convert_olci_optimized(
             log.info("Copying measurements subgroup", group=f"measurements/{child.name}")
             _copy_subtree(child, output_path, root_group=f"measurements/{child.name}")
 
-    # xarray DataTree enforces dimension consistency between parent and child
-    # nodes, so opening the whole store via ``xr.open_datatree`` would fail
-    # because the overview subgroups have smaller spatial dimensions than
-    # the parent ``measurements`` group.  Instead, we build the DataTree
-    # manually from the top-level groups only: overview levels (r2, r4, …)
-    # are in the zarr store and accessible via ``zarr.open_group``, but are
-    # intentionally not exposed as DataTree children.
-    root = zarr.open_group(output_path, mode="r")
-    tree_dict: dict[str, xr.Dataset] = {}
-    for key in root.group_keys():
-        child = root[key]
-        if isinstance(child, zarr.Group) and list(child.array_keys()):
-            tree_dict[f"/{key}"] = xr.open_dataset(
-                output_path,
-                engine="zarr",
-                group=key,
-                chunks={},
-                consolidated=False,
-            )
-    return xr.DataTree.from_dict(tree_dict)
+    return xr.open_datatree(
+        output_path,
+        engine="zarr",
+        chunks={},
+        consolidated=False,
+    )

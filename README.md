@@ -327,11 +327,12 @@ Key flags:
 
 #### What is converted
 
-- **`/measurements`**: all 21 OLCI radiance bands at native full resolution, with
-  GeoZarr `spatial:` convention metadata and per-pixel 2-D `latitude`/`longitude`
-  coordinate arrays.
+- **`/measurements/r0`**: all 21 OLCI radiance bands at native full resolution,
+  with per-pixel 2-D `latitude`/`longitude` coordinate arrays; the parent
+  `measurements/` group carries the GeoZarr `spatial:` and `multiscales`
+  convention metadata.
 - **Overview subgroups** (`r2`, `r4`, …): /2-decimated copies of the measurements
-  stored as sibling Zarr groups under `measurements/`.
+  stored as sibling Zarr groups next to `r0` under `measurements/`.
 - **`/conditions` and `/quality`**: copied through unmodified.
 
 > **Note:** OLCI support is initial/measurements-focused (v1).  Tie-point grid
