@@ -31,9 +31,14 @@ def build_rotated_swath(rows: int = 64, cols: int = 60, angle_deg: float = 30.0)
         dims=("rows", "columns"),
         attrs={"scale_factor": 0.0139, "add_offset": 0.0, "_FillValue": FILL},
     )
+    # float32 band with no pre-existing _FillValue: nodata defaults to NaN.
+    solar_flux = xr.DataArray(
+        (rr + cc).astype("float32"),
+        dims=("rows", "columns"),
+    )
     time_stamp = xr.DataArray(np.arange(rows).astype("datetime64[ns]"), dims=("rows",))
     return xr.Dataset(
-        {"oa01_radiance": da},
+        {"oa01_radiance": da, "solar_flux_proxy": solar_flux},
         coords={
             "latitude": (("rows", "columns"), lat),
             "longitude": (("rows", "columns"), lon),
@@ -84,10 +89,25 @@ def test_reproject_olci_produces_regular_grid_with_crs() -> None:
     assert out["altitude"].dims == ("y", "x")
     assert "time_stamp" not in out.variables
 
+    # float variable with no pre-existing _FillValue: nodata is NaN, but it
+    # is still recorded, and off-swath corners are NaN.
+    flux = out["solar_flux_proxy"]
+    assert np.isnan(flux.attrs["_FillValue"])
+    flux_vals = flux.values
+    assert np.isnan(flux_vals[0, 0])
+    assert np.isnan(flux_vals[-1, -1])
+
 
 def test_reproject_olci_missing_geolocation_raises() -> None:
     ds = build_rotated_swath().drop_vars("latitude")
     with pytest.raises(ValueError, match="latitude"):
+        reproject_olci(ds)
+
+
+def test_reproject_olci_wrong_geolocation_dims_raises() -> None:
+    ds = build_rotated_swath()
+    ds = ds.assign_coords(latitude=("rows", np.linspace(45, 46, 64)))
+    with pytest.raises(ValueError, match="2-D"):
         reproject_olci(ds)
 
 

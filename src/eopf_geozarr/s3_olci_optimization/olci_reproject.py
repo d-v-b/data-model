@@ -72,9 +72,12 @@ def reproject_olci(
     swath dim but cannot live on the grid (e.g. per-scan-line ``time_stamp``)
     are dropped; variables without swath dims pass through unchanged.
 
-    Off-swath cells are set to each variable's ``_FillValue`` (dtype max for
-    integer variables without one), and ``_FillValue`` is recorded in the
-    output attrs so downstream fill-aware averaging keeps working.
+    Off-swath cells are set to each warped variable's ``_FillValue`` (dtype
+    max for integer variables without one, NaN for float variables without
+    one), and ``_FillValue`` is recorded in the output attrs of every warped
+    variable — including NaN for float variables — so downstream fill-aware
+    averaging keeps working.  Passthrough variables that carry no swath dim
+    are not warped and carry no such guarantee.
 
     Raises
     ------
@@ -145,8 +148,8 @@ def reproject_olci(
             out_attrs = dict(var.attrs)
             if np.issubdtype(var.dtype, np.integer):
                 out_attrs["_FillValue"] = int(nodata)
-            elif not np.isnan(nodata):
-                out_attrs["_FillValue"] = float(nodata)
+            else:
+                out_attrs["_FillValue"] = float(nodata)  # NaN included
             out_attrs.pop("coordinates", None)  # swath geolocation is gone
             result_vars[name] = xr.DataArray(dest, dims=GRID_DIMS, attrs=out_attrs)
         elif any(d in var_dims for d in _SWATH_DIMS):
