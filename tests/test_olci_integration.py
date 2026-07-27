@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
+import rioxarray  # noqa: F401
 import xarray as xr
 import zarr
 from pydantic_zarr.core import tuplify_json
@@ -23,10 +24,16 @@ from eopf_geozarr.s3_olci_optimization.olci_converter import convert_olci_optimi
 
 
 def build_synthetic_olci(rows: int = 512, cols: int = 480) -> xr.DataTree:
-    """Minimal synthetic OLCI L1 EFR datatree (measurements only)."""
+    """Minimal synthetic OLCI L1 EFR datatree (measurements only).
+
+    Geolocation is an axis-aligned ~300 m grid (0.003 deg spacing) so the
+    dataset is genuinely warpable to a regular lat/lon grid.
+    """
     rng = np.random.default_rng(0)
-    lat = np.linspace(40, 41, rows * cols).reshape(rows, cols)
-    lon = np.linspace(10, 11, rows * cols).reshape(rows, cols)
+    lat_1d = np.linspace(45.0, 45.0 + 0.003 * (rows - 1), rows)
+    lon_1d = np.linspace(10.0, 10.0 + 0.003 * (cols - 1), cols)
+    lat = np.repeat(lat_1d[:, None], cols, axis=1)
+    lon = np.repeat(lon_1d[None, :], rows, axis=0)
     alt = np.zeros((rows, cols), dtype="int16")
     data: dict[str, xr.DataArray] = {}
     for i in range(1, 22):
@@ -80,10 +87,9 @@ def test_convert_olci_creates_overviews(tmp_path: object) -> None:
         480//2 = 240 < 256, so the guard fires immediately → zero overview levels.
 
     Case 2 — 1024x1024 with min_dimension=256:
-        1024//2=512>=256 → level r2 (512x512)
-        512//2=256>=256  → level r4 (256x256)
-        256//2=128<256   → stop
-        Exactly two levels; smallest must be exactly 256x256.
+        the warped grid stays close to 1024x1024, yielding exactly two
+        overview levels; each halves the previous and the deepest would drop
+        below min_dimension if halved again.
     """
     import zarr
 
@@ -114,28 +120,26 @@ def test_convert_olci_creates_overviews(tmp_path: object) -> None:
         f"got {subgroups2}"
     )
 
-    # Every level must have BOTH spatial dims >= min_dimension.
-    for sg_name in subgroups2:
+    # Every level must have BOTH spatial dims >= min_dimension, and each
+    # overview must be exactly half the previous level (floor division).
+    r0_2 = meas2["r0"]
+    assert isinstance(r0_2, zarr.Group)
+    band0 = r0_2["oa01_radiance"]
+    assert isinstance(band0, zarr.Array)
+    prev_shape = band0.shape
+    for sg_name in [k for k in subgroups2 if k != "r0"]:
         sg = meas2[sg_name]
         assert isinstance(sg, zarr.Group)
         band = sg["oa01_radiance"]
         assert isinstance(band, zarr.Array)
-        # shape is (rows, columns)
-        overview_rows, overview_cols = band.shape[0], band.shape[1]
-        assert overview_rows >= 256, f"measurements/{sg_name} rows={overview_rows} < 256"
-        assert overview_cols >= 256, f"measurements/{sg_name} cols={overview_cols} < 256"
+        assert band.shape[0] == prev_shape[0] // 2
+        assert band.shape[1] == prev_shape[1] // 2
+        assert band.shape[0] >= 256
+        assert band.shape[1] >= 256
+        prev_shape = band.shape
 
-    # The deepest level (r4 for 1024-input) must be exactly 256x256.
-    deepest = meas2[subgroups2[-1]]
-    assert isinstance(deepest, zarr.Group)
-    deepest_band = deepest["oa01_radiance"]
-    assert isinstance(deepest_band, zarr.Array)
-    assert deepest_band.shape[0] == 256, (
-        f"Expected smallest overview rows=256, got {deepest_band.shape}"
-    )
-    assert deepest_band.shape[1] == 256, (
-        f"Expected smallest overview cols=256, got {deepest_band.shape}"
-    )
+    # The deepest level would violate min_dimension if halved again.
+    assert prev_shape[0] // 2 < 256 or prev_shape[1] // 2 < 256
 
 
 def test_convert_olci_returns_datatree(tmp_path: object) -> None:
@@ -148,13 +152,12 @@ def test_convert_olci_returns_datatree(tmp_path: object) -> None:
 
 
 def test_convert_olci_output_opens_as_datatree(tmp_path: object) -> None:
-    """Acceptance: ``xr.open_datatree`` must open the exported store cleanly.
+    """Acceptance: the exported store is a regular grid with CRS at every level.
 
-    Full-resolution arrays live in ``measurements/r0`` as a named sibling of
-    the overview groups (``r2``, …), so no child group inherits mismatched
-    parent coordinates. The multiscales layout references the base level by
-    name (``"asset": "r0"``), not ``"."``. This is the layout generic GeoZarr
-    readers (e.g. titiler) require; see the discussion on PR #212.
+    xr.open_datatree must open the whole store; measurements/r0 holds the
+    warped native-resolution grid with 1-D y/x coordinates and a declared
+    CRS, overview siblings halve it, and the multiscales layout references
+    the base level by name.
     """
     dt = build_synthetic_olci(rows=1024, cols=1024)
     out = str(tmp_path / "olci_geozarr.zarr")  # type: ignore[operator]
@@ -163,22 +166,29 @@ def test_convert_olci_output_opens_as_datatree(tmp_path: object) -> None:
     opened = xr.open_datatree(out, engine="zarr", consolidated=False, chunks={})
 
     r0 = opened["/measurements/r0"].to_dataset()
-    assert dict(r0.sizes) == {"rows": 1024, "columns": 1024}
+    assert set(r0.sizes) == {"y", "x"}
     for i in range(1, 22):
         assert f"oa{i:02d}_radiance" in r0
-    assert "latitude" in r0.coords
-    assert "longitude" in r0.coords
-
+    # CRS declared at every level, 1-D regular coordinates
+    for level in ("r0", "r2", "r4"):
+        ds = opened[f"/measurements/{level}"].to_dataset()
+        assert ds.rio.crs is not None, f"{level}: no CRS"
+        assert ds.rio.crs.to_epsg() == 4326
+        for dim in ("y", "x"):
+            coord = ds[dim]
+            assert coord.ndim == 1
+            steps = np.diff(coord.values)
+            assert np.allclose(steps, steps[0])
+        band = ds["oa01_radiance"]
+        assert band.attrs["grid_mapping"] == "spatial_ref"
+    # halving structure relative to observed r0
     r2 = opened["/measurements/r2"].to_dataset()
-    assert dict(r2.sizes) == {"rows": 512, "columns": 512}
-    r4 = opened["/measurements/r4"].to_dataset()
-    assert dict(r4.sizes) == {"rows": 256, "columns": 256}
+    assert r2.sizes["y"] == r0.sizes["y"] // 2
+    assert r2.sizes["x"] == r0.sizes["x"] // 2
 
-    # The measurements group itself holds only convention metadata: no arrays,
-    # so children with differing sizes inherit nothing conflicting.
+    # measurements itself holds only convention metadata
     meas = opened["/measurements"].to_dataset()
     assert len(meas.data_vars) == 0
-    assert len(meas.coords) == 0
 
     meas_attrs = dict(zarr.open_group(out, mode="r")["measurements"].attrs)
     multiscales = meas_attrs["multiscales"]
@@ -186,12 +196,14 @@ def test_convert_olci_output_opens_as_datatree(tmp_path: object) -> None:
     layout = multiscales["layout"]
     assert isinstance(layout, list)
     assert layout[0] == {"asset": "r0"}
-    first_overview = layout[1]
-    assert isinstance(first_overview, dict)
-    assert first_overview["asset"] == "r2"
-    assert first_overview["derived_from"] == "r0"
+    # per-level geo-proj convention present
+    meas_group = zarr.open_group(out, mode="r")["measurements"]
+    assert isinstance(meas_group, zarr.Group)
+    r0_group = meas_group["r0"]
+    assert isinstance(r0_group, zarr.Group)
+    r0_attrs = dict(r0_group.attrs)
+    assert "proj:code" in r0_attrs
 
-    # The returned DataTree must expose the same structure as the store.
     assert "/measurements/r0" in result.groups
     assert "/measurements/r2" in result.groups
 
@@ -203,8 +215,10 @@ def test_convert_olci_conditions_quality_passthrough(tmp_path: object) -> None:
     # Build a tree with conditions and quality groups
     rng = np.random.default_rng(1)
     rows, cols = 128, 128
-    lat = np.linspace(40, 41, rows * cols).reshape(rows, cols)
-    lon = np.linspace(10, 11, rows * cols).reshape(rows, cols)
+    lat_1d = np.linspace(45.0, 45.0 + 0.003 * (rows - 1), rows)
+    lon_1d = np.linspace(10.0, 10.0 + 0.003 * (cols - 1), cols)
+    lat = np.repeat(lat_1d[:, None], cols, axis=1)
+    lon = np.repeat(lon_1d[None, :], rows, axis=0)
     alt = np.zeros((rows, cols), dtype="int16")
 
     meas_data: dict[str, xr.DataArray] = {
@@ -388,9 +402,10 @@ def test_convert_olci_odd_dims_overview_no_conflicting_sizes(tmp_path: object) -
     On an odd-column real OLCI product (4865 cols) this caused xr.open_dataset
     to raise ``ValueError: conflicting sizes for dimension 'columns'``.
 
-    We use rows=10, cols=9 (odd cols) with min_dimension=4 so that two
-    overview levels (r2 at 5x4, r4 at 2x2) are generated.  Each level is
-    opened via xr.open_dataset to confirm no conflicting-sizes error.
+    We use rows=10, cols=9 (odd cols) with min_dimension=4. Once warped to a
+    regular grid the exact base size need not match the swath input, so this
+    asserts coord/data length agreement and floor-halving structure at every
+    level rather than a specific (5, 4) shape.
     """
     dt = build_synthetic_olci(rows=10, cols=9)
     out = str(tmp_path / "odd_olci.zarr")  # type: ignore[operator]
@@ -403,27 +418,22 @@ def test_convert_olci_odd_dims_overview_no_conflicting_sizes(tmp_path: object) -
     meas = g["measurements"]
     assert isinstance(meas, _zarr.Group)
     level_keys = sorted(meas.group_keys())
-    # With rows=10, cols=9, min_dimension=4:
-    #   floor(9/2)=4 >= 4 → r2 generated
-    #   floor(4/2)=2 < 4 → stop
-    assert level_keys == ["r0", "r2"], (
-        f"Expected exactly ['r0', 'r2'] for 10x9 at min_dimension=4, got {level_keys}"
-    )
-    overview_keys = [k for k in level_keys if k != "r0"]
+    assert level_keys[0] == "r0"
 
-    # Open each overview level; this must NOT raise a conflicting-sizes error.
-    for lvl in overview_keys:
+    # Open each level (base + overviews); this must NOT raise a
+    # conflicting-sizes error, and each level must floor-halve the previous.
+    prev_shape: tuple[int, ...] | None = None
+    for lvl in level_keys:
         ds = xr.open_dataset(out, engine="zarr", group=f"measurements/{lvl}", consolidated=False)
         rad_shape = ds["oa01_radiance"].shape
-        lat_shape = ds["latitude"].shape
-        lon_shape = ds["longitude"].shape
-        assert rad_shape == lat_shape == lon_shape, (
-            f"measurements/{lvl}: shapes disagree — "
-            f"oa01_radiance={rad_shape}, latitude={lat_shape}, longitude={lon_shape}"
+        assert rad_shape == (ds["y"].size, ds["x"].size), (
+            f"measurements/{lvl}: data shape {rad_shape} != coord sizes "
+            f"(y={ds['y'].size}, x={ds['x'].size})"
         )
-        # r2 of a 10x9 swath must be (5, 4) = (floor(10/2), floor(9/2))
-        if lvl == "r2":
-            assert rad_shape == (5, 4), f"r2 shape expected (5,4), got {rad_shape}"
+        if prev_shape is not None:
+            assert rad_shape[0] == prev_shape[0] // 2
+            assert rad_shape[1] == prev_shape[1] // 2
+        prev_shape = rad_shape
         ds.close()
 
 

@@ -1,4 +1,4 @@
-"""Tests for olci_multiscale: decimate_swath, reduce_swath, swath_spatial_attrs."""
+"""Tests for olci_multiscale: decimate_swath, reduce_swath, grid_spatial_attrs."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ from eopf_geozarr.s3_olci_optimization.olci_multiscale import (
     decimate_swath,
     grid_spatial_attrs,
     reduce_swath,
-    swath_spatial_attrs,
 )
 
 
@@ -279,19 +278,6 @@ def test_reduce_swath_odd_simulates_real_olci_columns() -> None:
     assert out["longitude"].shape == expected, (
         f"longitude shape {out['longitude'].shape} != {expected}"
     )
-
-
-# ---------------------------------------------------------------------------
-# swath_spatial_attrs tests
-# ---------------------------------------------------------------------------
-
-
-def test_swath_spatial_attrs_has_no_transform() -> None:
-    attrs = swath_spatial_attrs()
-    assert attrs["spatial:dimensions"] == ["rows", "columns"]
-    assert attrs.get("spatial:registration") == "pixel"
-    assert "spatial:transform" not in attrs
-    assert "spatial:bbox" not in attrs
 
 
 # ---------------------------------------------------------------------------

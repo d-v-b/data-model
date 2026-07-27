@@ -195,27 +195,12 @@ def reduce_swath(
     return xr.Dataset(result_vars, coords=result_coords)
 
 
-def swath_spatial_attrs(
-    dims: tuple[str, str] = SWATH_DIMS,
-) -> SpatialAttrs:
-    """Spatial-convention data for curvilinear swath geometry.
-
-    OLCI has no affine transform; geolocation is carried by 2-D lat/lon
-    coordinate arrays, so we declare the spatial dimensions and pixel
-    registration but no ``spatial:transform``/``spatial:bbox``.
-    """
-    return {
-        "spatial:dimensions": [dims[0], dims[1]],
-        "spatial:registration": "pixel",
-    }
-
-
 def grid_spatial_attrs(transform: Affine, shape: tuple[int, int]) -> SpatialAttrs:
     """Spatial-convention data for a regular grid with an affine *transform*.
 
     *shape* is ``(height, width)``.  Emits ``spatial:dimensions`` ``["y","x"]``,
     pixel registration, the bounding box, and the 6-element row-major affine
-    transform — the gridded counterpart of :func:`swath_spatial_attrs`.
+    transform.
     """
     height, width = shape
     left, bottom, right, top = rasterio.transform.array_bounds(height, width, transform)
