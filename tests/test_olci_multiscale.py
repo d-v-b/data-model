@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import rasterio.transform
 import xarray as xr
 
 from eopf_geozarr.s3_olci_optimization.olci_multiscale import (
     decimate_swath,
+    grid_spatial_attrs,
     reduce_swath,
     swath_spatial_attrs,
 )
@@ -326,3 +328,26 @@ def test_reduce_swath_on_grid_dims() -> None:
     # scalar passthrough survives
     assert "spatial_ref" in out.coords
     assert out["spatial_ref"].attrs["crs_wkt"] == "stub"
+
+
+# ---------------------------------------------------------------------------
+# grid_spatial_attrs tests
+# ---------------------------------------------------------------------------
+
+
+def test_grid_spatial_attrs() -> None:
+    """grid_spatial_attrs derives dimensions, bbox, and 6-element transform."""
+    transform = rasterio.transform.from_origin(10.0, 46.0, 0.01, 0.01)
+    attrs = grid_spatial_attrs(transform, (100, 200))
+    assert attrs["spatial:dimensions"] == ["y", "x"]
+    assert attrs["spatial:registration"] == "pixel"  # type: ignore[index]
+    assert attrs["spatial:transform"] == [  # type: ignore[index]
+        0.01,
+        0.0,
+        10.0,
+        0.0,
+        -0.01,
+        46.0,
+    ]
+    # bbox is [xmin, ymin, xmax, ymax] from array_bounds
+    assert attrs["spatial:bbox"] == [10.0, 45.0, 12.0, 46.0]  # type: ignore[index]

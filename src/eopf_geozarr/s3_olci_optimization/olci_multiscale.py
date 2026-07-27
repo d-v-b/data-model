@@ -19,11 +19,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+import rasterio.transform
 import xarray as xr
 
 from eopf_geozarr.s3_olci_optimization.olci_band_mapping import OLCI_BANDS
 
 if TYPE_CHECKING:
+    from affine import Affine
     from zarr_cm import SpatialAttrs
 
 SWATH_DIMS = ("rows", "columns")
@@ -205,4 +207,28 @@ def swath_spatial_attrs(
     return {
         "spatial:dimensions": [dims[0], dims[1]],
         "spatial:registration": "pixel",
+    }
+
+
+def grid_spatial_attrs(transform: Affine, shape: tuple[int, int]) -> SpatialAttrs:
+    """Spatial-convention data for a regular grid with an affine *transform*.
+
+    *shape* is ``(height, width)``.  Emits ``spatial:dimensions`` ``["y","x"]``,
+    pixel registration, the bounding box, and the 6-element row-major affine
+    transform — the gridded counterpart of :func:`swath_spatial_attrs`.
+    """
+    height, width = shape
+    left, bottom, right, top = rasterio.transform.array_bounds(height, width, transform)
+    return {
+        "spatial:dimensions": ["y", "x"],
+        "spatial:registration": "pixel",
+        "spatial:bbox": [float(left), float(bottom), float(right), float(top)],
+        "spatial:transform": [
+            float(transform.a),
+            float(transform.b),
+            float(transform.c),
+            float(transform.d),
+            float(transform.e),
+            float(transform.f),
+        ],
     }
