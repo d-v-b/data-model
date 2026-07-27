@@ -7,6 +7,15 @@ parametrized test walks each converter's output and asserts the contract at
 every multiscale level. Products whose converter has not yet migrated off the
 legacy nested layout carry an xfail on the whole-store DataTree check so the
 requirement stays on record.
+
+Per-level CRS detection requires opening each level with
+``decode_coords="all"`` (the generic converter's own read path uses the same
+flag, see geozarr.py) so the CF `grid_mapping`/`spatial_ref` reference gets
+promoted into a coordinate; the default `xr.open_dataset` decode never does
+this. Separately, S1/S2 overview sub-groups (r2, r4, ...) still lack the
+zarr-cm proj:/spatial: convention attrs that OLCI stamps on every level — a
+real design-consistency gap, but not one that defeats CRS detection here, so
+it is tracked outside this test rather than xfailed.
 """
 
 from __future__ import annotations
@@ -79,22 +88,6 @@ DATATREE_XFAIL: dict[str, str] = {
     "s2": "generic converter still writes asset='.' nested overview layout",
 }
 
-#: Converters whose overview (non-base) pyramid levels don't carry a
-#: rioxarray-detectable CRS. The generic converter (geozarr.py) only stamps
-#: the zarr-cm proj:/spatial: convention attrs on the base-resolution group;
-#: overview sub-groups (r2, r4, ...) get a legacy CF-style `grid_mapping`
-#: attribute plus a `spatial_ref` variable that is never promoted back to a
-#: coordinate on plain `xr.open_dataset` reads, so rioxarray's CF and Zarr
-#: convention readers both fail to auto-detect the CRS there. OLCI does not
-#: have this gap: it stamps proj:/spatial: convention attrs on every level
-#: (cf. PR #212, commit c21e793).
-REGULAR_GRID_XFAIL: dict[str, str] = {
-    "s1": "generic converter only stamps proj:/spatial: convention attrs on the "
-    "base group; overview levels (r2, ...) have no rioxarray-detectable CRS",
-    "s2": "generic converter only stamps proj:/spatial: convention attrs on the "
-    "base group; overview levels (r2, ...) have no rioxarray-detectable CRS",
-}
-
 
 @pytest.fixture(scope="module", params=sorted(PRODUCT_CONVERTERS), ids=str)
 def converted_store(
@@ -135,12 +128,12 @@ def test_every_level_is_regular_grid_with_crs(
 ) -> None:
     """Hard requirement: each pyramid level is a regular grid with a real CRS."""
     store, name = converted_store
-    if name in REGULAR_GRID_XFAIL:
-        pytest.xfail(REGULAR_GRID_XFAIL[name])
     levels = _multiscale_level_paths(store)
     assert levels, f"{name}: no multiscale groups found in {store}"
     for level in levels:
-        ds = xr.open_dataset(str(store), group=level, engine="zarr", consolidated=False)
+        ds = xr.open_dataset(
+            str(store), group=level, engine="zarr", consolidated=False, decode_coords="all"
+        )
         crs = ds.rio.crs
         assert crs is not None, f"{name}:{level}: no CRS declared"
         # CRS round-trips through pyproj
