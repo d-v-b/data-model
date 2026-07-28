@@ -219,7 +219,8 @@ eopf-geozarr convert-s3-olci-optimized S3A_OL_1_EFR.zarr output.zarr \
 
 ```
 output.zarr/
-├── measurements/        # Carries multiscales + spatial: + proj: convention metadata
+├── measurements/        # Carries multiscales + spatial: convention metadata
+│                        # (+ proj: when --output-grid is a CRS)
 │   ├── r0/             # Native-resolution bands (instrument grid by default; regular
 │   │                   # y/x grid with spatial_ref when --output-grid is a CRS)
 │   ├── r2/             # 1/2-resolution overview
@@ -229,7 +230,8 @@ output.zarr/
 └── quality/             # Copied through unmodified (quality flags)
 ```
 
-Each measurement group carries GeoZarr `spatial:` and `proj:` convention metadata.
+Each measurement group carries GeoZarr `spatial:` convention metadata (plus
+`proj:` metadata when a CRS is selected).
 In native mode (`--output-grid native`, the default) bands keep per-pixel 2-D
 `latitude`/`longitude`/`altitude` and per-row `time_stamp`, with no projected CRS.
 When `--output-grid <CRS>` is given, bands are warped onto a regular grid with 1-D
