@@ -182,3 +182,22 @@ def test_reproject_olci_unpacks_cf_packed_geolocation() -> None:
     np.testing.assert_allclose(out_packed["x"].values, out_float["x"].values, atol=1e-5)
     np.testing.assert_allclose(out_packed["y"].values, out_float["y"].values, atol=1e-5)
     assert out_packed.sizes == out_float.sizes
+
+
+def test_reproject_olci_transposes_swath_bands() -> None:
+    """A band stored as (columns, rows) must be warped, not silently dropped.
+
+    The native pipeline normalizes transposed bands before block averaging;
+    the warp path must do the same rather than discarding them via the
+    swath-dim fallthrough.
+    """
+    ds = build_rotated_swath()
+    transposed = ds["oa01_radiance"].transpose("columns", "rows")
+    ds = ds.assign(oa02_radiance=transposed)
+
+    out = reproject_olci(ds)
+
+    assert "oa02_radiance" in out.data_vars
+    assert out["oa02_radiance"].dims == ("y", "x")
+    # Same underlying data as oa01 -> identical warped values.
+    np.testing.assert_array_equal(out["oa02_radiance"].values, out["oa01_radiance"].values)

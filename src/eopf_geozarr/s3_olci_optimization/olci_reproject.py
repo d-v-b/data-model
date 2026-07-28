@@ -147,7 +147,18 @@ def reproject_olci(
     for name in all_names:
         var = ds[name] if name in ds.data_vars else ds.coords[name]
         var_dims = tuple(str(d) for d in var.dims)
-        if var_dims == _SWATH_DIMS and np.issubdtype(var.dtype, np.number):
+        # Order-insensitive swath detection: a variant product storing a band
+        # transposed as (columns, rows) must still be warped, not silently
+        # dropped through the swath-dim fallthrough (matches the native
+        # pipeline's normalization in reduce_swath).
+        if (
+            len(var_dims) == 2
+            and set(var_dims) == set(_SWATH_DIMS)
+            and np.issubdtype(var.dtype, np.number)
+        ):
+            if var_dims != _SWATH_DIMS:
+                log.info("Transposing band to canonical swath dim order", band=name)
+                var = var.transpose(*_SWATH_DIMS)
             nodata = _nodata_for(var)
             src_nodata = (
                 nodata
