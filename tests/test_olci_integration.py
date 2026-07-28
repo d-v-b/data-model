@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
+import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
 import zarr
@@ -153,8 +154,60 @@ def test_convert_olci_returns_datatree(tmp_path: object) -> None:
     assert "/measurements" in result.groups
 
 
-def test_convert_olci_output_opens_as_datatree(tmp_path: object) -> None:
-    """Acceptance: the exported store is a regular grid with CRS at every level.
+def test_convert_olci_native_output_opens_as_datatree(tmp_path: object) -> None:
+    """Acceptance for the default (native) mode: swath geometry, no CRS.
+
+    The store keeps instrument geometry: r0 holds raw bands with 2-D
+    lat/lon over (rows, columns) at exact input size, overview siblings
+    halve it, the whole store opens with xr.open_datatree, and nothing
+    fabricates a CRS (no spatial_ref, no grid_mapping, no proj: attrs).
+    """
+    dt = build_synthetic_olci(rows=512, cols=512)
+    out = str(tmp_path / "olci_native.zarr")  # type: ignore[operator]
+    result = convert_olci_optimized(dt, output_path=out, min_dimension=128)
+
+    opened = xr.open_datatree(out, engine="zarr", consolidated=False, chunks={})
+
+    r0 = opened["/measurements/r0"].to_dataset()
+    assert dict(r0.sizes) == {"rows": 512, "columns": 512}  # exact: no warp
+    for level, size in (("r0", 512), ("r2", 256), ("r4", 128)):
+        ds = opened[f"/measurements/{level}"].to_dataset()
+        assert dict(ds.sizes) == {"rows": size, "columns": size}
+        assert ds["latitude"].dims == ("rows", "columns")
+        assert ds["longitude"].dims == ("rows", "columns")
+        assert "spatial_ref" not in ds.variables
+        assert "grid_mapping" not in ds["oa01_radiance"].attrs
+        assert ds.rio.crs is None
+
+    meas_group = zarr.open_group(out, mode="r")["measurements"]
+    assert isinstance(meas_group, zarr.Group)
+    meas_attrs = dict(meas_group.attrs)
+    assert meas_attrs["spatial:dimensions"] == ["rows", "columns"]
+    assert not any(k.startswith("proj:") for k in meas_attrs)
+    multiscales = meas_attrs["multiscales"]
+    assert isinstance(multiscales, dict)
+    layout = multiscales["layout"]
+    assert isinstance(layout, list)
+    assert layout[0] == {"asset": "r0"}
+    r0_group = meas_group["r0"]
+    assert isinstance(r0_group, zarr.Group)
+    r0_attrs = dict(r0_group.attrs)
+    assert r0_attrs["spatial:dimensions"] == ["rows", "columns"]
+    assert not any(k.startswith("proj:") for k in r0_attrs)
+
+    assert "/measurements/r0" in result.groups
+    assert "/measurements/r2" in result.groups
+
+
+def test_convert_olci_invalid_output_grid_raises(tmp_path: object) -> None:
+    dt = build_synthetic_olci(rows=64, cols=64)
+    out = str(tmp_path / "bad.zarr")  # type: ignore[operator]
+    with pytest.raises(ValueError, match="output_grid"):
+        convert_olci_optimized(dt, output_path=out, output_grid="not-a-crs")
+
+
+def test_convert_olci_regridded_output_opens_as_datatree(tmp_path: object) -> None:
+    """Acceptance for the opt-in regridded mode: the exported store is a regular grid with CRS at every level.
 
     xr.open_datatree must open the whole store; measurements/r0 holds the
     warped native-resolution grid with 1-D y/x coordinates and a declared
@@ -163,7 +216,7 @@ def test_convert_olci_output_opens_as_datatree(tmp_path: object) -> None:
     """
     dt = build_synthetic_olci(rows=1024, cols=1024)
     out = str(tmp_path / "olci_geozarr.zarr")  # type: ignore[operator]
-    result = convert_olci_optimized(dt, output_path=out, min_dimension=256)
+    result = convert_olci_optimized(dt, output_path=out, min_dimension=256, output_grid="EPSG:4326")
 
     opened = xr.open_datatree(out, engine="zarr", consolidated=False, chunks={})
 
@@ -427,10 +480,10 @@ def test_convert_olci_odd_dims_overview_no_conflicting_sizes(tmp_path: object) -
     On an odd-column real OLCI product (4865 cols) this caused xr.open_dataset
     to raise ``ValueError: conflicting sizes for dimension 'columns'``.
 
-    We use rows=10, cols=9 (odd cols) with min_dimension=4. Once warped to a
-    regular grid the exact base size need not match the swath input, so this
-    asserts coord/data length agreement and floor-halving structure at every
-    level rather than a specific (5, 4) shape.
+    We use rows=10, cols=9 (odd cols) with min_dimension=4 in the default
+    (native) mode, so this asserts coord/data length agreement and
+    floor-halving structure at every level over the swath ``rows``/``columns``
+    dims rather than a specific (5, 4) shape.
     """
     dt = build_synthetic_olci(rows=10, cols=9)
     out = str(tmp_path / "odd_olci.zarr")  # type: ignore[operator]
@@ -451,9 +504,9 @@ def test_convert_olci_odd_dims_overview_no_conflicting_sizes(tmp_path: object) -
     for lvl in level_keys:
         ds = xr.open_dataset(out, engine="zarr", group=f"measurements/{lvl}", consolidated=False)
         rad_shape = ds["oa01_radiance"].shape
-        assert rad_shape == (ds["y"].size, ds["x"].size), (
-            f"measurements/{lvl}: data shape {rad_shape} != coord sizes "
-            f"(y={ds['y'].size}, x={ds['x'].size})"
+        assert rad_shape == (ds.sizes["rows"], ds.sizes["columns"]), (
+            f"measurements/{lvl}: data shape {rad_shape} != dim sizes "
+            f"(rows={ds.sizes['rows']}, columns={ds.sizes['columns']})"
         )
         if prev_shape is not None:
             assert rad_shape[0] == prev_shape[0] // 2

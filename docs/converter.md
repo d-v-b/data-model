@@ -212,7 +212,7 @@ eopf-geozarr convert-s3-olci-optimized S3A_OL_1_EFR.zarr output.zarr \
 | `--min-dimension` | 256 | Minimum spatial dimension for overview levels |
 | `--enable-sharding` | off | Accepted but not yet wired into encoding (follow-up task) |
 | `--keep-scale-offset` | off | Accepted but not yet wired into encoding (follow-up task) |
-| `--target-crs` | EPSG:4326 | Target CRS for the reprojected output grid |
+| `--output-grid` | native | `native` preserves the instrument swath geometry; any other value is parsed as a CRS (e.g. `EPSG:4326`) and warps onto a regular grid |
 
 ### Output layout
 

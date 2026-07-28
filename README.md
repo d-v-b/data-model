@@ -322,7 +322,7 @@ Key flags:
   dimension would drop below this value (default: 256)
 - `--enable-sharding` — accepted but not yet wired into encoding (follow-up task)
 - `--keep-scale-offset` — accepted but not yet wired into encoding (follow-up task)
-- `--target-crs` — target CRS for the reprojected output grid (default: `EPSG:4326`)
+- `--output-grid` — `native` (default) preserves the instrument swath geometry; any other value is parsed as a CRS (e.g. `EPSG:4326`) and the swath is warped once onto a regular grid
 
 #### What is converted
 

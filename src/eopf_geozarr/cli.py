@@ -1399,10 +1399,14 @@ def add_s3_olci_optimization_commands(subparsers: argparse._SubParsersAction) ->
         ),
     )
     p.add_argument(
-        "--target-crs",
+        "--output-grid",
         type=str,
-        default="EPSG:4326",
-        help="Target CRS for the reprojected output grid (default: EPSG:4326)",
+        default="native",
+        help=(
+            "Output grid mode: 'native' (default) preserves the instrument "
+            "swath geometry; any other value is parsed as a CRS (e.g. "
+            "'EPSG:4326') and the swath is warped once onto a regular grid"
+        ),
     )
     p.add_argument("--verbose", action="store_true", help="Enable verbose output")
     p.set_defaults(func=convert_s3_olci_optimized_command)
@@ -1419,7 +1423,7 @@ def convert_s3_olci_optimized_command(args: argparse.Namespace) -> None:
         compression_level=args.compression_level,
         min_dimension=args.min_dimension,
         keep_scale_offset=args.keep_scale_offset,
-        target_crs=args.target_crs,
+        output_grid=args.output_grid,
     )
     log.info("S3 OLCI optimization completed", output_path=args.output_path)
 
