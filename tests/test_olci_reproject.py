@@ -146,3 +146,39 @@ def test_reproject_olci_projected_target_crs() -> None:
     band = out["oa01_radiance"]
     assert band.dtype == np.dtype("uint16")
     assert band.attrs["grid_mapping"] == "spatial_ref"
+
+
+def test_reproject_olci_unpacks_cf_packed_geolocation() -> None:
+    """CF-packed geolocation (raw int32 microdegrees) must be unpacked before warping.
+
+    The pipeline contract is mask_and_scale=False: real OLCI stores lat/lon
+    as int32 with scale_factor=1e-6. Feeding raw values to the warp as if
+    they were degrees georeferences the output a factor of 1e6 off.
+    The packed dataset must produce the same grid as its unpacked twin.
+    """
+    ds_float = build_rotated_swath()
+    lat_deg = np.asarray(ds_float["latitude"].values)
+    lon_deg = np.asarray(ds_float["longitude"].values)
+    ds_packed = ds_float.assign_coords(
+        latitude=(
+            ("rows", "columns"),
+            np.round(lat_deg / 1e-6).astype("int32"),
+            {"standard_name": "latitude", "scale_factor": 1e-6, "add_offset": 0.0},
+        ),
+        longitude=(
+            ("rows", "columns"),
+            np.round(lon_deg / 1e-6).astype("int32"),
+            {"standard_name": "longitude", "scale_factor": 1e-6, "add_offset": 0.0},
+        ),
+    )
+
+    out_packed = reproject_olci(ds_packed)
+    out_float = reproject_olci(ds_float)
+
+    # Coordinates land in real degree space, not microdegree-as-degree space.
+    assert 9.0 < float(out_packed["x"].values.min()) < 12.0
+    assert 44.0 < float(out_packed["y"].values.min()) < 47.0
+    # Same grid as the unpacked twin (int32 microdegree rounding is ~1e-6 deg).
+    np.testing.assert_allclose(out_packed["x"].values, out_float["x"].values, atol=1e-5)
+    np.testing.assert_allclose(out_packed["y"].values, out_float["y"].values, atol=1e-5)
+    assert out_packed.sizes == out_float.sizes

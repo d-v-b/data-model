@@ -44,6 +44,30 @@ def _nodata_for(var: xr.DataArray) -> float:
     return float("nan")
 
 
+def _unpacked_degrees(var: xr.DataArray) -> np.ndarray:
+    """Geolocation values as float64 degrees, with fill pixels as NaN.
+
+    The pipeline contract is ``mask_and_scale=False`` (raw values), and real
+    OLCI stores latitude/longitude as int32 microdegrees with
+    ``scale_factor = 1e-06`` — feeding raw values to the warp as if they were
+    degrees would georeference the output a factor of 10^6 off.  Mirrors the
+    unpacking the native pipeline's geodesic centroid path performs.
+    """
+    vals = np.asarray(var.values, dtype="float64")
+    fill = var.attrs.get("_FillValue")
+    if fill is None:
+        fill = var.encoding.get("_FillValue")
+    if fill is not None and not np.isnan(float(fill)):
+        vals = np.where(vals == float(fill), np.nan, vals)
+    scale = var.attrs.get("scale_factor")
+    if scale is None:
+        scale = var.encoding.get("scale_factor", 1.0)
+    offset = var.attrs.get("add_offset")
+    if offset is None:
+        offset = var.encoding.get("add_offset", 0.0)
+    return vals * float(scale) + float(offset)
+
+
 def _grid_coord_attrs(target_crs: str) -> tuple[dict[str, str], dict[str, str]]:
     """CF attrs for the 1-D (y, x) dimension coordinates in *target_crs*."""
     if ProjCRS.from_user_input(target_crs).is_geographic:
@@ -92,9 +116,9 @@ def reproject_olci(
     lon = ds.coords["longitude"]
     if tuple(str(d) for d in lat.dims) != _SWATH_DIMS or lat.dims != lon.dims:
         raise ValueError("latitude/longitude must be 2-D over (rows, columns)")
-    lat_vals = np.asarray(lat.values, dtype="float64")
-    lon_vals = np.asarray(lon.values, dtype="float64")
-    if lat_vals.max() == lat_vals.min() or lon_vals.max() == lon_vals.min():
+    lat_vals = _unpacked_degrees(lat)
+    lon_vals = _unpacked_degrees(lon)
+    if np.nanmax(lat_vals) == np.nanmin(lat_vals) or np.nanmax(lon_vals) == np.nanmin(lon_vals):
         raise ValueError("degenerate geolocation extent: latitude/longitude span zero area")
 
     src_height, src_width = lat_vals.shape
