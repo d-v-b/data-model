@@ -359,6 +359,42 @@ def test_cli_convert_s3_olci_optimized(tmp_path: pathlib.Path) -> None:
     g = zarr.open_group(str(out), mode="r")
     assert "measurements" in g
 
+    # Default (no flag) produced the native instrument grid.
+    meas_default = g["measurements"]
+    assert isinstance(meas_default, zarr.Group)
+    r0_default = meas_default["r0"]
+    assert isinstance(r0_default, zarr.Group)
+    band_default = r0_default["oa01_radiance"]
+    assert isinstance(band_default, zarr.Array)
+    assert band_default.metadata.dimension_names == ("rows", "columns")  # type: ignore[attr-defined]
+
+    # Opt-in regridding via --output-grid.
+    out2 = tmp_path / "olci_out_gridded.zarr"
+    result2 = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "eopf_geozarr",
+            "convert-s3-olci-optimized",
+            str(src),
+            str(out2),
+            "--output-grid",
+            "EPSG:4326",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert result2.returncode == 0, result2.stdout + result2.stderr
+    g2 = zarr.open_group(str(out2), mode="r")
+    meas2 = g2["measurements"]
+    assert isinstance(meas2, zarr.Group)
+    r0_2 = meas2["r0"]
+    assert isinstance(r0_2, zarr.Group)
+    band2 = r0_2["oa01_radiance"]
+    assert isinstance(band2, zarr.Array)
+    assert band2.metadata.dimension_names == ("y", "x")  # type: ignore[attr-defined]
+
 
 def _assert_radiance_dtype_and_attrs(
     group: zarr.Group, band_name: str, *, level_label: str
