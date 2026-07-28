@@ -1,12 +1,14 @@
 """Cross-product output contract.
 
 Reprojection to a regular grid with a declared CRS is a hard requirement for
-every converted product (see
+every product that is converted to a regular grid (see
 docs/superpowers/specs/2026-07-27-s3-olci-reprojection-design.md). One
 parametrized test walks each converter's output and asserts the contract at
 every multiscale level. Products whose converter has not yet migrated off the
 legacy nested layout carry an xfail on the whole-store DataTree check so the
-requirement stays on record.
+requirement stays on record. OLCI's native (default) mode intentionally keeps
+instrument swath geolocation with no CRS; that mode is covered separately by
+the swath-geolocation test below rather than by the regular-grid contract.
 
 Per-level CRS detection requires opening each level with
 ``decode_coords="all"`` (the generic converter's own read path uses the same
@@ -45,7 +47,10 @@ if TYPE_CHECKING:
 def _convert_olci(tmp: pathlib.Path) -> pathlib.Path:
     out = tmp / "olci.zarr"
     convert_olci_optimized(
-        build_synthetic_olci(rows=256, cols=256), output_path=str(out), min_dimension=64
+        build_synthetic_olci(rows=256, cols=256),
+        output_path=str(out),
+        min_dimension=64,
+        output_grid="EPSG:4326",
     )
     return out
 
@@ -155,3 +160,28 @@ def test_store_opens_as_datatree(converted_store: tuple[pathlib.Path, str]) -> N
     if name in DATATREE_XFAIL:
         pytest.xfail(DATATREE_XFAIL[name])
     xr.open_datatree(str(store), engine="zarr", consolidated=False, chunks={})
+
+
+@pytest.fixture(scope="module")
+def native_olci_store(tmp_path_factory: pytest.TempPathFactory) -> pathlib.Path:
+    out = tmp_path_factory.mktemp("olci_native") / "olci_native.zarr"
+    convert_olci_optimized(
+        build_synthetic_olci(rows=256, cols=256), output_path=str(out), min_dimension=64
+    )
+    return out
+
+
+def test_olci_native_store_opens_with_swath_geolocation(
+    native_olci_store: pathlib.Path,
+) -> None:
+    """Native mode keeps instrument geometry: datatree-openable, 2-D lat/lon,
+    and no fabricated CRS anywhere under measurements."""
+    opened = xr.open_datatree(str(native_olci_store), engine="zarr", consolidated=False, chunks={})
+    levels = [k for k in opened["/measurements"].children if str(k).startswith("r")]
+    assert levels, "no pyramid levels found"
+    for level in levels:
+        ds = opened[f"/measurements/{level}"].to_dataset()
+        assert ds["latitude"].dims == ("rows", "columns")
+        assert ds["longitude"].dims == ("rows", "columns")
+        assert "spatial_ref" not in ds.variables
+        assert ds.rio.crs is None

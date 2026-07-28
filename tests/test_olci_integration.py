@@ -420,9 +420,16 @@ def _assert_radiance_dtype_and_attrs(
         )
 
 
+@pytest.mark.parametrize(
+    ("output_grid", "golden_suffix"),
+    [("native", "native"), ("EPSG:4326", "epsg4326")],
+    ids=("native", "epsg4326"),
+)
 def test_olci_conversion_matches_snapshot(
     s3_olci_group_example: pathlib.Path,
     tmp_path: pathlib.Path,
+    output_grid: str,
+    golden_suffix: str,
 ) -> None:
     """Snapshot test: converted OLCI structure must match committed golden file.
 
@@ -435,6 +442,9 @@ def test_olci_conversion_matches_snapshot(
 
     ``min_dimension=8`` is used so that the 16x16 measurements grid generates
     one overview level (r2 at 8x8).
+
+    Parametrized over both output_grid modes (native swath, regridded
+    EPSG:4326), each with its own committed golden file.
 
     To (re)generate the snapshot, uncomment the regeneration block below,
     run the test once, then re-comment before committing.
@@ -470,13 +480,13 @@ def test_olci_conversion_matches_snapshot(
         mask_and_scale=False,
     )
     out = str(tmp_path / "out.zarr")
-    convert_olci_optimized(dt_in, output_path=out, min_dimension=8)
+    convert_olci_optimized(dt_in, output_path=out, min_dimension=8, output_grid=output_grid)
 
     observed_group = zarr.open_group(out, use_consolidated=False)
     observed_structure_json = GroupSpec.from_zarr(observed_group).model_dump()
 
     expected_path = Path("tests/_test_data/optimized_olci_examples") / (
-        s3_olci_group_example.stem + ".json"
+        f"{s3_olci_group_example.stem}-{golden_suffix}.json"
     )
 
     # Uncomment this block to (re)generate the snapshot from the observed structure.
