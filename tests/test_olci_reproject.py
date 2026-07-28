@@ -119,3 +119,30 @@ def test_reproject_olci_degenerate_extent_raises() -> None:
     )
     with pytest.raises(ValueError, match="degenerate"):
         reproject_olci(ds)
+
+
+def test_reproject_olci_projected_target_crs() -> None:
+    """Warping to a projected target CRS yields a metric grid with matching coord attrs.
+
+    Exercises the non-geographic branch end-to-end: the CLI-advertised
+    --target-crs flag must produce a regular grid in the requested CRS, with
+    projection_x/y_coordinate standard names and metre units on the 1-D coords.
+    """
+    ds = build_rotated_swath()
+    out = reproject_olci(ds, target_crs="EPSG:3857")
+
+    assert out.rio.crs is not None
+    assert out.rio.crs.to_epsg() == 3857
+    for dim, std_name in (
+        ("y", "projection_y_coordinate"),
+        ("x", "projection_x_coordinate"),
+    ):
+        coord = out[dim]
+        assert coord.ndim == 1
+        steps = np.diff(coord.values)
+        assert np.allclose(steps, steps[0])
+        assert coord.attrs["standard_name"] == std_name
+        assert coord.attrs["units"] == "m"
+    band = out["oa01_radiance"]
+    assert band.dtype == np.dtype("uint16")
+    assert band.attrs["grid_mapping"] == "spatial_ref"
