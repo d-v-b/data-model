@@ -11,6 +11,7 @@ from eopf_geozarr.s3_olci_optimization.olci_multiscale import (
     decimate_swath,
     grid_spatial_attrs,
     reduce_swath,
+    swath_spatial_attrs,
 )
 
 
@@ -435,3 +436,141 @@ def test_reduce_transposed_band_still_block_averaged() -> None:
     out = reduce_swath(ds, factor=2)
     assert tuple(out["oa01_radiance"].dims) == ("rows", "columns")
     assert int(out["oa01_radiance"].values[0, 0]) == 25
+
+
+# ---------------------------------------------------------------------------
+# restored geodesic-centroid geolocation tests (upstream d69bd45)
+# ---------------------------------------------------------------------------
+
+
+def test_reduce_swath_coordinates_are_block_geodesic_centroids() -> None:
+    """Each output coordinate is the geodesic centroid of its pixel block."""
+    ds = _swath(8, 6)
+    out = reduce_swath(ds, factor=2)
+    lat_block = ds["latitude"].values[0:2, 0:2]
+    lon_block = ds["longitude"].values[0:2, 0:2]
+    exp_lat, exp_lon = _geodesic_center(lat_block, lon_block)
+    np.testing.assert_allclose(float(out["latitude"].values[0, 0]), exp_lat, rtol=1e-12)
+    np.testing.assert_allclose(float(out["longitude"].values[0, 0]), exp_lon, rtol=1e-12)
+
+
+def test_reduce_swath_whole_image_collapses_to_geodesic_center() -> None:
+    """Reducing the full swath to one cell must yield its geodesic center."""
+    rows = cols = 4
+    ds = _swath(rows, cols)
+    out = reduce_swath(ds, factor=rows)
+    assert out["latitude"].shape == (1, 1)
+    exp_lat, exp_lon = _geodesic_center(ds["latitude"].values, ds["longitude"].values)
+    np.testing.assert_allclose(float(out["latitude"].values[0, 0]), exp_lat, rtol=1e-12)
+    np.testing.assert_allclose(float(out["longitude"].values[0, 0]), exp_lon, rtol=1e-12)
+
+
+def test_reduce_swath_longitude_stable_across_antimeridian() -> None:
+    """Lon values straddling +/-180 must average to ~180, not ~0.
+
+    A planar mean of [179.5, -179.5] is 0 (the wrong side of the planet);
+    the unit-vector mean lands on the antimeridian.
+    """
+    lat = xr.DataArray(
+        np.zeros((2, 2)), dims=("rows", "columns"), attrs={"standard_name": "latitude"}
+    )
+    lon = xr.DataArray(
+        np.array([[179.5, -179.5], [179.5, -179.5]]),
+        dims=("rows", "columns"),
+        attrs={"standard_name": "longitude"},
+    )
+    rad = xr.DataArray(
+        np.full((2, 2), 100, dtype="uint16"),
+        dims=("rows", "columns"),
+        attrs={"_FillValue": 65535},
+    )
+    ds = xr.Dataset({"oa01_radiance": rad}, coords={"latitude": lat, "longitude": lon})
+    out = reduce_swath(ds, factor=2)
+    assert abs(abs(float(out["longitude"].values[0, 0])) - 180.0) < 1e-9
+
+
+def test_reduce_swath_geolocation_fill_excluded_from_centroid() -> None:
+    """Fill pixels in lat OR lon are excluded from the block centroid; all-fill stays fill."""
+    fill = -999.0
+    lat_data = np.array([[10.0, 20.0], [30.0, fill]])
+    lon_data = np.array([[5.0, fill], [6.0, 7.0]])
+    lat = xr.DataArray(
+        lat_data,
+        dims=("rows", "columns"),
+        attrs={"standard_name": "latitude", "_FillValue": fill},
+    )
+    lon = xr.DataArray(
+        lon_data,
+        dims=("rows", "columns"),
+        attrs={"standard_name": "longitude", "_FillValue": fill},
+    )
+    ds = xr.Dataset(coords={"latitude": lat, "longitude": lon})
+    out = reduce_swath(ds, factor=2)
+    # Pixels (0,1) and (1,1) are fill in one of the pair -> only (0,0) and (1,0) count.
+    exp_lat, exp_lon = _geodesic_center(np.array([10.0, 30.0]), np.array([5.0, 6.0]))
+    np.testing.assert_allclose(float(out["latitude"].values[0, 0]), exp_lat, rtol=1e-12)
+    np.testing.assert_allclose(float(out["longitude"].values[0, 0]), exp_lon, rtol=1e-12)
+
+    all_fill = xr.Dataset(
+        coords={
+            "latitude": xr.full_like(lat, fill),
+            "longitude": xr.full_like(lon, fill),
+        }
+    )
+    out_fill = reduce_swath(all_fill, factor=2)
+    assert float(out_fill["latitude"].values[0, 0]) == fill
+    assert float(out_fill["longitude"].values[0, 0]) == fill
+
+
+def test_reduce_swath_packed_integer_geolocation_unpacked_for_centroid() -> None:
+    """CF-packed int32 microdegree lat/lon is decoded before the spherical mean.
+
+    Real OLCI products store geolocation as int32 with scale_factor=1e-06
+    (and the converter runs on un-decoded data).  Regression: feeding the raw
+    packed integers (45_000_000 for 45 deg) into the trigonometry collapsed
+    every overview coordinate to ~(0, 0).
+    """
+    scale = 1e-6
+    fill = np.iinfo("int32").min
+    lat_deg = np.array([[45.0, 45.001], [45.002, 45.003]])
+    lon_deg = np.array([[10.0, 10.001], [10.002, 10.003]])
+    lat = xr.DataArray(
+        np.round(lat_deg / scale).astype("int32"),
+        dims=("rows", "columns"),
+        attrs={"standard_name": "latitude", "scale_factor": scale, "_FillValue": fill},
+    )
+    lon = xr.DataArray(
+        np.round(lon_deg / scale).astype("int32"),
+        dims=("rows", "columns"),
+        attrs={"standard_name": "longitude", "scale_factor": scale, "_FillValue": fill},
+    )
+    ds = xr.Dataset(coords={"latitude": lat, "longitude": lon})
+    out = reduce_swath(ds, factor=2)
+
+    assert out["latitude"].dtype == np.dtype("int32")
+    assert out["latitude"].attrs["scale_factor"] == scale
+    exp_lat, exp_lon = _geodesic_center(lat_deg, lon_deg)
+    # Output is re-packed, so compare decoded values to within one quantum.
+    np.testing.assert_allclose(float(out["latitude"].values[0, 0]) * scale, exp_lat, atol=scale)
+    np.testing.assert_allclose(float(out["longitude"].values[0, 0]) * scale, exp_lon, atol=scale)
+
+
+def test_reduce_swath_odd_dims_coords_are_block_centroids() -> None:
+    """Coordinates on odd-dim inputs use the same trimmed blocks as radiance."""
+    ds = _swath_odd(rows=7, cols=5)
+    out = reduce_swath(ds, factor=2)
+    # Block [2:4, 2:4] feeds output cell (1, 1); the trailing odd row/column
+    # is trimmed exactly as coarsen(boundary="trim") trims the radiance.
+    exp_lat, exp_lon = _geodesic_center(
+        ds["latitude"].values[2:4, 2:4], ds["longitude"].values[2:4, 2:4]
+    )
+    np.testing.assert_allclose(float(out["latitude"].values[1, 1]), exp_lat, rtol=1e-12)
+    np.testing.assert_allclose(float(out["longitude"].values[1, 1]), exp_lon, rtol=1e-12)
+
+
+def test_swath_spatial_attrs_has_no_transform() -> None:
+    attrs = swath_spatial_attrs()
+    assert attrs["spatial:dimensions"] == ["rows", "columns"]
+    assert attrs.get("spatial:registration") == "pixel"
+    assert "spatial:transform" not in attrs
+    assert "spatial:bbox" not in attrs
