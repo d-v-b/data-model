@@ -623,3 +623,18 @@ def test_convert_olci_rerun_removes_stale_overview_groups(tmp_path: object) -> N
     assert isinstance(meas, zarr.Group)
     levels_second = {k for k in meas.group_keys() if k.startswith("r")}
     assert levels_second == {"r0", "r2"}, f"stale overview groups survived re-run: {levels_second}"
+
+
+def test_convert_olci_nonpositive_min_dimension_raises(tmp_path: object) -> None:
+    """min_dimension < 1 must fail fast, before the output store is touched.
+
+    Regression: _overview_levels loops `while min(r, c) // 2 >= min_dimension`,
+    which never terminates once r and c decay to 0 — so min_dimension <= 0
+    previously hung the converter forever (after truncating the store).
+    """
+    dt = build_synthetic_olci(rows=64, cols=64)
+    for bad in (0, -1):
+        out = str(tmp_path / f"bad_{bad}.zarr")  # type: ignore[operator]
+        with pytest.raises(ValueError, match="min_dimension"):
+            convert_olci_optimized(dt, output_path=out, min_dimension=bad)
+        assert not Path(out).exists(), "store must not be created on invalid min_dimension"

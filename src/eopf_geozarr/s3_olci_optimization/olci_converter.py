@@ -249,6 +249,12 @@ def convert_olci_optimized(
     logged when a non-default value is passed for any of them, so callers
     aren't silently handed default-encoded output.
     """
+    # Fail fast before any store mutation: _overview_levels floor-halves the
+    # dimensions, and min(r, c) // 2 >= min_dimension never becomes false for
+    # min_dimension <= 0 once the sizes decay to zero (infinite loop).
+    if min_dimension < 1:
+        raise ValueError(f"min_dimension must be >= 1; got {min_dimension}")
+
     unwired: dict[str, tuple[object, object]] = {
         "enable_sharding": (enable_sharding, False),
         "spatial_chunk": (spatial_chunk, 1024),
