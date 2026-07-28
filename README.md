@@ -295,9 +295,10 @@ via /2 downsampling.
 Sentinel-3 OLCI (Ocean and Land Colour Instrument) Level-1 EFR (Full Resolution)
 products are detected automatically by `eopf-geozarr convert` and routed to the
 dedicated OLCI converter.  Unlike Sentinel-2, OLCI data starts out on **native
-swath geometry**: measurements are stored on a per-pixel 2-D lat/lon grid.  The
-exporter warps this curvilinear swath once onto a regular grid (default
-`EPSG:4326`) so that the output is a standard GeoZarr raster.
+swath geometry**: measurements are stored on a per-pixel 2-D lat/lon grid.  By
+default the exporter preserves that instrument geometry; pass
+`--output-grid <CRS>` (e.g. `EPSG:4326`) to warp the swath once onto a regular
+grid so the output is a standard, tileable GeoZarr raster.
 
 #### Auto-detection
 
