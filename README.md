@@ -326,18 +326,19 @@ Key flags:
 
 #### What is converted
 
-- **`/measurements/r0`**: all 21 OLCI radiance bands warped once from the
-  native swath onto a regular grid (default `EPSG:4326`, ~300 m preserved),
-  with 1-D `y`/`x` coordinates, a `spatial_ref` variable, and `grid_mapping`
-  on every band; the parent `measurements/` group carries the GeoZarr
-  `multiscales`, `spatial:`, and `proj:` convention metadata.
-- **Overview subgroups** (`r2`, `r4`, …): /2 fill-aware block-averaged copies
-  stored as sibling Zarr groups next to `r0`, each with its own CRS metadata.
+- **`/measurements/r0`**: all 21 OLCI radiance bands. By default
+  (`output_grid="native"`) the instrument swath geometry is preserved:
+  raw bands with per-pixel 2-D `latitude`/`longitude`/`altitude` and
+  per-row `time_stamp`, and no projected CRS. With `--output-grid
+  <CRS>` (e.g. `EPSG:4326`) the swath is warped once onto a regular
+  grid with 1-D `y`/`x` coordinates, a `spatial_ref` variable, and
+  `grid_mapping` on every band (per-scan-line `time_stamp` has no home
+  on a regular grid and is dropped; it remains in the source product).
+- **Overview subgroups** (`r2`, `r4`, …): /2 fill-aware block-averaged
+  copies as sibling groups next to `r0`. In native mode overview
+  lat/lon are per-block geodesic centroids; in regridded mode each
+  level carries its own CRS metadata.
 - **`/conditions` and `/quality`**: copied through unmodified.
-
-> **Note:** per-scan-line `time_stamp` is not representable on a regular grid
-> and is dropped from the converted measurements (it remains in the source
-> product).
 
 > **Note:** OLCI support is initial/measurements-focused (v1).  Tie-point grid
 > groups (`conditions/geometry`, `meteorology`, `instrument`) are copied through but

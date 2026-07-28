@@ -180,11 +180,12 @@ The result is a space-efficient multiscale pyramid: `/measurements/reflectance/{
 ## Sentinel-3 OLCI L1 EFR Conversion
 
 Sentinel-3 OLCI (Ocean and Land Colour Instrument) Level-1 EFR (Full Resolution)
-products are supported.  OLCI measurements start out on **native swath geometry**:
-a per-pixel 2-D lat/lon grid.  The converter reprojects (warps) the swath measurements
-once onto a regular grid (default `EPSG:4326`) using the swath geolocation arrays,
-then generates /2 fill-aware block-averaged overview subgroups for multi-resolution
-access.
+products are supported.  OLCI measurements keep **native swath geometry by
+default**: a per-pixel 2-D lat/lon grid, with no reprojection.  Passing
+`--output-grid <CRS>` opts into a one-time warp of the swath measurements onto
+a regular grid (e.g. `EPSG:4326`) using the swath geolocation arrays.  Either
+way, the converter then generates /2 fill-aware block-averaged overview
+subgroups for multi-resolution access.
 
 ### Auto-detection
 
@@ -212,15 +213,15 @@ eopf-geozarr convert-s3-olci-optimized S3A_OL_1_EFR.zarr output.zarr \
 | `--min-dimension` | 256 | Minimum spatial dimension for overview levels |
 | `--enable-sharding` | off | Accepted but not yet wired into encoding (follow-up task) |
 | `--keep-scale-offset` | off | Accepted but not yet wired into encoding (follow-up task) |
-| `--output-grid` | native | `native` preserves the instrument swath geometry; any other value is parsed as a CRS (e.g. `EPSG:4326`) and warps onto a regular grid |
+| `--output-grid` | native | `native` preserves instrument geometry; any CRS string (e.g. `EPSG:4326`) warps onto a regular grid |
 
 ### Output layout
 
 ```
 output.zarr/
 ├── measurements/        # Carries multiscales + spatial: + proj: convention metadata
-│   ├── r0/             # Warped native-resolution OLCI bands (oa01_radiance … oa21_radiance)
-│   │                   # with 1-D y/x coordinates and spatial_ref
+│   ├── r0/             # Native-resolution bands (instrument grid by default; regular
+│   │                   # y/x grid with spatial_ref when --output-grid is a CRS)
 │   ├── r2/             # 1/2-resolution overview
 │   ├── r4/             # 1/4-resolution overview
 │   └── ...
@@ -228,10 +229,13 @@ output.zarr/
 └── quality/             # Copied through unmodified (quality flags)
 ```
 
-Each measurement group carries GeoZarr `spatial:` and `proj:` convention metadata,
-with 1-D `y`/`x` dimension coordinates and a `spatial_ref` variable referenced by
-`grid_mapping` on every band.  Per-scan-line `time_stamp` is dropped, since it has
-no representation on a regular grid.
+Each measurement group carries GeoZarr `spatial:` and `proj:` convention metadata.
+In native mode (`--output-grid native`, the default) bands keep per-pixel 2-D
+`latitude`/`longitude`/`altitude` and per-row `time_stamp`, with no projected CRS.
+When `--output-grid <CRS>` is given, bands are warped onto a regular grid with 1-D
+`y`/`x` dimension coordinates and a `spatial_ref` variable referenced by
+`grid_mapping` on every band; per-scan-line `time_stamp` has no representation on
+a regular grid and is dropped (it remains in the source product).
 
 > **Note:** OLCI support is initial/measurements-focused (v1).  Tie-point grid
 > groups in `conditions/geometry`, `meteorology`, and `instrument` are copied
