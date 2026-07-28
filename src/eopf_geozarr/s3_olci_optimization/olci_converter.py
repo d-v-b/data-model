@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+import numpy as np
 import rioxarray  # noqa: F401
 import structlog
 import xarray as xr
@@ -349,12 +350,28 @@ def convert_olci_optimized(
     log.info("Generating overview levels", n_levels=n_levels)
 
     level_datasets: dict[str, xr.Dataset] = {"r0": measurements}
+    base_transform = measurements.rio.transform(recalc=True) if crs_obj is not None else None
     current = measurements
     for level in range(1, n_levels + 1):
         current = reduce_swath(current, factor=2, dims=pyramid_dims)
         current = _clear_encoding(current)
         # Attrs already sanitized at native level and passed through by
         # reduce_swath; no second sanitize pass needed.
+        if base_transform is not None:
+            # Radiance is block-AVERAGED, so an overview coordinate is the
+            # CENTER of the 2^level x 2^level base-pixel block it aggregates.
+            # Stride-decimated coords (the first fine pixel's center) would
+            # shift every level's recomputed transform/bbox by
+            # (2^level - 1)/2 base pixels and contradict the multiscales
+            # layout's declared {scale: [2, 2], translation: [0, 0]}.
+            # Derive edge-aligned coords from the r0 transform instead.
+            step = float(2**level)
+            xs = base_transform.c + base_transform.a * step * (np.arange(current.sizes["x"]) + 0.5)
+            ys = base_transform.f + base_transform.e * step * (np.arange(current.sizes["y"]) + 0.5)
+            current = current.assign_coords(
+                x=("x", xs, dict(measurements["x"].attrs)),
+                y=("y", ys, dict(measurements["y"].attrs)),
+            )
         group_name = f"r{2**level}"
         level_datasets[group_name] = current
         log.info("Writing overview", group=f"measurements/{group_name}", shape=dict(current.sizes))

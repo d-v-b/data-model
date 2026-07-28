@@ -450,27 +450,25 @@ def test_olci_conversion_matches_snapshot(
     run the test once, then re-comment before committing.
     """
     # The JSON fixture materializes arrays as zeros; zero lat/lon is a
-    # degenerate geolocation the warp rejects. Seed a plausible grid.
-    #
-    # NOTE: the fixture's latitude/longitude arrays are stored raw as int32
-    # with a CF scale_factor of 1e-6 (real degrees = raw * scale_factor), and
-    # this test opens the datatree with mask_and_scale=False, so xarray hands
-    # reproject_olci the *raw* int32 values unscaled. A ~300 m (0.003 deg)
-    # spacing collapses to a single truncated integer across this fixture's
-    # small 16-row/16-col grid, which is degenerate. Use whole-degree spacing
-    # instead so each row/column truncates to a distinct raw value.
+    # degenerate geolocation the warp rejects. Seed a plausible ~300 m
+    # (0.003 deg) grid the way the real product stores it: the fixture's
+    # latitude/longitude arrays are raw int32 microdegrees with a CF
+    # scale_factor of 1e-6 (real degrees = raw * scale_factor), so write
+    # RAW values of degrees / 1e-6. Both pipelines unpack the packing
+    # (reproject_olci for the warp, _geodesic_block_mean for native
+    # centroids), so the seeded geolocation decodes to real degrees.
     fixture_group = zarr.open_group(str(s3_olci_group_example), mode="a")
     fixture_meas = fixture_group["measurements"]
     assert isinstance(fixture_meas, zarr.Group)
     lat_arr = fixture_meas["latitude"]
     assert isinstance(lat_arr, zarr.Array)
     ny, nx = lat_arr.shape
-    lat_1d = np.linspace(45.0, 45.0 + 1.0 * (ny - 1), ny)
-    lon_1d = np.linspace(10.0, 10.0 + 1.0 * (nx - 1), nx)
-    lat_arr[:] = np.repeat(lat_1d[:, None], nx, axis=1)
+    lat_deg = np.linspace(45.0, 45.0 + 0.003 * (ny - 1), ny)
+    lon_deg = np.linspace(10.0, 10.0 + 0.003 * (nx - 1), nx)
+    lat_arr[:] = np.round(np.repeat(lat_deg[:, None], nx, axis=1) / 1e-6).astype("int32")
     lon_arr = fixture_meas["longitude"]
     assert isinstance(lon_arr, zarr.Array)
-    lon_arr[:] = np.repeat(lon_1d[None, :], ny, axis=0)
+    lon_arr[:] = np.round(np.repeat(lon_deg[None, :], ny, axis=0) / 1e-6).astype("int32")
 
     dt_in = xr.open_datatree(
         str(s3_olci_group_example),
@@ -638,3 +636,46 @@ def test_convert_olci_nonpositive_min_dimension_raises(tmp_path: object) -> None
         with pytest.raises(ValueError, match="min_dimension"):
             convert_olci_optimized(dt, output_path=out, min_dimension=bad)
         assert not Path(out).exists(), "store must not be created on invalid min_dimension"
+
+
+def test_convert_olci_regridded_overviews_share_common_origin(tmp_path: object) -> None:
+    """Regridded overview levels must be edge-aligned /2 reductions of r0.
+
+    Radiance is block-averaged, so an overview coordinate is the CENTER of
+    the block it aggregates. Stride-decimating the 1-D coords instead put
+    every level's declared transform/bbox (2^l - 1)/2 fine pixels up/left of
+    the data and contradicted the multiscales layout's
+    {scale: [2, 2], translation: [0, 0]}.
+    """
+    dt = build_synthetic_olci(rows=1024, cols=1024)
+    out = str(tmp_path / "olci_reg.zarr")  # type: ignore[operator]
+    convert_olci_optimized(dt, output_path=out, min_dimension=256, output_grid="EPSG:4326")
+
+    levels = {}
+    for level in ("r0", "r2", "r4"):
+        levels[level] = xr.open_dataset(
+            out,
+            engine="zarr",
+            group=f"measurements/{level}",
+            consolidated=False,
+            decode_coords="all",
+        )
+    t0 = levels["r0"].rio.transform(recalc=True)
+    t2 = levels["r2"].rio.transform(recalc=True)
+    t4 = levels["r4"].rio.transform(recalc=True)
+
+    # All levels share one origin (edge-aligned pyramid)...
+    for t in (t2, t4):
+        assert abs(t.c - t0.c) < 1e-9, f"x-origin drifted: {t.c} vs {t0.c}"
+        assert abs(t.f - t0.f) < 1e-9, f"y-origin drifted: {t.f} vs {t0.f}"
+    # ...with pixel size doubling per level.
+    assert np.isclose(t2.a, 2 * t0.a)
+    assert np.isclose(t2.e, 2 * t0.e)
+    assert np.isclose(t4.a, 4 * t0.a)
+    assert np.isclose(t4.e, 4 * t0.e)
+
+    # Overview coordinate = center of the aggregated 2x2 block, not the
+    # first fine pixel's center.
+    x0, y0 = levels["r0"]["x"].values, levels["r0"]["y"].values
+    assert np.isclose(levels["r2"]["x"].values[0], (x0[0] + x0[1]) / 2)
+    assert np.isclose(levels["r2"]["y"].values[0], (y0[0] + y0[1]) / 2)
