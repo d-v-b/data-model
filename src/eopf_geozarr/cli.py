@@ -28,11 +28,16 @@ from .conversion.fs_utils import (
     validate_s3_access,
 )
 from .conversion.geozarr import get_zarr_group
+from .conversion.open_source import open_source_datatree
 
 if TYPE_CHECKING:
     from dask.distributed import Client
 
 log = structlog.get_logger()
+
+# Default for convert's --spatial-chunk; shared between the parser definition
+# and the OLCI auto-detect path's ignored-options check.
+CONVERT_SPATIAL_CHUNK_DEFAULT = 4096
 
 # Suppress xarray FutureWarning about timedelta decoding
 warnings.filterwarnings("ignore", message=".*", category=FutureWarning)
@@ -110,6 +115,10 @@ def _is_sentinel3_olci_input(dt: xr.DataTree) -> bool:
     ``is_sentinel3_olci_dataset`` validates structurally against a Zarr v2 model
     and can raise on unrelated inputs; any failure simply means "not a recognised
     OLCI product", so fall back to the generic converter.
+
+    Detection is intentionally conservative (strict structural validation), so
+    near-miss OLCI products fall through to the generic path; the explicit
+    ``convert-s3-olci-optimized`` subcommand bypasses detection entirely.
     """
     try:
         return is_sentinel3_olci_dataset(get_zarr_group(dt))
@@ -202,14 +211,14 @@ def convert_command(args: argparse.Namespace) -> None:
 
         # Convert to GeoZarr compliant format
         log.info("Converting to GeoZarr compliant format...")
-        if _is_sentinel2_input(dt):
+        if _is_sentinel2_input(dt) and not getattr(args, "no_s2_optimized", False):
             # Sentinel-2 inputs use the optimized flat multiscale layout
             # (sibling r{N}m levels), shared with `convert-s2-optimized`. The
             # generic per-group options below do not apply to that layout.
             log.info(
                 "Detected Sentinel-2 input; using optimized flat multiscale layout "
                 "(per-group options such as --groups/--crs-groups/--gcp-group/--min-dimension "
-                "do not apply)"
+                "do not apply; pass --no-s2-optimized to force the generic path)"
             )
             dt_geozarr = convert_s2_optimized(
                 dt_input=dt,
@@ -221,13 +230,50 @@ def convert_command(args: argparse.Namespace) -> None:
                 keep_scale_offset=False,
                 max_retries=args.max_retries,
             )
-        elif _is_sentinel3_olci_input(dt):
-            log.info("Detected Sentinel-3 OLCI product; using OLCI converter")
+        # Opt-out flag first: skip the structural OLCI detection (a full
+        # model validation of the store) when the user already declined it.
+        elif not getattr(args, "no_s3_olci_optimized", False) and _is_sentinel3_olci_input(dt):
+            log.info(
+                "Detected Sentinel-3 OLCI product; using OLCI converter "
+                "(pass --no-s3-olci-optimized to force the generic path)"
+            )
+            # convert_olci_optimized requires raw (non-mask-scaled) input:
+            # radiance must stay packed uint16 with CF scale_factor/add_offset
+            # and _FillValue in .attrs (see _clear_encoding / reduce_swath).
+            # The tree above was opened with CF decoding on for detection and
+            # the generic path, so close it and re-open raw, matching
+            # convert_s3_olci_optimized_command.
+            dt.close()
+            dt_raw = open_source_datatree(
+                str(input_path),
+                storage_options=storage_options,
+                mask_and_scale=False,
+            )
+            # Only forward options the OLCI converter actually applies;
+            # enable_sharding / spatial_chunk are accepted by
+            # convert_olci_optimized but not yet wired into the encoding
+            # (forwarding them would trigger its ignored-options warning on
+            # every run, since convert's defaults differ). Re-add them here
+            # once the converter wires them through — and don't drop a user's
+            # explicit setting silently in the meantime.
+            ignored_cli_options = [
+                name
+                for name, is_non_default in (
+                    ("--spatial-chunk", args.spatial_chunk != CONVERT_SPATIAL_CHUNK_DEFAULT),
+                    ("--enable-sharding", args.enable_sharding),
+                )
+                if is_non_default
+            ]
+            if ignored_cli_options:
+                log.warning(
+                    "Options not yet applied by the OLCI converter and "
+                    "ignored on the auto-detect path",
+                    ignored_options=ignored_cli_options,
+                )
             dt_geozarr = convert_olci_optimized(
-                dt,
+                dt_raw,
                 output_path=output_path,
-                enable_sharding=args.enable_sharding,
-                spatial_chunk=args.spatial_chunk,
+                min_dimension=args.min_dimension,
             )
         else:
             dt_geozarr = create_geozarr_dataset(
@@ -1100,7 +1146,22 @@ def create_parser() -> argparse.ArgumentParser:
 
     # Convert command
     convert_parser = subparsers.add_parser(
-        "convert", help="Convert EOPF dataset to GeoZarr compliant format"
+        "convert",
+        help="Convert EOPF dataset to GeoZarr compliant format",
+        description=(
+            "Convert EOPF dataset to GeoZarr compliant format. Sentinel-2 inputs are "
+            "auto-detected and converted with the optimized flat multiscale layout "
+            "(equivalent to convert-s2-optimized with keep_scale_offset disabled); for "
+            "those inputs the per-group options --groups, --crs-groups, --gcp-group and "
+            "--min-dimension do not apply. Sentinel-3 OLCI inputs are likewise "
+            "auto-detected and converted with the OLCI swath converter (equivalent to "
+            "convert-s3-olci-optimized), which honors --min-dimension but not the "
+            "per-group options; OLCI detection is intentionally strict, so near-miss "
+            "products fall back to the generic path — use convert-s3-olci-optimized "
+            "to convert them explicitly. Pass --no-s2-optimized / "
+            "--no-s3-olci-optimized to force the generic conversion path, which "
+            "honors all options."
+        ),
     )
     convert_parser.add_argument(
         "input_path", type=str, help="Path to input EOPF dataset (Zarr format)"
@@ -1115,19 +1176,22 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         nargs="+",
         default=["/measurements/r10m", "/measurements/r20m", "/measurements/r60m"],
-        help="Groups to convert (default: Sentinel-2 resolution groups)",
+        help="Groups to convert (ignored for auto-detected Sentinel-2 inputs)",
     )
     convert_parser.add_argument(
         "--spatial-chunk",
         type=int,
-        default=4096,
+        default=CONVERT_SPATIAL_CHUNK_DEFAULT,
         help="Spatial chunk size for encoding (default: 4096)",
     )
     convert_parser.add_argument(
         "--min-dimension",
         type=int,
         default=256,
-        help="Minimum dimension for overview levels (default: 256)",
+        help=(
+            "Minimum dimension for overview levels (default: 256; ignored for "
+            "auto-detected Sentinel-2 inputs)"
+        ),
     )
     convert_parser.add_argument(
         "--max-retries",
@@ -1139,12 +1203,19 @@ def create_parser() -> argparse.ArgumentParser:
         "--crs-groups",
         type=str,
         nargs="*",
-        help="Groups that need CRS information added on best-effort basis (e.g., /conditions/geometry)",
+        help=(
+            "Groups that need CRS information added on best-effort basis "
+            "(e.g., /conditions/geometry; ignored for auto-detected Sentinel-2 inputs)"
+        ),
     )
     convert_parser.add_argument(
         "--gcp-group",
         type=str,
-        help="Groups where Ground Control Points (GCPs) are located (e.g., /conditions/gcp) (Sentinel-1)",
+        help=(
+            "Groups where Ground Control Points (GCPs) are located "
+            "(e.g., /conditions/gcp) (Sentinel-1; ignored for auto-detected "
+            "Sentinel-2 inputs)"
+        ),
     )
     convert_parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     convert_parser.add_argument(
@@ -1156,6 +1227,22 @@ def create_parser() -> argparse.ArgumentParser:
         "--enable-sharding",
         action="store_true",
         help="Enable zarr sharding for spatial dimensions of each variable",
+    )
+    convert_parser.add_argument(
+        "--no-s2-optimized",
+        action="store_true",
+        help=(
+            "Disable Sentinel-2 auto-detection and use the generic conversion path, "
+            "honoring --groups/--crs-groups/--gcp-group/--min-dimension"
+        ),
+    )
+    convert_parser.add_argument(
+        "--no-s3-olci-optimized",
+        action="store_true",
+        help=(
+            "Disable Sentinel-3 OLCI auto-detection and use the generic conversion "
+            "path, honoring --groups/--crs-groups/--gcp-group"
+        ),
     )
     convert_parser.set_defaults(func=convert_command)
 
@@ -1243,10 +1330,7 @@ def convert_s2_optimized_command(args: argparse.Namespace) -> None:
     try:
         # Load input dataset
         log.info("Loading Sentinel-2 dataset from", input_path=args.input_path)
-        storage_options = get_storage_options(str(args.input_path))
-        dt_input = xr.open_datatree(
-            str(args.input_path), engine="zarr", chunks="auto", storage_options=storage_options
-        )
+        dt_input = open_source_datatree(str(args.input_path))
 
         # Convert
         convert_s2_optimized(
@@ -1282,14 +1366,23 @@ def add_s3_olci_optimization_commands(subparsers: argparse._SubParsersAction) ->
     )
     p.add_argument("input_path", type=str, help="Path to input OLCI dataset (Zarr)")
     p.add_argument("output_path", type=str, help="Path for output optimized dataset")
-    p.add_argument("--spatial-chunk", type=int, default=1024, help="Spatial chunk size")
-    p.add_argument("--enable-sharding", action="store_true", help="Enable Zarr v3 sharding")
+    p.add_argument(
+        "--spatial-chunk",
+        type=int,
+        default=1024,
+        help="Spatial chunk size (not yet applied; reserved for a follow-up)",
+    )
+    p.add_argument(
+        "--enable-sharding",
+        action="store_true",
+        help="Enable Zarr v3 sharding (not yet applied; reserved for a follow-up)",
+    )
     p.add_argument(
         "--compression-level",
         type=int,
         default=3,
         choices=range(1, 10),
-        help="Compression level 1-9 (default: 3)",
+        help="Compression level 1-9 (default: 3; not yet applied; reserved for a follow-up)",
     )
     p.add_argument(
         "--min-dimension",
@@ -1300,7 +1393,10 @@ def add_s3_olci_optimization_commands(subparsers: argparse._SubParsersAction) ->
     p.add_argument(
         "--keep-scale-offset",
         action="store_true",
-        help="Preserve scale-offset encoding instead of decoding to float",
+        help=(
+            "Preserve scale-offset encoding instead of decoding to float "
+            "(not yet applied; output is currently always raw integer)"
+        ),
     )
     p.add_argument(
         "--target-crs",
@@ -1314,14 +1410,7 @@ def add_s3_olci_optimization_commands(subparsers: argparse._SubParsersAction) ->
 
 def convert_s3_olci_optimized_command(args: argparse.Namespace) -> None:
     """Execute S3 OLCI optimized conversion command."""
-    storage_options = get_storage_options(str(args.input_path))
-    dt_input = xr.open_datatree(
-        str(args.input_path),
-        engine="zarr",
-        chunks="auto",
-        storage_options=storage_options,
-        mask_and_scale=False,
-    )
+    dt_input = open_source_datatree(str(args.input_path), mask_and_scale=False)
     convert_olci_optimized(
         dt_input,
         output_path=args.output_path,

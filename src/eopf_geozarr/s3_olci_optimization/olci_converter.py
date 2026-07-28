@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 log = structlog.get_logger()
 
 
-def _sanitize_olci_array_attrs(attrs: dict[str, object]) -> dict[str, object]:
+def _sanitize_olci_array_attrs_keep_fill(attrs: dict[str, object]) -> dict[str, object]:
     """Return a copy of *attrs* with stale source-only keys removed.
 
     Strips ``_eopf_attrs``, ``dtype``, ``valid_min``, and ``valid_max`` (source
@@ -50,12 +50,22 @@ def is_sentinel3_olci_dataset(group: zarr.Group) -> bool:
     Detection is structural: the group must validate against
     ``Sentinel3OlciRoot`` and its ``measurements`` group must contain the
     first OLCI radiance band.
+
+    Detection is intentionally conservative: ``Sentinel3OlciRoot`` uses a
+    closed member set and requires the standard EOPF root attrs, so a
+    product with extra top-level groups or missing root metadata fails
+    validation and is treated as "not OLCI" (falling through to the generic
+    converter in the CLI). Users with such near-miss products should use the
+    explicit ``convert-s3-olci-optimized`` subcommand, which skips detection.
     """
     from eopf_geozarr.pyz.v2 import GroupSpec
 
     try:
         model = Sentinel3OlciRoot.model_validate(GroupSpec.from_zarr(group).model_dump())
-    except ValueError as e:
+    except Exception as e:
+        # Classify, never raise: from_zarr/model_dump can fail with types
+        # other than ValidationError on malformed or unexpected stores, and
+        # any failure simply means "not a recognised OLCI product".
         log.debug("Not an OLCI dataset", error=str(e))
         return False
     try:
@@ -111,7 +121,7 @@ def _clear_encoding(ds: xr.Dataset) -> xr.Dataset:
 def _sanitize_data_vars(ds: xr.Dataset) -> xr.Dataset:
     """Return *ds* with stale source attrs stripped from all data variables.
 
-    Applies :func:`_sanitize_olci_array_attrs` to every data variable in *ds*.
+    Applies :func:`_sanitize_olci_array_attrs_keep_fill` to every data variable in *ds*.
     Coordinate variable attrs are left intact.
 
     This removes ``_eopf_attrs``, ``dtype``, ``valid_min``, and ``valid_max``
@@ -127,7 +137,7 @@ def _sanitize_data_vars(ds: xr.Dataset) -> xr.Dataset:
     for name in ds.data_vars:
         var = ds[name]
         new_var = var.copy(data=var.data)
-        new_var.attrs = _sanitize_olci_array_attrs(dict(var.attrs))
+        new_var.attrs = _sanitize_olci_array_attrs_keep_fill(dict(var.attrs))
         new_vars[str(name)] = new_var
     return ds.assign(new_vars)
 
@@ -220,6 +230,9 @@ def convert_olci_optimized(
     -------
     xr.DataTree
         The opened output DataTree (lazy; backed by the written Zarr store).
+        Opened with ``mask_and_scale=False``, mirroring the raw store and the
+        converter's input: radiance is packed ``uint16`` with its CF
+        ``scale_factor``/``_FillValue`` attrs intact, not decoded floats.
         Native-resolution arrays live at ``measurements/r0`` with overview
         levels (``r2``, ``r4``, …) as sibling groups, all on a regular grid
         with 1-D ``y``/``x`` coordinates and a declared CRS; ``measurements``
@@ -232,9 +245,34 @@ def convert_olci_optimized(
     and ``keep_scale_offset`` are accepted but not yet applied to the on-disk
     encoding.  Wiring them through the existing ``conversion`` helpers
     (``create_measurements_encoding``, sharding codec, etc.) is left for a
-    follow-up task so as not to block the integration test.
+    follow-up task so as not to block the integration test.  A warning is
+    logged when a non-default value is passed for any of them, so callers
+    aren't silently handed default-encoded output.
     """
+    unwired: dict[str, tuple[object, object]] = {
+        "enable_sharding": (enable_sharding, False),
+        "spatial_chunk": (spatial_chunk, 1024),
+        "compression_level": (compression_level, 3),
+        "keep_scale_offset": (keep_scale_offset, False),
+    }
+    ignored = [name for name, (value, default) in unwired.items() if value != default]
+    if ignored:
+        log.warning(
+            "Options not yet applied by the OLCI converter; output uses default encoding",
+            ignored_options=ignored,
+        )
+
     measurements = dt_input["/measurements"].to_dataset()
+    # Structural detection does not constrain dimension names, but the whole
+    # swath pipeline (reduce_swath, decimate_swath, SWATH_DIMS) assumes
+    # rows/columns; fail with a clear error instead of a bare KeyError below.
+    missing_dims = [d for d in ("rows", "columns") if d not in measurements.sizes]
+    if missing_dims:
+        raise ValueError(
+            "OLCI converter requires swath dimensions ('rows', 'columns') on the "
+            f"measurements group; missing {missing_dims}. Use the generic convert "
+            "path for products with different dimension names."
+        )
     # Strip any inherited Zarr v2 encoding (e.g. numcodecs.Blosc compressors)
     # so the v3 writer can choose its own default codecs without raising a
     # "Expected a BytesBytesCodec" error.  The caller is expected to have opened
@@ -258,12 +296,19 @@ def convert_olci_optimized(
     # inherited encoding once more after the warp.
     measurements = _clear_encoding(measurements)
 
+    # Truncate any pre-existing store first: the writes below are per-group
+    # (mode="w" scoped to measurements/r0, mode="a" for overviews/ancillary),
+    # so a prior run with more overview levels or extra ancillary groups would
+    # otherwise leave stale sibling groups behind, and the returned DataTree
+    # (built by re-scanning the store) would surface them.
+    zarr.open_group(output_path, mode="w", zarr_format=3)
+
     # The native-resolution arrays go in a named child group (r0) alongside the
     # overview groups (r2, r4, …) rather than directly in ``measurements``.
     # If the parent held the full-res coordinates itself, every overview child
-    # would inherit them over the shared rows/columns dims at mismatched sizes
-    # and ``xr.open_datatree`` (and any generic GeoZarr reader) would reject
-    # the store with an alignment error.
+    # would inherit them over the shared y/x dims at mismatched sizes and
+    # ``xr.open_datatree`` (and any generic GeoZarr reader) would reject the
+    # store with an alignment error.
     log.info("Writing native-resolution measurements", shape=dict(measurements.sizes))
     measurements.to_zarr(
         output_path,
@@ -358,9 +403,16 @@ def convert_olci_optimized(
             log.info("Copying measurements subgroup", group=f"measurements/{child.name}")
             _copy_subtree(child, output_path, root_group=f"measurements/{child.name}")
 
+    # The r0 named-sibling layout keeps every parent group free of arrays, so
+    # the whole store — overview levels and nested ancillary groups included —
+    # opens directly as a DataTree. mask_and_scale=False so the returned tree
+    # mirrors the raw store (packed uint16 + CF attrs), matching how the
+    # converter opened its input, rather than handing callers CF-decoded
+    # floats.
     return xr.open_datatree(
         output_path,
         engine="zarr",
         chunks={},
         consolidated=False,
+        mask_and_scale=False,
     )

@@ -14,6 +14,19 @@ from eopf_geozarr.s3_olci_optimization.olci_multiscale import (
 )
 
 
+def _geodesic_center(lat_deg: np.ndarray, lon_deg: np.ndarray) -> tuple[float, float]:
+    """Reference spherical centroid of a set of lat/lon positions, in degrees."""
+    lat = np.deg2rad(np.asarray(lat_deg, dtype="float64"))
+    lon = np.deg2rad(np.asarray(lon_deg, dtype="float64"))
+    x = float((np.cos(lat) * np.cos(lon)).mean())
+    y = float((np.cos(lat) * np.sin(lon)).mean())
+    z = float(np.sin(lat).mean())
+    return (
+        float(np.rad2deg(np.arctan2(z, np.hypot(x, y)))),
+        float(np.rad2deg(np.arctan2(y, x))),
+    )
+
+
 def _swath(rows: int = 8, cols: int = 6) -> xr.Dataset:
     """Minimal synthetic swath dataset with one radiance band and two coords."""
     rad = xr.DataArray(
@@ -109,14 +122,30 @@ def test_reduce_swath_radiance_is_averaged_not_decimated() -> None:
     assert int(out["oa01_radiance"].values[0, 0]) == expected_block
 
 
-def test_reduce_swath_coordinates_decimated() -> None:
-    """Coordinate arrays must be decimated (stride), not averaged."""
-    ds = _swath(8, 6)
+def test_reduce_swath_altitude_is_block_averaged() -> None:
+    """Altitude gets the fill-aware block mean, not stride decimation.
+
+    A stride sample would locate the overview cell's altitude ~half a block
+    away from the geodesic-centroid lat/lon describing the same cell.
+    """
+    fill = -32768
+    alt = xr.DataArray(
+        np.array([[100, 200], [300, fill]], dtype="int16"),
+        dims=("rows", "columns"),
+        attrs={"standard_name": "altitude", "_FillValue": fill},
+    )
+    lat = xr.DataArray(
+        np.zeros((2, 2)), dims=("rows", "columns"), attrs={"standard_name": "latitude"}
+    )
+    lon = xr.DataArray(
+        np.zeros((2, 2)), dims=("rows", "columns"), attrs={"standard_name": "longitude"}
+    )
+    ds = xr.Dataset(coords={"latitude": lat, "longitude": lon, "altitude": alt})
     out = reduce_swath(ds, factor=2)
-    # lat[0,0] in output == lat[0,0] in input
-    assert float(out["latitude"].values[0, 0]) == float(ds["latitude"].values[0, 0])
-    # lat[1,1] in output == lat[2,2] in input (stride-2)
-    assert float(out["latitude"].values[1, 1]) == float(ds["latitude"].values[2, 2])
+    # Mean of the three valid pixels (fill excluded), not alt[0, 0] == 100.
+    assert int(out["altitude"].values[0, 0]) == 200
+    assert out["altitude"].dtype == np.dtype("int16")
+    assert out["altitude"].attrs["standard_name"] == "altitude"
 
 
 def test_reduce_swath_fill_value_preserved_in_all_fill_block() -> None:
@@ -248,16 +277,6 @@ def test_reduce_swath_odd_dims_radiance_is_block_averaged() -> None:
     assert int(out["oa01_radiance"].values[0, 0]) == expected
 
 
-def test_reduce_swath_odd_dims_coords_decimated() -> None:
-    """Coordinate arrays must use stride decimation on odd-dim inputs."""
-    ds = _swath_odd(rows=7, cols=5)
-    out = reduce_swath(ds, factor=2)
-    # Output[0,0] must equal input[0,0] (stride starts at 0).
-    assert float(out["latitude"].values[0, 0]) == float(ds["latitude"].values[0, 0])
-    # Output[1,1] must equal input[2,2] (stride=2 -> second step at index 2).
-    assert float(out["latitude"].values[1, 1]) == float(ds["latitude"].values[2, 2])
-
-
 def test_reduce_swath_odd_simulates_real_olci_columns() -> None:
     """Simulate the real-world OLCI case: 4090x4865 (odd cols) -> both 2432 cols.
 
@@ -337,3 +356,82 @@ def test_grid_spatial_attrs() -> None:
     ]
     # bbox is [xmin, ymin, xmax, ymax] from array_bounds
     assert attrs["spatial:bbox"] == [10.0, 45.0, 12.0, 46.0]  # type: ignore[index]
+
+
+def test_reduce_fill_collision_nudged_not_recoded_as_fill() -> None:
+    """A valid block whose mean rounds to the fill sentinel must not become fill.
+
+    Uses a sentinel interior to the data range (a bound sentinel such as 0 or
+    65535 cannot be reached by a mean of valid values that all sit on one side
+    of it): values [999, 1001, 999, 1001] average exactly to _FillValue=1000
+    and must be nudged to the neighboring in-range value instead.
+    """
+    rows, cols = 2, 2
+    rad = xr.DataArray(
+        np.array([[999, 1001], [999, 1001]], dtype="uint16"),
+        dims=("rows", "columns"),
+        attrs={"_FillValue": 1000},
+    )
+    lat = xr.DataArray(np.zeros((rows, cols)), dims=("rows", "columns"))
+    lon = xr.DataArray(np.zeros((rows, cols)), dims=("rows", "columns"))
+    ds = xr.Dataset({"oa01_radiance": rad}, coords={"latitude": lat, "longitude": lon})
+
+    out = reduce_swath(ds, factor=2)
+    value = int(out["oa01_radiance"].values[0, 0])
+    assert value != 1000, "valid block was recoded as fill"
+    assert value == 999  # unrounded mean == sentinel → nudged one step down
+
+
+def test_reduce_all_fill_block_stays_fill() -> None:
+    """An all-fill block keeps the sentinel value in the overview."""
+    rad = xr.DataArray(
+        np.full((2, 2), 1000, dtype="uint16"),
+        dims=("rows", "columns"),
+        attrs={"_FillValue": 1000},
+    )
+    lat = xr.DataArray(np.zeros((2, 2)), dims=("rows", "columns"))
+    lon = xr.DataArray(np.zeros((2, 2)), dims=("rows", "columns"))
+    ds = xr.Dataset({"oa01_radiance": rad}, coords={"latitude": lat, "longitude": lon})
+
+    out = reduce_swath(ds, factor=2)
+    assert int(out["oa01_radiance"].values[0, 0]) == 1000
+
+
+def test_reduce_partially_filled_block_averages_valid_pixels_only() -> None:
+    """A block mixing fill and valid pixels averages only the valid pixels.
+
+    Block [[100, 200], [300, fill]] with _FillValue=65535 must average the
+    three valid pixels (200), not collapse to fill or include the sentinel.
+    """
+    rad = xr.DataArray(
+        np.array([[100, 200], [300, 65535]], dtype="uint16"),
+        dims=("rows", "columns"),
+        attrs={"_FillValue": 65535},
+    )
+    lat = xr.DataArray(np.zeros((2, 2)), dims=("rows", "columns"))
+    lon = xr.DataArray(np.zeros((2, 2)), dims=("rows", "columns"))
+    ds = xr.Dataset({"oa01_radiance": rad}, coords={"latitude": lat, "longitude": lon})
+
+    out = reduce_swath(ds, factor=2)
+    assert int(out["oa01_radiance"].values[0, 0]) == 200
+
+
+def test_reduce_transposed_band_still_block_averaged() -> None:
+    """A radiance band stored as (columns, rows) is averaged, not decimated.
+
+    Swath detection is order-insensitive: the transposed band is normalized to
+    (rows, columns) and fill-aware block-averaged. Stride decimation would
+    keep the block's origin value (10) instead of the block mean (25).
+    """
+    rad = xr.DataArray(
+        np.array([[10, 20], [30, 40]], dtype="uint16"),
+        dims=("columns", "rows"),
+        attrs={"_FillValue": 65535},
+    )
+    lat = xr.DataArray(np.zeros((2, 2)), dims=("rows", "columns"))
+    lon = xr.DataArray(np.zeros((2, 2)), dims=("rows", "columns"))
+    ds = xr.Dataset({"oa01_radiance": rad}, coords={"latitude": lat, "longitude": lon})
+
+    out = reduce_swath(ds, factor=2)
+    assert tuple(out["oa01_radiance"].dims) == ("rows", "columns")
+    assert int(out["oa01_radiance"].values[0, 0]) == 25
