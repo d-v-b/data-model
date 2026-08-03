@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import numpy as np
 import structlog
 import xarray as xr
-import zarr
 from dask.array import from_delayed
 from dask.delayed import delayed
 from pydantic.experimental.missing_sentinel import MISSING
@@ -37,6 +36,7 @@ from .s2_resampling import determine_variable_type, downsample_variable
 if TYPE_CHECKING:
     from collections.abc import Hashable, Mapping
 
+    import zarr
     from zarr_cm import MultiscalesAttrs
     from zarr_cm import spatial as spatial_cm
 
@@ -412,13 +412,7 @@ def create_multiscale_from_datatree(
     log.info("Adding multiscales metadata to parent groups")
 
     # Get the parent group (it was created when writing the resolution groups).
-    # `output_group[base_path]` is typed `Array | Group`; `base_path` always
-    # addresses a group (the reflectance parent), so verify that at runtime.
-    parent_group = output_group[base_path]
-    if not isinstance(parent_group, zarr.Group):
-        raise TypeError(
-            f"expected a zarr.Group at {base_path!r}, got {type(parent_group).__name__}"
-        )
+    parent_group = output_group.get_group(base_path)
 
     add_multiscales_metadata_to_parent(
         parent_group,

@@ -310,8 +310,7 @@ def test_create_multiscale_from_datatree(
     # check that all multiscale levels have the same data type
     # this check is redundant with the later check, but it's expedient to check this here.
     # eventually this check should be spun out into its own test
-    reflectance_group = observed_group["measurements/reflectance"]
-    assert isinstance(reflectance_group, zarr.Group)
+    reflectance_group = observed_group.get_group("measurements/reflectance")
     _, res_groups = zip(*reflectance_group.groups(), strict=False)
 
     dtype_mismatch: set[object] = set()
