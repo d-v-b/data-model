@@ -29,9 +29,10 @@ requires-python = ">=3.12"
 dependencies = [
     "pydantic-zarr>=0.8.0",
     "pydantic>=2.12",
-    # <3.3.0: open_source_datatree uses zarr's experimental CacheStore, whose
+    # >=3.3.0: Group.get_group / Group.get_array for type-safe member access.
+    # <3.4.0: open_source_datatree uses zarr's experimental CacheStore, whose
     # location/API may change between minor releases; bump deliberately.
-    "zarr[cast-value-rs]>=3.2.0,<3.3.0",
+    "zarr[cast-value-rs]>=3.3.0,<3.4.0",
     "xarray>=2025.7.1",
     "dask[array,distributed]>=2026.1.0",
     "numpy>=2.3.1",
