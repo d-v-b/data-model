@@ -15,8 +15,12 @@ from __future__ import annotations
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from pydantic.experimental.missing_sentinel import MISSING  # noqa: F401  (re-export for mypy)
+from pydantic.experimental.missing_sentinel import MISSING
 from pydantic_zarr.v3 import ArraySpec, GroupSpec
+from zarr_cm import ConventionMetadataObject
+from zarr_cm import geo_proj as geo_proj_cm
+from zarr_cm import multiscales as multiscales_cm
+from zarr_cm import spatial as spatial_cm
 
 from eopf_geozarr.data_api.geozarr.common import is_none
 from eopf_geozarr.data_api.geozarr.multiscales import MultiscaleMeta
@@ -27,6 +31,27 @@ from eopf_geozarr.data_api.geozarr.projjson import (
 )
 
 
+def declared_convention_uuids(
+    zarr_conventions: tuple[ConventionMetadataObject, ...],
+) -> set[str]:
+    """Return the set of convention UUIDs declared in a ``zarr_conventions`` array."""
+    return {str(c["uuid"]) for c in zarr_conventions if "uuid" in c}
+
+
+def _require_conventions(
+    zarr_conventions: tuple[ConventionMetadataObject, ...],
+    required: dict[str, str],
+) -> None:
+    """Raise if any of ``required`` (uuid -> convention name) is not declared."""
+    declared = declared_convention_uuids(zarr_conventions)
+    missing = [name for uuid, name in required.items() if uuid not in declared]
+    if missing:
+        raise ValueError(
+            f"zarr_conventions must declare the {', '.join(sorted(missing))} "
+            "convention(s) used by this node"
+        )
+
+
 class GeoZarrStoreAttrs(BaseModel):
     """Attributes required at the store root (outermost Zarr group).
 
@@ -35,6 +60,7 @@ class GeoZarrStoreAttrs(BaseModel):
     default. Use `"EPSG:4326"` when no other CRS is meaningful.
     """
 
+    zarr_conventions: tuple[ConventionMetadataObject, ...]
     bbox: list[float] = Field(alias="spatial:bbox", min_length=4, max_length=4)
     code: str | None = Field(None, alias="proj:code", exclude_if=is_none, pattern="^[A-Z]+:[0-9]+$")
     wkt2: str | None = Field(None, alias="proj:wkt2", exclude_if=is_none)
@@ -74,6 +100,14 @@ class GeoZarrStoreAttrs(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def validate_conventions_declared(self) -> Self:
+        _require_conventions(
+            self.zarr_conventions,
+            {spatial_cm.UUID: "spatial", geo_proj_cm.UUID: "geo-proj"},
+        )
+        return self
+
 
 class GeoZarrScaleLevel(ScaleLevel):
     """Multiscale layout entry with mandatory `spatial:transform` + `spatial:shape`."""
@@ -86,6 +120,15 @@ class GeoZarrScaleLevel(ScaleLevel):
         populate_by_name=True,
         serialize_by_alias=True,
     )
+
+    @model_validator(mode="after")
+    def validate_transform_with_derived_from(self) -> Self:
+        if self.derived_from is not MISSING and self.transform is MISSING:
+            raise ValueError(
+                f"layout entry {self.asset!r}: 'transform' is required when "
+                "'derived_from' is present"
+            )
+        return self
 
 
 class GeoZarrMultiscaleMeta(MultiscaleMeta):
@@ -104,7 +147,14 @@ class GeoZarrMultiscaleGroupAttrs(MultiscaleGroupAttrs):
     # Intentionally tightens the base ``multiscales`` field to the ``GeoZarrMultiscaleMeta``
     # subclass; pyright flags the narrowed override on a mutable (invariant) field.
     multiscales: GeoZarrMultiscaleMeta  # pyright: ignore[reportIncompatibleVariableOverride]
+    # The base class allows zarr_conventions to be MISSING; the minispec requires the
+    # multiscale group to declare all three conventions, so make the field mandatory.
+    zarr_conventions: tuple[ConventionMetadataObject, ...]  # pyright: ignore[reportGeneralTypeIssues, reportIncompatibleVariableOverride]
     spatial_bbox: list[float] = Field(alias="spatial:bbox", min_length=4, max_length=4)
+    spatial_dimensions: list[str] = Field(alias="spatial:dimensions", min_length=1)
+    code: str | None = Field(None, alias="proj:code", exclude_if=is_none, pattern="^[A-Z]+:[0-9]+$")
+    wkt2: str | None = Field(None, alias="proj:wkt2", exclude_if=is_none)
+    projjson: ProjJSON | None = Field(None, alias="proj:projjson", exclude_if=is_none)
 
     model_config = ConfigDict(
         extra="allow",
@@ -119,6 +169,26 @@ class GeoZarrMultiscaleGroupAttrs(MultiscaleGroupAttrs):
             raise ValueError(
                 "spatial:bbox must be ordered as [xmin, ymin, xmax, ymax] with xmin<=xmax and ymin<=ymax"
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_crs_present(self) -> Self:
+        if not any([self.code, self.wkt2, self.projjson]):
+            raise ValueError(
+                "Multiscale dataset requires a CRS: set one of proj:code, proj:wkt2, or proj:projjson"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_conventions_declared(self) -> Self:
+        _require_conventions(
+            self.zarr_conventions,
+            {
+                multiscales_cm.UUID: "multiscales",
+                spatial_cm.UUID: "spatial",
+                geo_proj_cm.UUID: "geo-proj",
+            },
+        )
         return self
 
 
