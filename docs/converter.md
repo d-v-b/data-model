@@ -43,10 +43,21 @@ eopf-geozarr validate output.zarr
 ```
 
 The validator checks the store root (conventions declaration, `spatial:bbox`,
-CRS), every multiscale group (layout completeness, per-level georeferencing)
-and every node using the `proj:` / `spatial:` conventions. Each violation is
+CRS), every multiscale group (layout completeness, per-level georeferencing),
+every node using the `proj:` / `spatial:` conventions, and the structural
+Dataset rules (no scalar arrays, unique string `dimension_names`, matching
+1-D coordinate arrays for every data-variable dimension). Each violation is
 reported with its Zarr node path, and the command exits non-zero when the
 store is not compliant.
+
+> [!Note]
+> **Migration**: earlier releases' `validate` command always exited 0 and only
+> warned about per-variable CF attributes. Stores converted with
+> eopf-geozarr <= 0.10.x predate the store-root `zarr_conventions`
+> requirement and will report as non-compliant until reconverted (or until the
+> root metadata is added, e.g. via
+> `eopf_geozarr.conversion.utils.write_store_root_geo_metadata`). Pipelines
+> that scripted against the old output text or exit code need updating.
 
 ## Python API
 

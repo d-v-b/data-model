@@ -74,6 +74,11 @@ def build_compliant_store(path: pathlib.Path) -> str:
         level.attrs.update(_level_attrs((n, n), [res, 0.0, 600000.0, 0.0, -res, 5090160.0]))
         arr = level.create_array("b02", shape=(n, n), dtype="uint16", dimension_names=("y", "x"))
         arr[:] = np.zeros((n, n), dtype="uint16")
+        for coord in ("y", "x"):
+            coord_arr = level.create_array(
+                coord, shape=(n,), dtype="float64", dimension_names=(coord,)
+            )
+            coord_arr[:] = np.arange(n, dtype="float64")
     return store_path
 
 
@@ -118,11 +123,12 @@ def test_missing_root_crs(compliant_store: str) -> None:
     assert any("CRS" in i.message and i.path == "/" for i in report.issues)
 
 
-def test_multiple_root_crs(compliant_store: str) -> None:
+def test_multiple_root_crs_allowed(compliant_store: str) -> None:
+    """The minispec requires at least one CRS key; redundant encodings are fine."""
     root = _root_attrs(compliant_store)
     root.attrs["proj:wkt2"] = "GEOGCRS[...]"
     report = validate_store(compliant_store)
-    assert any("At most one" in i.message and i.path == "/" for i in report.issues)
+    assert report.compliant, [str(i) for i in report.issues]
 
 
 def test_malformed_root_bbox(compliant_store: str) -> None:
@@ -226,3 +232,101 @@ def test_array_convention_use_with_inherited_declaration(compliant_store: str) -
     arr.attrs["proj:code"] = "EPSG:32632"
     report = validate_store(compliant_store)
     assert report.compliant, [str(i) for i in report.issues]
+
+
+def test_malformed_zarr_conventions_reports_issue(compliant_store: str) -> None:
+    """A malformed zarr_conventions value is diagnosed, not crashed on."""
+    root = zarr.open_group(compliant_store, mode="r+")
+    orphan = root.create_group("weird")
+    orphan.attrs["zarr_conventions"] = 5
+    orphan.attrs["spatial:dimensions"] = ["y", "x"]
+    report = validate_store(compliant_store)
+    assert any(
+        "zarr_conventions must be an array" in i.message and i.path == "/weird"
+        for i in report.issues
+    )
+
+
+def test_malformed_zarr_conventions_entry_reports_issue(compliant_store: str) -> None:
+    root = _root_attrs(compliant_store)
+    conventions = cast("list[Any]", root.attrs["zarr_conventions"])
+    root.attrs["zarr_conventions"] = [*conventions, 42]
+    report = validate_store(compliant_store)
+    assert any("zarr_conventions[2]" in i.message and i.path == "/" for i in report.issues)
+
+
+def test_empty_multiscales_layout_rejected(compliant_store: str) -> None:
+    ms = zarr.open_group(compliant_store, mode="r+")["measurements"]
+    multiscales = dict(cast("dict[str, Any]", ms.attrs["multiscales"]))
+    multiscales["layout"] = []
+    ms.attrs["multiscales"] = multiscales
+    report = validate_store(compliant_store)
+    assert any("layout" in i.message and i.path == "/measurements" for i in report.issues)
+
+
+def test_subgroup_does_not_inherit_declarations(compliant_store: str) -> None:
+    """Convention declarations are inherited by direct child arrays only."""
+    root = zarr.open_group(compliant_store, mode="r+")
+    parent = root.create_group("parent")
+    parent.attrs.update(
+        cast(
+            "dict[str, Any]",
+            {
+                "zarr_conventions": [SPATIAL_CMO, PROJ_CMO],
+                "proj:code": "EPSG:32632",
+                "spatial:dimensions": ["y", "x"],
+            },
+        )
+    )
+    sub = parent.create_group("child_group")
+    sub.attrs["spatial:dimensions"] = ["y", "x"]
+    report = validate_store(compliant_store)
+    assert any(
+        "does not declare the spatial convention" in i.message and i.path == "/parent/child_group"
+        for i in report.issues
+    )
+
+
+def test_scalar_array_in_dataset_rejected(compliant_store: str) -> None:
+    level = zarr.open_group(compliant_store, mode="r+")["measurements/r10m"]
+    assert isinstance(level, zarr.Group)
+    level.create_array("scalar", shape=(), dtype="int64")
+    report = validate_store(compliant_store)
+    assert any(
+        "scalar arrays are not allowed" in i.message and i.path == "/measurements/r10m/scalar"
+        for i in report.issues
+    )
+
+
+def test_grid_mapping_container_array_tolerated(compliant_store: str) -> None:
+    """A 0-D array referenced via grid_mapping is CF metadata, not a DataArray."""
+    level = zarr.open_group(compliant_store, mode="r+")["measurements/r10m"]
+    assert isinstance(level, zarr.Group)
+    level.create_array("spatial_ref", shape=(), dtype="int64")
+    arr = level["b02"]
+    assert isinstance(arr, zarr.Array)
+    arr.attrs["grid_mapping"] = "spatial_ref"
+    report = validate_store(compliant_store)
+    assert report.compliant, [str(i) for i in report.issues]
+
+
+def test_data_variable_without_coordinate_rejected(compliant_store: str) -> None:
+    level = zarr.open_group(compliant_store, mode="r+")["measurements/r10m"]
+    assert isinstance(level, zarr.Group)
+    level.create_array("extra", shape=(4, 4), dtype="uint16", dimension_names=("a", "b"))
+    report = validate_store(compliant_store)
+    assert any(
+        "no matching 1-D coordinate array" in i.message and i.path == "/measurements/r10m/extra"
+        for i in report.issues
+    )
+
+
+def test_array_without_dimension_names_rejected(compliant_store: str) -> None:
+    level = zarr.open_group(compliant_store, mode="r+")["measurements/r20m"]
+    assert isinstance(level, zarr.Group)
+    level.create_array("nameless", shape=(4, 4), dtype="uint16")
+    report = validate_store(compliant_store)
+    assert any(
+        "dimension_names must be set" in i.message and i.path == "/measurements/r20m/nameless"
+        for i in report.issues
+    )

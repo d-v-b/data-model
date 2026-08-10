@@ -66,3 +66,60 @@ def test_create_geozarr_dataset_output_is_minispec_compliant(
     )
     report = validate_store(output)
     assert report.compliant, "\n".join(str(i) for i in report.issues)
+
+
+def test_calculate_overview_levels_small_native_keeps_level_zero() -> None:
+    """A native grid below min_dimension still yields level 0 (native)."""
+    from eopf_geozarr.conversion.geozarr import calculate_overview_levels
+
+    levels = calculate_overview_levels(92, 92, min_dimension=256)
+    assert [lvl["level"] for lvl in levels] == [0]
+    assert levels[0]["width"] == 92
+    assert levels[0]["height"] == 92
+
+
+def test_small_group_keeps_multiscale_metadata(
+    synthetic_s2_tree: xr.DataTree, tmp_path: pathlib.Path
+) -> None:
+    """The sub-min_dimension r60m group must still carry its conventions.
+
+    Pins the level-0 fix directly: without it the r60m group is written with no
+    multiscales/spatial/proj metadata at all and becomes invisible to the
+    validator (which only inspects convention-bearing nodes).
+    """
+    import zarr
+
+    output = str(tmp_path / "geozarr.zarr")
+    create_geozarr_dataset(
+        dt_input=synthetic_s2_tree,
+        groups=["/measurements/reflectance/r60m"],
+        output_path=output,
+        spatial_chunk=4096,
+        min_dimension=256,
+        max_retries=3,
+    )
+    group = zarr.open_group(output, mode="r")["measurements/reflectance/r60m"]
+    attrs = dict(group.attrs)
+    assert "multiscales" in attrs, sorted(attrs)
+    assert "zarr_conventions" in attrs
+    assert "spatial:bbox" in attrs
+    assert "proj:code" in attrs
+
+
+def test_cli_validate_exits_nonzero_on_noncompliant_store(tmp_path: pathlib.Path) -> None:
+    """The validate command's failure contract: non-compliant store -> exit 1."""
+    import subprocess
+    import sys
+
+    import zarr
+
+    store = str(tmp_path / "bad.zarr")
+    zarr.open_group(store, mode="w", zarr_format=3)  # bare root, no metadata
+
+    result = subprocess.run(
+        [sys.executable, "-m", "eopf_geozarr", "validate", store],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "NOT compliant" in result.stdout

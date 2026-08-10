@@ -2377,43 +2377,6 @@
                     "longitude"
                   ]
                 },
-                "isobaricInhPa": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "pressure",
-                    "positive": "down",
-                    "standard_name": "air_pressure",
-                    "stored_direction": "decreasing",
-                    "units": "hPa",
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
-                  "shape": [],
-                  "data_type": "float64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": "NaN",
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
-                },
                 "latitude": {
                   "zarr_format": 3,
                   "node_type": "array",
@@ -2496,40 +2459,6 @@
                   "dimension_names": [
                     "longitude"
                   ]
-                },
-                "number": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "ensemble member numerical id",
-                    "standard_name": "realization",
-                    "units": "1"
-                  },
-                  "shape": [],
-                  "data_type": "int64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": 0,
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
                 },
                 "omaod550": {
                   "zarr_format": 3,
@@ -2695,40 +2624,6 @@
                     "longitude"
                   ]
                 },
-                "step": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "time since forecast_reference_time",
-                    "standard_name": "forecast_period",
-                    "units": "minutes"
-                  },
-                  "shape": [],
-                  "data_type": "int64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": 0,
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
-                },
                 "suaod550": {
                   "zarr_format": 3,
                   "node_type": "array",
@@ -2810,110 +2705,6 @@
                     "latitude",
                     "longitude"
                   ]
-                },
-                "surface": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "original GRIB coordinate for key: level(surface)",
-                    "units": "1",
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
-                  "shape": [],
-                  "data_type": "float64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": "NaN",
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
-                },
-                "time": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "initial time of forecast",
-                    "standard_name": "forecast_reference_time",
-                    "units": "days since 2025-01-13 00:00:00",
-                    "calendar": "proleptic_gregorian"
-                  },
-                  "shape": [],
-                  "data_type": "int64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": 0,
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
-                },
-                "valid_time": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "time",
-                    "standard_name": "time",
-                    "units": "days since 2025-01-13 10:33:00",
-                    "calendar": "proleptic_gregorian"
-                  },
-                  "shape": [],
-                  "data_type": "int64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": 0,
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
                 },
                 "z": {
                   "zarr_format": 3,
@@ -3012,43 +2803,6 @@
                 "institution": "European Centre for Medium-Range Weather Forecasts"
               },
               "members": {
-                "isobaricInhPa": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "pressure",
-                    "positive": "down",
-                    "standard_name": "air_pressure",
-                    "stored_direction": "decreasing",
-                    "units": "hPa",
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
-                  "shape": [],
-                  "data_type": "float64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": "NaN",
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
-                },
                 "latitude": {
                   "zarr_format": 3,
                   "node_type": "array",
@@ -3214,40 +2968,6 @@
                     "longitude"
                   ]
                 },
-                "number": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "ensemble member numerical id",
-                    "standard_name": "realization",
-                    "units": "1"
-                  },
-                  "shape": [],
-                  "data_type": "int64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": 0,
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
-                },
                 "r": {
                   "zarr_format": 3,
                   "node_type": "array",
@@ -3329,74 +3049,6 @@
                     "latitude",
                     "longitude"
                   ]
-                },
-                "step": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "time since forecast_reference_time",
-                    "standard_name": "forecast_period",
-                    "units": "minutes"
-                  },
-                  "shape": [],
-                  "data_type": "int64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": 0,
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
-                },
-                "surface": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "original GRIB coordinate for key: level(surface)",
-                    "units": "1",
-                    "_FillValue": "AAAAAAAA+H8="
-                  },
-                  "shape": [],
-                  "data_type": "float64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": "NaN",
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
                 },
                 "tco3": {
                   "zarr_format": 3,
@@ -3562,41 +3214,6 @@
                     "longitude"
                   ]
                 },
-                "time": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "initial time of forecast",
-                    "standard_name": "forecast_reference_time",
-                    "units": "days since 2025-01-13 00:00:00",
-                    "calendar": "proleptic_gregorian"
-                  },
-                  "shape": [],
-                  "data_type": "int64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": 0,
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
-                },
                 "u10": {
                   "zarr_format": 3,
                   "node_type": "array",
@@ -3760,41 +3377,6 @@
                     "latitude",
                     "longitude"
                   ]
-                },
-                "valid_time": {
-                  "zarr_format": 3,
-                  "node_type": "array",
-                  "attributes": {
-                    "long_name": "time",
-                    "standard_name": "time",
-                    "units": "days since 2025-01-13 10:33:00",
-                    "calendar": "proleptic_gregorian"
-                  },
-                  "shape": [],
-                  "data_type": "int64",
-                  "chunk_grid": {
-                    "name": "regular",
-                    "configuration": {
-                      "chunk_shape": []
-                    }
-                  },
-                  "chunk_key_encoding": {
-                    "name": "default",
-                    "configuration": {
-                      "separator": "/"
-                    }
-                  },
-                  "fill_value": 0,
-                  "codecs": [
-                    {
-                      "name": "bytes",
-                      "configuration": {
-                        "endian": "little"
-                      }
-                    }
-                  ],
-                  "storage_transformers": [],
-                  "dimension_names": null
                 }
               }
             }

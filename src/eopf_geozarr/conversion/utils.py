@@ -387,18 +387,62 @@ def _as_bbox(value: object) -> tuple[float, float, float, float] | None:
     return (float(value[0]), float(value[1]), float(value[2]), float(value[3]))
 
 
+def _crs_from_attrs(attrs: dict[str, Any]) -> Any | None:
+    """Resolve a pyproj CRS from a group's ``proj:*`` attributes, else ``None``.
+
+    Tries ``proj:code``, then ``proj:wkt2``, then ``proj:projjson``. Malformed
+    values are logged and treated as unresolvable rather than raised, since the
+    attributes come from stored metadata.
+    """
+    from pyproj import CRS as PyprojCRS
+
+    code = attrs.get("proj:code")
+    if isinstance(code, str):
+        try:
+            return PyprojCRS.from_user_input(code)
+        except Exception as e:  # malformed stored metadata
+            log.warning("Unresolvable proj:code; skipping group bbox", code=code, error=str(e))
+            return None
+    wkt2 = attrs.get("proj:wkt2")
+    if isinstance(wkt2, str):
+        try:
+            return PyprojCRS.from_wkt(wkt2)
+        except Exception as e:
+            log.warning("Unresolvable proj:wkt2; skipping group bbox", error=str(e))
+            return None
+    projjson = attrs.get("proj:projjson")
+    if isinstance(projjson, dict):
+        try:
+            return PyprojCRS.from_json_dict(projjson)
+        except Exception as e:
+            log.warning("Unresolvable proj:projjson; skipping group bbox", error=str(e))
+            return None
+    return None
+
+
 def write_store_root_geo_metadata(
     output_path: str, storage_options: dict[str, Any] | None = None
 ) -> None:
     """Write the minispec store-root metadata on the root group.
 
     Walks the zarr store, collects every child-group `spatial:bbox` along with
-    its `proj:code`, reprojects each to EPSG:4326 and writes the union plus the
-    CRS code and the matching ``zarr_conventions`` declaration on the root
-    group. The CRS is always declared explicitly per the Store Root section of
-    the minispec — there is no implicit default.
+    its CRS (resolved from ``proj:code`` / ``proj:wkt2`` / ``proj:projjson``),
+    reprojects each to EPSG:4326 with edge densification and writes the union
+    plus the CRS code and the matching ``zarr_conventions`` declaration on the
+    root group. Groups whose CRS cannot be resolved are skipped with a warning
+    rather than assumed to be in degrees. The CRS is always declared explicitly
+    per the Store Root section of the minispec — there is no implicit default.
+
+    When *storage_options* is ``None``, the store's options are derived from
+    *output_path* via :func:`eopf_geozarr.conversion.fs_utils.get_storage_options`
+    so remote (e.g. S3) stores honour the configured endpoint and credentials.
     """
     from pyproj import Transformer
+
+    from eopf_geozarr.conversion import fs_utils
+
+    if storage_options is None:
+        storage_options = cast("dict[str, Any] | None", fs_utils.get_storage_options(output_path))
 
     root = zarr.open_group(output_path, mode="r+", storage_options=storage_options)
 
@@ -406,18 +450,33 @@ def write_store_root_geo_metadata(
 
     def _walk(group: zarr.Group) -> None:
         attrs = dict(group.attrs)
-        bbox = attrs.get("spatial:bbox")
-        code = attrs.get("proj:code")
-        corners = _as_bbox(bbox)
+        corners = _as_bbox(attrs.get("spatial:bbox"))
         if corners is not None:
-            x0, y0, x1, y1 = corners
-            if code and code != "EPSG:4326":
-                transformer = Transformer.from_crs(code, "EPSG:4326", always_xy=True)
-                xmin, ymin = transformer.transform(x0, y0)
-                xmax, ymax = transformer.transform(x1, y1)
-                bboxes_4326.append((xmin, ymin, xmax, ymax))
+            crs = _crs_from_attrs(attrs)
+            if crs is None:
+                if any(k in attrs for k in ("proj:code", "proj:wkt2", "proj:projjson")):
+                    # warning already logged by _crs_from_attrs
+                    pass
+                else:
+                    log.warning(
+                        "Group has spatial:bbox but no proj:* CRS; skipping it "
+                        "for the store-root footprint",
+                        group=group.path,
+                    )
+            elif crs.to_epsg() == 4326:
+                bboxes_4326.append(corners)
             else:
-                bboxes_4326.append((x0, y0, x1, y1))
+                try:
+                    transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+                    # transform_bounds densifies the edges, which corner-wise
+                    # transformation misses (projected edges curve in lon/lat).
+                    bboxes_4326.append(transformer.transform_bounds(*corners, densify_pts=21))
+                except Exception as e:  # never abort the write for one group
+                    log.warning(
+                        "Failed to reproject group bbox; skipping it",
+                        group=group.path,
+                        error=str(e),
+                    )
         for child in group.groups():
             _walk(child[1])
 
@@ -425,12 +484,21 @@ def write_store_root_geo_metadata(
         _walk(child_group)
 
     if not bboxes_4326:
-        log.warning("No child-group spatial:bbox found; skipping store-root metadata")
+        log.warning("No usable child-group spatial:bbox found; skipping store-root metadata")
         return
 
-    xmin = min(b[0] for b in bboxes_4326)
+    if any(b[0] > b[2] for b in bboxes_4326):
+        # At least one footprint crosses the antimeridian; a single
+        # [xmin, ymin, xmax, ymax] box cannot represent the union faithfully,
+        # so fall back to the full longitude range.
+        log.warning(
+            "A child bbox crosses the antimeridian; store-root bbox uses the full longitude range"
+        )
+        xmin, xmax = -180.0, 180.0
+    else:
+        xmin = min(b[0] for b in bboxes_4326)
+        xmax = max(b[2] for b in bboxes_4326)
     ymin = min(b[1] for b in bboxes_4326)
-    xmax = max(b[2] for b in bboxes_4326)
     ymax = max(b[3] for b in bboxes_4326)
     root_attrs: dict[str, Any] = {
         "zarr_conventions": [dict(spatial_cm.CMO), dict(geo_proj_cm.CMO)],

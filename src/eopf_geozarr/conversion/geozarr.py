@@ -147,8 +147,12 @@ def create_geozarr_dataset(
 
     # Write the store-root spatial footprint (geozarr minispec, Store Root
     # section): union of child-group bboxes in EPSG:4326 plus the conventions
-    # declaration.
-    utils.write_store_root_geo_metadata(output_path)
+    # declaration. A failure here must not discard the already-written data;
+    # the store simply stays root-metadata-less (and the validator reports it).
+    try:
+        utils.write_store_root_geo_metadata(output_path)
+    except Exception as e:
+        log.warning("Failed to write store-root spatial metadata", error=str(e))
 
     # Consolidate metadata at the root level AFTER all groups are written
     log.info("Consolidating metadata at root level for consistent zarr access...")
@@ -160,6 +164,24 @@ def create_geozarr_dataset(
         log.warning("Root level consolidation failed", error=str(e))
 
     return dt_geozarr
+
+
+def _crs_candidate_from_attrs(attrs: dict[str, Any]) -> str | None:
+    """Pick a CRS string from a variable's source attributes, if any.
+
+    Prefers the legacy ``proj:epsg`` key, then the geo-proj convention keys
+    ``proj:code`` and ``proj:wkt2`` (which sanitize_array_attrs later removes).
+    """
+    epsg = attrs.get("proj:epsg")
+    if epsg is not None:
+        return f"epsg:{epsg}"
+    code = attrs.get("proj:code")
+    if isinstance(code, str) and code:
+        return code
+    wkt2 = attrs.get("proj:wkt2")
+    if isinstance(wkt2, str) and wkt2:
+        return wkt2
+    return None
 
 
 def setup_datatree_metadata_geozarr_spec_compliant(
@@ -215,6 +237,11 @@ def setup_datatree_metadata_geozarr_spec_compliant(
         for var_name in ds.data_vars:
             log.info("Processing variable / band %s", var_name)
 
+            # Capture the CRS from the source attrs before sanitizing: sanitize
+            # strips the geo-proj convention keys (proj:code/proj:wkt2/...),
+            # which may be the only CRS declaration a source product carries.
+            source_crs = _crs_candidate_from_attrs(dict(ds[var_name].attrs))
+
             # Sanitize source-only and misleading attributes
             is_float = np.issubdtype(ds[var_name].dtype, np.floating)
             ds[var_name].attrs = utils.sanitize_array_attrs(
@@ -238,10 +265,9 @@ def setup_datatree_metadata_geozarr_spec_compliant(
             ds[var_name].attrs["grid_mapping"] = grid_mapping_var_name
 
             # Set CRS if available
-            if "proj:epsg" in ds[var_name].attrs:
-                epsg = ds[var_name].attrs["proj:epsg"]
-                log.info("Setting CRS for variable %s to EPSG %s", var_name, epsg)
-                ds = ds.rio.write_crs(f"epsg:{epsg}")
+            if source_crs is not None:
+                log.info("Setting CRS for variable %s to %s", var_name, source_crs)
+                ds = ds.rio.write_crs(source_crs)
             elif epsg_CPM_260:
                 log.info(
                     "Setting CRS for variable %s to EPSG (CPM 2.6.0 default)",
@@ -937,6 +963,18 @@ def create_overview_dataset_all_vars(
             "x": (["x"], x_coords, x_attrs),
             "y": (["y"], y_coords, y_attrs),
         }
+
+    # Carry over 1-D non-spatial coordinates (e.g. time) so every data-variable
+    # dimension keeps a matching coordinate variable in the overview group
+    # (required by the minispec's Dataset Members rules).
+    for coord_name, coord in ds.coords.items():
+        if coord_name in ("x", "y") or coord.ndim != 1 or coord.dims[0] != coord_name:
+            continue
+        overview_coords[str(coord_name)] = (
+            [str(coord_name)],
+            coord.values,
+            dict(coord.attrs),
+        )
 
     # Determine standard name based on whether this is Sentinel-1 data
     # TODO: use a better way to determine this than just checking for ds_gcp

@@ -12,6 +12,7 @@ Tightens the zarr convention-level models defined in `geozarr.multiscales`,
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -32,14 +33,21 @@ from eopf_geozarr.data_api.geozarr.projjson import (
 
 
 def declared_convention_uuids(
-    zarr_conventions: tuple[ConventionMetadataObject, ...],
+    zarr_conventions: object,
 ) -> set[str]:
-    """Return the set of convention UUIDs declared in a ``zarr_conventions`` array."""
-    return {str(c["uuid"]) for c in zarr_conventions if "uuid" in c}
+    """Return the set of convention UUIDs declared in a ``zarr_conventions`` array.
+
+    Tolerates malformed input (wrong container type, non-mapping entries) by
+    ignoring it — the value comes from untrusted store metadata and shape
+    problems are reported separately by the validator.
+    """
+    if not isinstance(zarr_conventions, (list, tuple)):
+        return set()
+    return {str(c["uuid"]) for c in zarr_conventions if isinstance(c, Mapping) and "uuid" in c}
 
 
 def _require_conventions(
-    zarr_conventions: tuple[ConventionMetadataObject, ...],
+    zarr_conventions: object,
     required: dict[str, str],
 ) -> None:
     """Raise if any of ``required`` (uuid -> convention name) is not declared."""
@@ -55,9 +63,9 @@ def _require_conventions(
 class GeoZarrStoreAttrs(BaseModel):
     """Attributes required at the store root (outermost Zarr group).
 
-    Both `spatial:bbox` and a CRS are mandatory. The CRS is encoded by exactly
-    one of `proj:code`, `proj:wkt2`, or `proj:projjson`; there is no implicit
-    default. Use `"EPSG:4326"` when no other CRS is meaningful.
+    Both `spatial:bbox` and a CRS are mandatory. The CRS is encoded by at
+    least one of `proj:code`, `proj:wkt2`, or `proj:projjson`; there is no
+    implicit default. Use `"EPSG:4326"` when no other CRS is meaningful.
     """
 
     zarr_conventions: tuple[ConventionMetadataObject, ...]
@@ -89,14 +97,9 @@ class GeoZarrStoreAttrs(BaseModel):
 
     @model_validator(mode="after")
     def validate_crs(self) -> Self:
-        crs_fields_set = sum(1 for v in (self.code, self.wkt2, self.projjson) if v is not None)
-        if crs_fields_set == 0:
+        if not any(v is not None for v in (self.code, self.wkt2, self.projjson)):
             raise ValueError(
-                "Store root requires a CRS: set exactly one of proj:code, proj:wkt2, or proj:projjson"
-            )
-        if crs_fields_set > 1:
-            raise ValueError(
-                "At most one of proj:code, proj:wkt2, proj:projjson may be set at the store root"
+                "Store root requires a CRS: set at least one of proj:code, proj:wkt2, or proj:projjson"
             )
         return self
 
@@ -133,6 +136,12 @@ class GeoZarrScaleLevel(ScaleLevel):
 
 class GeoZarrMultiscaleMeta(MultiscaleMeta):
     """Multiscale metadata where every layout entry is a `GeoZarrScaleLevel`."""
+
+    @model_validator(mode="after")
+    def validate_layout_not_empty(self) -> Self:
+        if len(self.layout) < 1:
+            raise ValueError("multiscales.layout must not be empty")
+        return self
 
     # Intentionally tightens the base ``layout`` field: ``GeoZarrScaleLevel`` is a
     # subclass of ``ScaleLevel`` and the optional ``MISSING`` default is dropped to make

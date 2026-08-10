@@ -339,6 +339,14 @@ def create_multiscale_from_datatree(
             # Non-measurement groups: preserve original encoding
             encoding = create_original_encoding(dataset)
 
+        # Drop scalar (0-D) coordinates such as a source `band` label: the
+        # minispec's DataArray rules forbid scalar arrays in a GeoZarr dataset.
+        scalar_coords = [name for name, coord in dataset.coords.items() if coord.ndim == 0]
+        if scalar_coords:
+            dataset = dataset.drop_vars(scalar_coords)
+            for name in scalar_coords:
+                encoding.pop(str(name), None)
+
         ds_out = stream_write_dataset(
             dataset,
             path=group_path,
