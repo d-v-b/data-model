@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import pathlib
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -11,6 +11,9 @@ import xarray as xr
 
 from eopf_geozarr.conversion import create_geozarr_dataset
 from eopf_geozarr.data_api.geozarr.validation import validate_store
+
+if TYPE_CHECKING:
+    import pathlib
 
 
 @pytest.fixture

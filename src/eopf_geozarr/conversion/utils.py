@@ -6,8 +6,11 @@ import numpy as np
 import rasterio  # noqa: F401  # Import to enable .rio accessor
 import structlog
 import xarray as xr
+import zarr
 import zarr_cm
 from zarr_cm import GeoProjAttrs, MultiConventionAttrs, MultiscalesAttrs, SpatialAttrs
+from zarr_cm import geo_proj as geo_proj_cm
+from zarr_cm import spatial as spatial_cm
 
 log = structlog.get_logger()
 
@@ -122,9 +125,16 @@ def sanitize_array_attrs(
       ``valid_min``, ``valid_max`` and rewrites
       ``units: "digital_counts"`` → ``"1"``.
 
+    - Geo-proj *convention* keys (``proj:code``, ``proj:wkt2``,
+      ``proj:projjson``) are always removed: per the minispec they belong on
+      (or are inherited from) the enclosing group, and source products carry
+      them on arrays without the required ``zarr_conventions`` declaration.
+      Legacy external keys such as ``proj:epsg`` are left alone.
+
     CF keys ``scale_factor`` and ``add_offset`` are always preserved.
     """
-    out = {k: v for k, v in attrs.items() if k not in ("_eopf_attrs", "_FillValue")}
+    dropped = {"_eopf_attrs", "_FillValue", *geo_proj_cm.CONVENTION_KEYS}
+    out = {k: v for k, v in attrs.items() if k not in dropped}
     if is_decoded_float:
         for key in ("dtype", "fill_value", "valid_min", "valid_max"):
             out.pop(key, None)
@@ -362,3 +372,70 @@ def compute_overview_gcps(
         # re-assign original dimensions
         .rename_dims(line="azimuth_time", pixel="ground_range")
     )
+
+
+def _as_bbox(value: object) -> tuple[float, float, float, float] | None:
+    """Return *value* as a 4-tuple of floats, or ``None`` if it is not one.
+
+    ``spatial:bbox`` is read from stored metadata, so its type is not known
+    statically; this verifies the shape at runtime rather than asserting it.
+    """
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        return None
+    if not all(isinstance(v, (int, float)) for v in value):
+        return None
+    return (float(value[0]), float(value[1]), float(value[2]), float(value[3]))
+
+
+def write_store_root_geo_metadata(
+    output_path: str, storage_options: dict[str, Any] | None = None
+) -> None:
+    """Write the minispec store-root metadata on the root group.
+
+    Walks the zarr store, collects every child-group `spatial:bbox` along with
+    its `proj:code`, reprojects each to EPSG:4326 and writes the union plus the
+    CRS code and the matching ``zarr_conventions`` declaration on the root
+    group. The CRS is always declared explicitly per the Store Root section of
+    the minispec — there is no implicit default.
+    """
+    from pyproj import Transformer
+
+    root = zarr.open_group(output_path, mode="r+", storage_options=storage_options)
+
+    bboxes_4326: list[tuple[float, float, float, float]] = []
+
+    def _walk(group: zarr.Group) -> None:
+        attrs = dict(group.attrs)
+        bbox = attrs.get("spatial:bbox")
+        code = attrs.get("proj:code")
+        corners = _as_bbox(bbox)
+        if corners is not None:
+            x0, y0, x1, y1 = corners
+            if code and code != "EPSG:4326":
+                transformer = Transformer.from_crs(code, "EPSG:4326", always_xy=True)
+                xmin, ymin = transformer.transform(x0, y0)
+                xmax, ymax = transformer.transform(x1, y1)
+                bboxes_4326.append((xmin, ymin, xmax, ymax))
+            else:
+                bboxes_4326.append((x0, y0, x1, y1))
+        for child in group.groups():
+            _walk(child[1])
+
+    for _, child_group in root.groups():
+        _walk(child_group)
+
+    if not bboxes_4326:
+        log.warning("No child-group spatial:bbox found; skipping store-root metadata")
+        return
+
+    xmin = min(b[0] for b in bboxes_4326)
+    ymin = min(b[1] for b in bboxes_4326)
+    xmax = max(b[2] for b in bboxes_4326)
+    ymax = max(b[3] for b in bboxes_4326)
+    root_attrs: dict[str, Any] = {
+        "zarr_conventions": [dict(spatial_cm.CMO), dict(geo_proj_cm.CMO)],
+        "spatial:bbox": [xmin, ymin, xmax, ymax],
+        "proj:code": "EPSG:4326",
+    }
+    root.attrs.update(root_attrs)
+    log.info("Wrote store-root spatial metadata", bbox=[xmin, ymin, xmax, ymax])

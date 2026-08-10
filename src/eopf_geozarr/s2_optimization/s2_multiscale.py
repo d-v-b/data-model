@@ -783,8 +783,9 @@ def add_multiscales_metadata_to_parent(
             "spatial_shape": (height, width),
         }
 
-        # Only add spatial_transform if we have valid transform data
-        if transform is not None and not all(t == 0 for t in transform):
+        # The minispec requires spatial:transform on every layout entry, so it
+        # is kept even when degenerate (e.g. all-zero coordinates).
+        if transform is not None:
             layout_entry["spatial_transform"] = transform
 
         overview_levels.append(layout_entry)
@@ -828,8 +829,9 @@ def add_multiscales_metadata_to_parent(
         scale_level_data["spatial:shape"] = overview_level["spatial_shape"]
         if "spatial_transform" in overview_level:
             spatial_transform = overview_level["spatial_transform"]
-            # Only add spatial_transform if we have valid transform data (not all zeros)
-            if spatial_transform is not None and not all(t == 0 for t in spatial_transform):
+            # The minispec requires spatial:transform on every layout entry,
+            # so it is written even when degenerate (e.g. all-zero coordinates).
+            if spatial_transform is not None:
                 scale_level_data["spatial:transform"] = spatial_transform
 
         scale_level = zcm.ScaleLevel(**scale_level_data)

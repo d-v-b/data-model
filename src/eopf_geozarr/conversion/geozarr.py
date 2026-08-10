@@ -145,6 +145,11 @@ def create_geozarr_dataset(
         enable_sharding,
     )
 
+    # Write the store-root spatial footprint (geozarr minispec, Store Root
+    # section): union of child-group bboxes in EPSG:4326 plus the conventions
+    # declaration.
+    utils.write_store_root_geo_metadata(output_path)
+
     # Consolidate metadata at the root level AFTER all groups are written
     log.info("Consolidating metadata at root level for consistent zarr access...")
     try:
@@ -670,9 +675,9 @@ def create_geozarr_compliant_multiscales(
             )
         w, h = int(ol["width"]), int(ol["height"])
         scale_level_data["spatial:shape"] = (h, w)
-        spatial_tf = _spatial_transform_for(native_bounds, w, h)
-        if not all(v == 0.0 for v in spatial_tf):
-            scale_level_data["spatial:transform"] = spatial_tf
+        # The minispec requires spatial:transform on every layout entry, so it
+        # is written even when degenerate (e.g. all-zero coordinates).
+        scale_level_data["spatial:transform"] = _spatial_transform_for(native_bounds, w, h)
         layout.append(zcm.ScaleLevel(**scale_level_data))
 
     # Validate + serialize the multiscales block via the project model (which
@@ -779,9 +784,26 @@ def create_geozarr_compliant_multiscales(
 
         log.info("%s created in %s seconds", asset_name, round(proc_time, 2))
 
+        # Each overview level must itself qualify as a GeoZarr dataset
+        # (minispec, Multiscale Dataset > Members): write the spatial + proj
+        # conventions on the overview group.
+        level_attrs = utils.build_convention_attrs(
+            spatial={
+                "spatial:dimensions": ["y", "x"],
+                "spatial:bbox": list(native_bounds),
+                "spatial:shape": [int(height), int(width)],
+                "spatial:transform": list(
+                    _spatial_transform_for(native_bounds, int(width), int(height))
+                ),
+                "spatial:registration": "pixel",
+            },
+            crs=native_crs or None,
+        )
+
         # Consolidate metadata for this overview group
         ov_group_path = fs_utils.normalize_path(f"{output_path}/{overview_group.lstrip('/')}")
         ov_zarr_group = fs_utils.open_zarr_group(ov_group_path, mode="r+")
+        ov_zarr_group.attrs.update(cast("dict[str, JSON]", level_attrs))
         consolidate_metadata(ov_zarr_group.store)
         log.info("✅ Metadata consolidated for overview %s", asset_name)
 
@@ -826,7 +848,9 @@ def calculate_overview_levels(
     current_width = native_width
     current_height = native_height
 
-    while min(current_width, current_height) >= min_dimension:
+    # Level 0 (native resolution) is always present, even when the native grid
+    # is smaller than min_dimension; min_dimension only bounds the overviews.
+    while level == 0 or min(current_width, current_height) >= min_dimension:
         overview_level: dict[str, Any] = {
             "level": level,
             "width": current_width,
