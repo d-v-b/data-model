@@ -11,6 +11,7 @@ import zarr
 from pydantic import ValidationError
 from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
+from pyproj import CRS
 
 from eopf_geozarr.data_api.s2 import Sentinel2Root
 from eopf_geozarr.data_api.s2_plan import (
@@ -111,8 +112,6 @@ def test_plan_georeferencing_is_self_consistent(path: pathlib.Path) -> None:
     band's origin, the bbox is the transform applied to the level shape, and
     the grid-mapping array holds the band's own CRS.
     """
-    from pyproj import CRS
-
     planned = _planned_reflectance(path)
     finest = planned["members"][f"r{REFLECTANCE_SCALE_LEVELS[0]}m"]
     band = next(v for k, v in finest["members"].items() if k.startswith("b"))

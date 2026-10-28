@@ -14,6 +14,8 @@ claimed — instead of leniently.
 
 from __future__ import annotations
 
+from typing import Literal, NotRequired
+
 from typing_extensions import TypedDict
 from zarr_metadata.v3.definition import CORE_AND_EXTENSIONS, DataTypeDefinition
 
@@ -22,6 +24,15 @@ class FixedLengthUtf32Configuration(TypedDict, closed=True):
     """The configuration of zarr-python's ``fixed_length_utf32`` data type."""
 
     length_bytes: int
+
+
+class FixedLengthUtf32Object(TypedDict, closed=True):
+    """``fixed_length_utf32`` data type metadata in object form, mirroring the
+    shape of ``zarr-metadata``'s per-extension ``*Object`` types."""
+
+    name: Literal["fixed_length_utf32"]
+    configuration: FixedLengthUtf32Configuration
+    must_understand: NotRequired[bool]
 
 
 FIXED_LENGTH_UTF32 = DataTypeDefinition(

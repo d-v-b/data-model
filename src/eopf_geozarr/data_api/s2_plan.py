@@ -36,18 +36,38 @@ import base64
 import struct
 from collections.abc import Mapping
 from math import ceil
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 import numpy as np
+from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
 from pydantic_zarr.v3 import ArraySpec as ArraySpecV3
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
+from pyproj import CRS
+from typing_extensions import TypedDict
+from zarr_cm import ConventionMetadataObject
+from zarr_cm.multiscales import CMO as MULTISCALES_CMO
+from zarr_cm.multiscales import MultiscalesAttrs
+from zarr_cm.proj import CMO as PROJ_CMO
+from zarr_cm.spatial import CMO as SPATIAL_CMO
+from zarr_metadata.typed_json import check
 
 from eopf_geozarr.data_api.geozarr.v3 import DataArray
 from eopf_geozarr.data_api.s2 import Sentinel2Root
+from eopf_geozarr.s2_optimization.s2_multiscale import SCL_ATTRS, SCL_NODATA
 
 if TYPE_CHECKING:
     import zarr
-    from pydantic_zarr.v3 import AnyGroupSpec
+    from pydantic_zarr.v3 import AnyGroupSpec, FillValue
+    from zarr_cm.multiscales import LayoutObject
+    from zarr_metadata.v3.chunk_grid.regular import RegularChunkGridObject
+    from zarr_metadata.v3.chunk_key_encoding.default import DefaultChunkKeyEncodingObject
+    from zarr_metadata.v3.codec.blosc import BloscCodecObject
+    from zarr_metadata.v3.codec.bytes import BytesCodecObject
+    from zarr_metadata.v3.codec.crc32c import Crc32cCodecObject
+    from zarr_metadata.v3.codec.sharding_indexed import ShardingIndexedCodecObject
+    from zarr_metadata.v3.codec.zstd import ZstdCodecObject
+
+    from eopf_geozarr.data_api.geozarr.scope import FixedLengthUtf32Object
 
 S2Level = Literal["L1C", "L2A"]
 
@@ -88,30 +108,15 @@ _BAND_ATTR_CARRY = (
 # stores for the float coordinate arrays
 _NAN_FLOAT64_B64 = base64.b64encode(struct.pack("<d", float("nan"))).decode()
 
-_CHUNK_KEY_ENCODING: dict[str, object] = {"name": "default", "configuration": {"separator": "/"}}
+_CHUNK_KEY_ENCODING: Final[DefaultChunkKeyEncodingObject] = {
+    "name": "default",
+    "configuration": {"separator": "/"},
+}
 
-# registry entries for the zarr conventions the plan declares (zarr-conventions v0.1)
-_MULTISCALES_CONVENTION = {
-    "uuid": "d35379db-88df-4056-af3a-620245f8e347",
-    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/multiscales/refs/tags/v0.1/schema.json",
-    "spec_url": "https://github.com/zarr-conventions/multiscales/blob/v0.1/README.md",
-    "name": "multiscales",
-    "description": "Multiscale layout of zarr datasets",
-}
-_SPATIAL_CONVENTION = {
-    "uuid": "689b58e2-cf7b-45e0-9fff-9cfc0883d6b4",
-    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/spatial/refs/tags/v0.1/schema.json",
-    "spec_url": "https://github.com/zarr-conventions/spatial/blob/v0.1/README.md",
-    "name": "spatial",
-    "description": "Spatial coordinate information",
-}
-_PROJ_CONVENTION = {
-    "uuid": "f17cb550-5864-4468-aeb7-f3180cfb622f",
-    "schema_url": "https://raw.githubusercontent.com/zarr-conventions/proj/refs/tags/v0.1/schema.json",
-    "spec_url": "https://github.com/zarr-conventions/proj/blob/v0.1/README.md",
-    "name": "proj",
-    "description": "Coordinate reference system information for geospatial data",
-}
+#: The little-endian `bytes` codec, the array -> bytes codec of every planned array.
+_BYTES_LITTLE: Final[BytesCodecObject] = {"name": "bytes", "configuration": {"endian": "little"}}
+
+_CRC32C: Final[Crc32cCodecObject] = {"name": "crc32c"}
 
 
 def load_sentinel2(group: zarr.Group) -> Sentinel2Root:
@@ -123,8 +128,6 @@ def load_sentinel2(group: zarr.Group) -> Sentinel2Root:
     closed TypedDicts, attributes by the attribute models). Raises
     `pydantic.ValidationError` when the group is not a Sentinel-2 product.
     """
-    from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
-
     return Sentinel2Root.model_validate(GroupSpecV2.from_zarr(group).model_dump())
 
 
@@ -163,11 +166,16 @@ def _shard_and_inner(shape: tuple[int, ...]) -> tuple[tuple[int, ...], tuple[int
     return shard, inner
 
 
+def _regular_grid(chunk_shape: tuple[int, ...]) -> RegularChunkGridObject:
+    """The regular chunk grid metadata for one chunk shape."""
+    return {"name": "regular", "configuration": {"chunk_shape": chunk_shape}}
+
+
 def _plan_band(
     source_attrs: Mapping[str, object],
     shape: tuple[int, ...],
     data_type: str,
-    fill_value: object,
+    fill_value: FillValue,
     dimension_names: tuple[str, ...],
     typesize: int,
 ) -> DataArray:
@@ -186,47 +194,41 @@ def _plan_band(
 def _band_array(
     attributes: dict[str, object],
     shape: tuple[int, ...],
-    data_type: str | dict[str, object],
-    fill_value: object,
+    data_type: str | FixedLengthUtf32Object,
+    fill_value: FillValue,
     dimension_names: tuple[str, ...],
     typesize: int,
 ) -> DataArray:
     """One band array document: sharded uint16 with the blosc policy."""
     shard, inner = _shard_and_inner(shape)
+    compressor: BloscCodecObject = {
+        "name": "blosc",
+        "configuration": {
+            "typesize": typesize,
+            "cname": "zstd",
+            "clevel": 3,
+            "shuffle": "shuffle",
+            "blocksize": 0,
+        },
+    }
+    sharding: ShardingIndexedCodecObject = {
+        "name": "sharding_indexed",
+        "configuration": {
+            "chunk_shape": inner,
+            "codecs": (_BYTES_LITTLE, compressor),
+            "index_codecs": (_BYTES_LITTLE, _CRC32C),
+            "index_location": "end",
+        },
+    }
     return DataArray.model_validate(
         {
             "attributes": attributes,
             "shape": shape,
             "data_type": data_type,
-            "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": shard}},
+            "chunk_grid": _regular_grid(shard),
             "chunk_key_encoding": _CHUNK_KEY_ENCODING,
             "fill_value": fill_value,
-            "codecs": (
-                {
-                    "name": "sharding_indexed",
-                    "configuration": {
-                        "chunk_shape": inner,
-                        "codecs": (
-                            {"name": "bytes", "configuration": {"endian": "little"}},
-                            {
-                                "name": "blosc",
-                                "configuration": {
-                                    "typesize": typesize,
-                                    "cname": "zstd",
-                                    "clevel": 3,
-                                    "shuffle": "shuffle",
-                                    "blocksize": 0,
-                                },
-                            },
-                        ),
-                        "index_codecs": (
-                            {"name": "bytes", "configuration": {"endian": "little"}},
-                            {"name": "crc32c"},
-                        ),
-                        "index_location": "end",
-                    },
-                },
-            ),
+            "codecs": (sharding,),
             "dimension_names": dimension_names,
         }
     )
@@ -239,23 +241,47 @@ def _plan_coordinate(name: str, size: int) -> DataArray:
             "attributes": {"_FillValue": _NAN_FLOAT64_B64},
             "shape": (size,),
             "data_type": "float64",
-            "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": (size,)}},
+            "chunk_grid": _regular_grid((size,)),
             "chunk_key_encoding": _CHUNK_KEY_ENCODING,
             "fill_value": "NaN",
-            "codecs": ({"name": "bytes", "configuration": {"endian": "little"}},),
+            "codecs": (_BYTES_LITTLE,),
             "dimension_names": (name,),
         }
     )
 
 
-def _grid_mapping_attributes(wkt2: str) -> dict[str, object]:
+class GridMappingAttrs(TypedDict, closed=True):
+    """
+    The attributes of a Sentinel-2 `spatial_ref` grid-mapping array: pyproj's
+    CF encoding of the tile's UTM (transverse mercator) CRS, plus the WKT1
+    spellings rioxarray stores (CF's `crs_wkt` and GDAL's `spatial_ref`).
+    """
+
+    crs_wkt: str
+    false_easting: float
+    false_northing: float
+    geographic_crs_name: str
+    grid_mapping_name: str
+    horizontal_datum_name: str
+    inverse_flattening: float
+    latitude_of_projection_origin: float
+    longitude_of_central_meridian: float
+    longitude_of_prime_meridian: float
+    prime_meridian_name: str
+    projected_crs_name: str
+    reference_ellipsoid_name: str
+    scale_factor_at_central_meridian: float
+    semi_major_axis: float
+    semi_minor_axis: float
+    spatial_ref: str
+
+
+def _grid_mapping_attributes(wkt2: str) -> GridMappingAttrs:
     """
     The CF grid-mapping attributes of a CRS, rioxarray-style, derived from
     the product's own `proj:wkt2` (rather than re-deriving from the EPSG
     code, which is hostage to the installed PROJ database's naming).
     """
-    from pyproj import CRS
-
     # round-trip through CF: the stored grid mapping is exactly what a reader
     # reconstructs from the CF attributes, with the authority bookkeeping the
     # CF form cannot carry dropped from the WKT
@@ -264,7 +290,12 @@ def _grid_mapping_attributes(wkt2: str) -> dict[str, object]:
     wkt = crs.to_wkt("WKT1_GDAL")
     attributes["crs_wkt"] = wkt
     attributes["spatial_ref"] = wkt
-    return attributes
+    checked, problems = check(attributes, GridMappingAttrs)
+    if checked is None or problems:
+        details = "; ".join(f"{'.'.join(map(str, p.loc))}: {p.message}" for p in problems)
+        msg = f"The product CRS is not the expected transverse-mercator grid mapping: {details}"
+        raise ValueError(msg)
+    return checked
 
 
 def _plan_spatial_ref(wkt2: str, *, native: bool) -> ArraySpecV3:
@@ -276,9 +307,7 @@ def _plan_spatial_ref(wkt2: str, *, native: bool) -> ArraySpecV3:
     The levels written natively carry a zstd codec; the coarsened levels are
     written uncompressed (mirroring the two write paths of the converter).
     """
-    codecs: tuple[Mapping[str, object], ...] = (
-        {"name": "bytes", "configuration": {"endian": "little"}},
-    )
+    codecs: tuple[BytesCodecObject | ZstdCodecObject, ...] = (_BYTES_LITTLE,)
     if native:
         codecs = (*codecs, {"name": "zstd", "configuration": {"level": 0, "checksum": False}})
     return ArraySpecV3.model_validate(
@@ -286,7 +315,7 @@ def _plan_spatial_ref(wkt2: str, *, native: bool) -> ArraySpecV3:
             "attributes": _grid_mapping_attributes(wkt2),
             "shape": (),
             "data_type": "int64",
-            "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": ()}},
+            "chunk_grid": _regular_grid(()),
             "chunk_key_encoding": _CHUNK_KEY_ENCODING,
             "fill_value": 0,
             "codecs": codecs,
@@ -294,11 +323,45 @@ def _plan_spatial_ref(wkt2: str, *, native: bool) -> ArraySpecV3:
     )
 
 
+SpatialGroupAttrs = TypedDict(
+    "SpatialGroupAttrs",
+    {
+        "grid_mapping": str,
+        "proj:code": str,
+        "spatial:bbox": list[float],
+        "spatial:dimensions": list[str],
+        "spatial:registration": str,
+        "spatial:shape": list[int],
+        "spatial:transform": list[float],
+        "zarr_conventions": list[ConventionMetadataObject],
+    },
+)
+"""The spatial/proj convention attributes of one georeferenced group (a
+resolution dataset or a pyramid level), which always carries every key;
+the per-key value types are zarr-cm's."""
+
+MultiscaleGroupAttrs = TypedDict(
+    "MultiscaleGroupAttrs",
+    {
+        "multiscales": MultiscalesAttrs,
+        "proj:code": str,
+        "spatial:bbox": list[float],
+        "spatial:dimensions": list[str],
+        "spatial:registration": str,
+        "spatial:transform": list[float],
+        "zarr_conventions": list[ConventionMetadataObject],
+    },
+)
+"""The attributes of a multiscale pyramid's root group: zarr-cm's multiscales
+attributes plus the finest level's georeferencing (no `grid_mapping` or
+`spatial:shape`, which belong to the level groups)."""
+
+
 def _spatial_dataset_attributes(
     transform: tuple[float, float, float, float, float, float],
     shape: tuple[int, ...],
     epsg: int,
-) -> dict[str, object]:
+) -> SpatialGroupAttrs:
     """The spatial/proj convention attributes of one spatial dataset's group."""
     res_x, _, x0, _, res_y, y0 = transform
     rows, cols = shape
@@ -310,7 +373,7 @@ def _spatial_dataset_attributes(
         "spatial:registration": "pixel",
         "spatial:shape": list(shape),
         "spatial:transform": list(transform),
-        "zarr_conventions": [_SPATIAL_CONVENTION, _PROJ_CONVENTION],
+        "zarr_conventions": [SPATIAL_CMO, PROJ_CMO],
     }
 
 
@@ -320,7 +383,7 @@ def _level_spatial_attributes(
     shape: tuple[int, ...],
     origin: tuple[float, float],
     epsg: int,
-) -> dict[str, object]:
+) -> SpatialGroupAttrs:
     """The spatial/proj convention attributes of one pyramid level's group."""
     x0, y0 = origin
     resolution = float(meters)
@@ -363,9 +426,9 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
 
     # per-level planned bands: name -> (source attrs, shape, dtype itemsize)
     planned_levels: dict[int, dict[str, DataArray]] = {}
-    level_attributes: dict[int, dict[str, object]] = {}
+    level_attributes: dict[int, SpatialGroupAttrs] = {}
     previous_meters: int | None = None
-    layout: list[dict[str, object]] = []
+    layout: list[LayoutObject] = []
     members_out: dict[str, AnyGroupSpec] = {}
 
     for meters in REFLECTANCE_SCALE_LEVELS:
@@ -442,18 +505,20 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
             members=level_members,
         )
 
-        entry: dict[str, object] = {
+        level_shape2d = list(shape2d)
+        level_transform = [float(meters), 0.0, origin[0], 0.0, -float(meters), origin[1]]
+        entry: LayoutObject = {
             "asset": f"r{meters}m",
-            "spatial:shape": list(shape2d),
-            "spatial:transform": [float(meters), 0.0, origin[0], 0.0, -float(meters), origin[1]],
+            "spatial:shape": level_shape2d,
+            "spatial:transform": level_transform,
         }
         if previous_meters is not None:
             factor = meters // previous_meters
             entry = {
-                "asset": entry["asset"],
+                "asset": f"r{meters}m",
                 "derived_from": f"r{previous_meters}m",
-                "spatial:shape": entry["spatial:shape"],
-                "spatial:transform": entry["spatial:transform"],
+                "spatial:shape": level_shape2d,
+                "spatial:transform": level_transform,
                 "transform": {"scale": [factor, factor], "translation": [0.0, 0.0]},
             }
         layout.append(entry)
@@ -461,7 +526,7 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
 
     finest_meters = REFLECTANCE_SCALE_LEVELS[0]
     finest_level_attrs = level_attributes[min(input_levels)]
-    group_attributes: dict[str, object] = {
+    group_attributes: MultiscaleGroupAttrs = {
         "multiscales": {"layout": layout, "resampling_method": "average"},
         "proj:code": f"EPSG:{epsg}",
         "spatial:bbox": finest_level_attrs["spatial:bbox"],
@@ -475,7 +540,7 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
             -float(finest_meters),
             origin[1],
         ],
-        "zarr_conventions": [_MULTISCALES_CONVENTION, _SPATIAL_CONVENTION, _PROJ_CONVENTION],
+        "zarr_conventions": [MULTISCALES_CMO, SPATIAL_CMO, PROJ_CMO],
     }
     return GroupSpecV3(attributes=group_attributes, members=members_out)
 
@@ -520,7 +585,7 @@ def _doc_attrs(doc: Mapping[str, Any]) -> Mapping[str, object]:
     return attributes
 
 
-def _v3_data_type(dtype_v2: str) -> str | dict[str, object]:
+def _v3_data_type(dtype_v2: str) -> str | FixedLengthUtf32Object:
     """The Zarr V3 data type of a Zarr V2 dtype string."""
     parsed = np.dtype(dtype_v2)
     if parsed.kind == "U":
@@ -543,8 +608,6 @@ def _carried_array_attributes(
         out["grid_mapping"] = "spatial_ref"
     if name == "scl":
         # the converter's SCL flag table and NO_DATA fill declaration
-        from eopf_geozarr.s2_optimization.s2_multiscale import SCL_ATTRS, SCL_NODATA
-
         out.update(SCL_ATTRS)
         out["_FillValue"] = SCL_NODATA
     return out
@@ -568,7 +631,7 @@ def _plan_carried_array(name: str, doc: _ArrayDoc, *, spatial: bool) -> DataArra
         return _plan_coordinate(name, shape[0])
     parsed = np.dtype(str(doc["dtype"]))
     data_type = _v3_data_type(str(doc["dtype"]))
-    fill_value: object = "NaN" if parsed.kind == "f" else "" if parsed.kind == "U" else 0
+    fill_value: FillValue = "NaN" if parsed.kind == "f" else "" if parsed.kind == "U" else 0
     attributes = _carried_array_attributes(
         attrs,
         is_float=parsed.kind == "f",
@@ -582,10 +645,10 @@ def _plan_carried_array(name: str, doc: _ArrayDoc, *, spatial: bool) -> DataArra
                 "attributes": attributes,
                 "shape": shape,
                 "data_type": data_type,
-                "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": shape}},
+                "chunk_grid": _regular_grid(shape),
                 "chunk_key_encoding": _CHUNK_KEY_ENCODING,
                 "fill_value": fill_value,
-                "codecs": ({"name": "bytes", "configuration": {"endian": "little"}},),
+                "codecs": (_BYTES_LITTLE,),
                 "dimension_names": dims,
             }
         )
@@ -686,9 +749,9 @@ def _plan_aux_multiscale(
     origin = (transform[2], transform[5])
 
     planned_levels: dict[int, dict[str, DataArray]] = {}
-    level_attributes: dict[int, dict[str, object]] = {}
+    level_attributes: dict[int, SpatialGroupAttrs] = {}
     members_out: dict[str, AnyGroupSpec] = {}
-    layout: list[dict[str, object]] = []
+    layout: list[LayoutObject] = []
     previous_meters: int | None = None
     uses_flags = False
 
@@ -745,25 +808,27 @@ def _plan_aux_multiscale(
             attributes=level_attributes[meters], members=level_members
         )
 
-        entry: dict[str, object] = {
+        level_shape2d = [rows, cols]
+        level_transform = [float(meters), 0.0, origin[0], 0.0, -float(meters), origin[1]]
+        entry: LayoutObject = {
             "asset": f"r{meters}m",
-            "spatial:shape": [rows, cols],
-            "spatial:transform": [float(meters), 0.0, origin[0], 0.0, -float(meters), origin[1]],
+            "spatial:shape": level_shape2d,
+            "spatial:transform": level_transform,
         }
         if previous_meters is not None:
             factor = meters // previous_meters
             entry = {
-                "asset": entry["asset"],
+                "asset": f"r{meters}m",
                 "derived_from": f"r{previous_meters}m",
-                "spatial:shape": entry["spatial:shape"],
-                "spatial:transform": entry["spatial:transform"],
+                "spatial:shape": level_shape2d,
+                "spatial:transform": level_transform,
                 "transform": {"scale": [factor, factor], "translation": [0.0, 0.0]},
             }
         layout.append(entry)
         previous_meters = meters
 
     finest_meters = scale_levels[0]
-    group_attributes: dict[str, object] = {
+    group_attributes: MultiscaleGroupAttrs = {
         "multiscales": {
             "layout": layout,
             "resampling_method": "nearest" if uses_flags else "average",
@@ -780,7 +845,7 @@ def _plan_aux_multiscale(
             -float(finest_meters),
             origin[1],
         ],
-        "zarr_conventions": [_MULTISCALES_CONVENTION, _SPATIAL_CONVENTION, _PROJ_CONVENTION],
+        "zarr_conventions": [MULTISCALES_CMO, SPATIAL_CMO, PROJ_CMO],
     }
     return GroupSpecV3(attributes=group_attributes, members=members_out)
 
