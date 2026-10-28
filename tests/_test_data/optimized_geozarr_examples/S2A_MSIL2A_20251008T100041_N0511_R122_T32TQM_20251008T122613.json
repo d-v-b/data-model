@@ -994,7 +994,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -1744,7 +1743,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -2209,7 +2207,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -2636,7 +2633,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -2914,7 +2910,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -3199,7 +3194,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -3477,7 +3471,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -3842,8 +3835,8 @@
                       "chunk_grid": {
                         "configuration": {
                           "chunk_shape": [
-                            1024,
-                            1024
+                            915,
+                            915
                           ]
                         },
                         "name": "regular"
@@ -3858,8 +3851,8 @@
                         {
                           "configuration": {
                             "chunk_shape": [
-                              512,
-                              512
+                              915,
+                              915
                             ],
                             "codecs": [
                               {
@@ -3947,7 +3940,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -4249,7 +4241,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -4544,7 +4535,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -4846,7 +4836,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -5141,7 +5130,6 @@
                         }
                       ],
                       "data_type": "int64",
-                      "dimension_names": null,
                       "fill_value": 0,
                       "node_type": "array",
                       "shape": [],
@@ -7933,7 +7921,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -9342,7 +9329,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -10655,7 +10641,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -12064,7 +12049,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -13480,7 +13464,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -14889,7 +14872,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -15179,7 +15161,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -15551,7 +15532,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -15923,7 +15903,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -16666,7 +16645,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -17536,7 +17514,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -18061,7 +18038,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -18597,7 +18573,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -18965,7 +18940,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -19326,7 +19300,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -19488,8 +19461,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        1830,
-                        1830
+                        2048,
+                        2048
                       ]
                     },
                     "name": "regular"
@@ -19504,8 +19477,8 @@
                     {
                       "configuration": {
                         "chunk_shape": [
-                          1830,
-                          1830
+                          1024,
+                          1024
                         ],
                         "codecs": [
                           {
@@ -19582,8 +19555,8 @@
                   "chunk_grid": {
                     "configuration": {
                       "chunk_shape": [
-                        1830,
-                        1830
+                        2048,
+                        2048
                       ]
                     },
                     "name": "regular"
@@ -19598,8 +19571,8 @@
                     {
                       "configuration": {
                         "chunk_shape": [
-                          1830,
-                          1830
+                          1024,
+                          1024
                         ],
                         "codecs": [
                           {
@@ -19687,7 +19660,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],
@@ -20048,7 +20020,6 @@
                     }
                   ],
                   "data_type": "int64",
-                  "dimension_names": null,
                   "fill_value": 0,
                   "node_type": "array",
                   "shape": [],

@@ -404,6 +404,7 @@ def generic_multiscales(
     enable_sharding: bool = True,
     crs: CRS | None = None,
     scale_offset_codec: bool = False,
+    spatial_chunk: int = 1024,
 ) -> dict[str, Any]:
     base_path, scale_levels = spec.base_path, spec.scale_levels
     finest_dataset_key = spec.finest_key
@@ -477,9 +478,14 @@ def generic_multiscales(
 
             log.info("Creating level with resolution", level=dest_level_name, resolution=dest_level)
 
-            # Create downsampled dataset by coarsening
-            downsampled_dataset = create_downsampled_resolution_group(
-                source_ds, factor=downsample_factor
+            # Create downsampled dataset by coarsening, then rechunk
+            # uniformly before deriving the encoding: coarsening divides
+            # whatever dask chunks the source happens to have, which
+            # previously leaked incidental chunk shapes into the stored
+            # encoding (inner chunks of 915, 512 and 1830 for like levels).
+            downsampled_dataset = utils._rechunk_ds(
+                create_downsampled_resolution_group(source_ds, factor=downsample_factor),
+                spatial_chunk,
             )
 
             log.info("Writing level to path", level=dest_level_name, output_path=dest_level_path)
@@ -792,6 +798,7 @@ def create_multiscale_from_datatree(
                 enable_sharding=enable_sharding,
                 crs=crs,
                 scale_offset_codec=scale_offset_codec,
+                spatial_chunk=spatial_chunk,
             )
         )
 
@@ -808,6 +815,7 @@ def create_multiscale_from_datatree(
         enable_sharding=enable_sharding,
         crs=crs,
         scale_offset_codec=scale_offset_codec,
+        spatial_chunk=spatial_chunk,
     )
 
     # update processed groups with multiscale included groups, old instances of dataset are replaced,

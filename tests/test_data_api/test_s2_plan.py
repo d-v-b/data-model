@@ -76,36 +76,6 @@ def _mask_harness_georef(node: dict[str, Any]) -> None:
             _mask_harness_georef(member)
 
 
-def _mask_generated_aux_chunking(node: dict[str, Any], input_doc: dict[str, Any]) -> None:
-    """
-    Blank the chunk and shard shapes of the *generated* aux pyramid levels
-    (in place). The converter derives them from the dask chunking of whatever
-    object the level was coarsened from, which is incoherent across products
-    (inner chunks of 915, 512 and 1830 for the same situation); the plan uses
-    its uniform rule, so these values cannot be pinned by the snapshots.
-    """
-    from eopf_geozarr.data_api.s2_plan import AUX_MULTISCALE_LEVELS
-
-    for group_path in AUX_MULTISCALE_LEVELS:
-        planned_group: dict[str, Any] | None = node
-        input_group: dict[str, Any] | None = input_doc
-        for part in group_path.split("/"):
-            planned_group = (planned_group or {}).get("members", {}).get(part)
-            input_group = (input_group or {}).get("members", {}).get(part)
-        if planned_group is None or input_group is None:
-            continue
-        for level_name, level in planned_group.get("members", {}).items():
-            if level_name in input_group.get("members", {}):
-                continue  # a native level: its chunking is pinned
-            for name, member in level.get("members", {}).items():
-                if name in ("x", "y", "spatial_ref") or "shape" not in member:
-                    continue
-                member.pop("chunk_grid", None)
-                codecs = member.get("codecs")
-                if codecs and codecs[0].get("name") == "sharding_indexed":
-                    codecs[0]["configuration"].pop("chunk_shape", None)
-
-
 @pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
 def test_plan_matches_snapshot(path: pathlib.Path) -> None:
     """
@@ -113,17 +83,13 @@ def test_plan_matches_snapshot(path: pathlib.Path) -> None:
     tree, every array document (shapes, dtypes, shards, codecs, dimension
     names) and every attribute, across measurements, conditions and quality —
     except the georeferencing values the snapshot harness injects from its
-    synthetic tile (pinned to the product's own metadata by the
-    self-consistency test instead), and the chunk shapes of the generated aux
-    pyramid levels (incoherent in the snapshots; see
-    `_mask_generated_aux_chunking`).
+    synthetic tile, which the self-consistency test pins to the product's own
+    metadata instead.
     """
-    input_doc = _read(path)
     planned = _planned_root(path)
     expected = _snapshot_root(path)
     for tree in (planned, expected):
         _mask_harness_georef(tree)
-        _mask_generated_aux_chunking(tree, input_doc)
     assert planned == expected
 
 
