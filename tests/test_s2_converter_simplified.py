@@ -7,11 +7,12 @@ Tests the new simplified approach that uses only xarray and proper metadata cons
 import json
 from pathlib import Path
 from typing import cast
-from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
 import xarray as xr
+import zarr
+from pyproj import CRS
 
 from eopf_geozarr.s2_optimization.s2_converter import (
     _validate_s2_input,
@@ -223,7 +224,7 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
     measurements/reflectance group, but not for other groups.
     """
 
-    datasets = {
+    written = {
         "/measurements/reflectance/r10m": xr.Dataset(),
         "/quality/atmosphere": xr.Dataset(),
     }
@@ -235,10 +236,12 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
             zarr_format=3,
             consolidated=False,
         )
-        for k, v in datasets.items()
+        for k, v in written.items()
     ]
 
-    simple_root_consolidation(output_path=str(tmp_path / "test.zarr"), datasets=datasets)
+    simple_root_consolidation(
+        output_path=str(tmp_path / "test.zarr"), datasets=dict.fromkeys(written, ())
+    )
 
     root_z_meta = json.loads((tmp_path / "test.zarr/zarr.json").read_text())
     reflectance_zmeta = json.loads(
@@ -275,14 +278,15 @@ def test_simple_root_consolidation_aux_multiscales(
     """
     output_path = tmp_path / "test.zarr"
     levels = ("r60m", "r120m")
-    datasets = {"/measurements/reflectance/r10m": xr.Dataset()}
+    written = {"/measurements/reflectance/r10m": xr.Dataset()}
     for base_path in aux_groups:
         for level in levels:
-            datasets[f"{base_path}/{level}"] = xr.Dataset({"b00": (["y", "x"], np.zeros((2, 2)))})
+            written[f"{base_path}/{level}"] = xr.Dataset({"b00": (["y", "x"], np.zeros((2, 2)))})
 
-    for k, v in datasets.items():
+    for k, v in written.items():
         v.to_zarr(str(output_path) + k, mode="a", zarr_format=3, consolidated=False)
 
+    datasets = {path: tuple(str(name) for name in ds.data_vars) for path, ds in written.items()}
     simple_root_consolidation(output_path=str(output_path), datasets=datasets)
 
     for base_path in aux_groups:
@@ -306,7 +310,6 @@ def test_simple_root_consolidation_aux_multiscales(
 
 def test_write_store_root_bbox_reprojects_utm_to_wgs84(tmp_path: Path) -> None:
     """Store-root bbox unions child-group bboxes and outputs EPSG:4326 coords."""
-    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -334,7 +337,6 @@ def test_write_store_root_bbox_reprojects_utm_to_wgs84(tmp_path: Path) -> None:
 
 def test_write_store_root_bbox_unions_multiple_children(tmp_path: Path) -> None:
     """Store-root bbox is the union across multiple child-group footprints."""
-    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -354,7 +356,6 @@ def test_write_store_root_bbox_unions_multiple_children(tmp_path: Path) -> None:
 
 def test_write_store_root_bbox_densifies_edges(tmp_path: Path) -> None:
     """Reprojection uses transform_bounds, not just the two diagonal corners."""
-    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -375,8 +376,6 @@ def test_write_store_root_bbox_densifies_edges(tmp_path: Path) -> None:
 
 def test_write_store_root_bbox_resolves_wkt2_only_crs(tmp_path: Path) -> None:
     """A group carrying only proj:wkt2 is reprojected, not assumed to be degrees."""
-    import zarr
-    from pyproj import CRS
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -393,7 +392,6 @@ def test_write_store_root_bbox_resolves_wkt2_only_crs(tmp_path: Path) -> None:
 
 def test_write_store_root_bbox_skips_group_without_crs(tmp_path: Path) -> None:
     """A bbox with no resolvable CRS must not be unioned as if it were degrees."""
-    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -411,7 +409,6 @@ def test_write_store_root_bbox_skips_group_without_crs(tmp_path: Path) -> None:
 
 def test_write_store_root_bbox_invalid_code_does_not_raise(tmp_path: Path) -> None:
     """An unresolvable proj:code is skipped with a warning, never raised."""
-    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -430,7 +427,6 @@ def test_write_store_root_bbox_invalid_code_does_not_raise(tmp_path: Path) -> No
 
 def test_write_store_root_bbox_antimeridian_falls_back_to_full_range(tmp_path: Path) -> None:
     """A footprint crossing the antimeridian widens the root bbox to +/-180."""
-    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -446,68 +442,29 @@ def test_write_store_root_bbox_antimeridian_falls_back_to_full_range(tmp_path: P
     assert bbox == [-180.0, bbox[1], 180.0, bbox[3]], bbox
 
 
-class TestConvenienceFunction:
-    """Test the convenience function."""
-
-    @patch("eopf_geozarr.conversion.utils.create_result_datatree")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.zarr.open_group")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.initialize_crs_from_dataset")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.get_zarr_group")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.is_sentinel2_dataset")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.create_multiscale_from_datatree")
-    @patch("eopf_geozarr.s2_optimization.s2_converter.simple_root_consolidation")
-    def test_convert_s2_optimized_convenience_function(
-        self,
-        mock_consolidation: Mock,
-        mock_multiscale: Mock,
-        mock_is_s2: Mock,
-        mock_get_zarr_group: Mock,
-        mock_init_crs: Mock,
-        mock_zarr_open_group: Mock,
-        mock_create_result_datatree: Mock,
-    ) -> None:
-        """Test the convenience function parameter passing."""
-        # Setup mocks
-        mock_multiscale.return_value = {}
-        mock_is_s2.return_value = True
-        mock_get_zarr_group.return_value = Mock()
-        mock_init_crs.return_value = None  # Return None for CRS
-
-        # Mock zarr.open_group to return a group with proper groups() and members() methods
-        mock_zarr_group = Mock()
-        mock_zarr_group.groups.return_value = iter([])  # Return empty iterator for groups
-        mock_zarr_group.members.return_value = {}  # Return empty dict for members
-        mock_zarr_open_group.return_value = mock_zarr_group
-
-        # Mock create_result_datatree to return a mock DataTree with groups attribute
-        mock_result_dt = Mock()
-        mock_result_dt.groups = []  # Empty list for groups
-        mock_create_result_datatree.return_value = mock_result_dt
-
-        # Test parameter passing - Mock DataTree with groups attribute
-        dt_input = Mock()
-        dt_input.groups = ["/measurements/reflectance/r10m"]
-        output_path = "/test/path"
-
+@pytest.mark.parametrize(
+    "deviation",
+    [
+        {"enable_sharding": False},
+        {"spatial_chunk": 512},
+        {"compression_level": 2},
+        {"scale_offset_codec": True},
+    ],
+    ids=lambda d: next(iter(d)),
+)
+def test_convert_s2_optimized_refuses_non_policy_options(deviation: dict) -> None:
+    """The plan-driven writer has a fixed write policy; a deviating layout
+    option is refused before any work happens."""
+    with pytest.raises(ValueError, match="fixed write policy"):
         convert_s2_optimized(
-            dt_input,
-            output_path=output_path,
-            enable_sharding=False,
-            spatial_chunk=512,
-            compression_level=2,
-            max_retries=5,
+            xr.DataTree(),
+            output_path="/unused",
             validate_output=False,
+            **deviation,
         )
-
-        # Verify multiscale function was called with correct args
-        mock_multiscale.assert_called_once()
-        call_kwargs = mock_multiscale.call_args.kwargs
-        assert call_kwargs["enable_sharding"] is False
-        assert call_kwargs["spatial_chunk"] == 512
 
 
 def test_simple_root_consolidation_adds_reflectance_stac_asset(tmp_path: Path) -> None:
-    from pyproj import CRS
 
     # initialise an empty dataset to mimic the process and write to tmp
     r10m = xr.Dataset(coords={"y": np.arange(10), "x": np.arange(20)})
@@ -517,8 +474,6 @@ def test_simple_root_consolidation_adds_reflectance_stac_asset(tmp_path: Path) -
         zarr_format=3,
         consolidated=False,
     )
-    datasets = {"/measurements/reflectance/r10m": r10m}
-
     # adding dummy data to dt_input to mimic input reference dtreee
     dt_input = xr.DataTree(xr.Dataset({"dummy": (["y"], np.zeros(10))}))
     dt_input.attrs = {"stac_discovery": {"properties": {"mission": "sentinel-2"}}}
@@ -526,9 +481,10 @@ def test_simple_root_consolidation_adds_reflectance_stac_asset(tmp_path: Path) -
     # test execution of func
     simple_root_consolidation(
         output_path=str(tmp_path / "test.zarr"),
-        datasets=datasets,
+        datasets={"/measurements/reflectance/r10m": ()},
         dt_input=dt_input,
         crs=CRS.from_epsg(32632),
+        reflectance_shape=(10, 20),
     )
 
     # read in the consolidated dTree root to cross-check with expected outcome
@@ -551,17 +507,12 @@ def test_add_multiscale_pyramids_to_stac_metadata_adds_missing_levels() -> None:
     """Pyramid levels absent from existing STAC assets get one asset per data variable."""
     existing_asset = {"href": "/measurements/reflectance/r10m/b02", "title": "B02"}
     attrs: dict = {"stac_discovery": {"assets": {"b02": dict(existing_asset)}}}
-    datasets = {
+    datasets: dict[str, tuple[str, ...] | None] = {
         # already referenced by an existing asset -> must not be duplicated
-        "/measurements/reflectance/r10m": xr.Dataset({"b02": (["y", "x"], np.zeros((4, 4)))}),
+        "/measurements/reflectance/r10m": ("b02",),
         # new pyramid level -> assets added, spatial_ref skipped
-        "/measurements/reflectance/r20m": xr.Dataset(
-            {
-                "b02": (["y", "x"], np.zeros((2, 2))),
-                "b05": (["y", "x"], np.zeros((2, 2))),
-                "spatial_ref": ((), 0),
-            }
-        ),
+        "/measurements/reflectance/r20m": ("b02", "b05", "spatial_ref"),
+        # a multiscale root carries no variables of its own
         "/measurements/reflectance/r60m": None,
     }
 
@@ -578,9 +529,7 @@ def test_add_multiscale_pyramids_to_stac_metadata_adds_missing_levels() -> None:
 @pytest.mark.parametrize("attrs", [{}, {"stac_discovery": {}}, {"stac_discovery": {"assets": {}}}])
 def test_add_multiscale_pyramids_to_stac_metadata_without_assets_is_noop(attrs: dict) -> None:
     """Missing stac_discovery/assets returns the attributes unchanged instead of raising."""
-    datasets = {
-        "/measurements/reflectance/r20m": xr.Dataset({"b02": (["y", "x"], np.zeros((2, 2)))})
-    }
+    datasets = {"/measurements/reflectance/r20m": ("b02",)}
     expected = json.loads(json.dumps(attrs))
 
     assert add_multiscale_pyramids_to_stac_metadata(datasets, attrs) == expected

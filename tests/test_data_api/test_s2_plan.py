@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 from typing import Any
 
@@ -88,6 +89,13 @@ def test_plan_matches_snapshot(path: pathlib.Path) -> None:
     metadata instead.
     """
     planned = _planned_root(path)
+    if os.environ.get("REGENERATE_SNAPSHOTS"):
+        # The plan is the snapshots' source of truth now that the writer
+        # realizes it directly. Note that regenerating replaces the historical
+        # harness-tile georeferencing with each product's own, after which the
+        # masking below (and `_EXACT_PRODUCT`) can be retired.
+        snapshot_path = _SNAPSHOT_DIR / path.name
+        snapshot_path.write_text(json.dumps(planned, indent=2, sort_keys=True) + "\n")
     expected = _snapshot_root(path)
     for tree in (planned, expected):
         _mask_harness_georef(tree)

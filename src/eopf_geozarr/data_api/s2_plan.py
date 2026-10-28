@@ -67,7 +67,10 @@ if TYPE_CHECKING:
     from zarr_metadata.v3.codec.sharding_indexed import ShardingIndexedCodecObject
     from zarr_metadata.v3.codec.zstd import ZstdCodecObject
 
-    from eopf_geozarr.data_api.geozarr.scope import FixedLengthUtf32Object
+    from eopf_geozarr.data_api.geozarr.scope import (
+        FixedLengthUtf32Object,
+        NullTerminatedBytesObject,
+    )
 
 S2Level = Literal["L1C", "L2A"]
 
@@ -153,6 +156,31 @@ def product_level(root: Sentinel2Root) -> S2Level:
     raise ValueError(msg)
 
 
+def _product_proj(root: Sentinel2Root) -> tuple[tuple[float, float], int, str] | None:
+    """
+    The product-level georeferencing, as (origin, EPSG, WKT2), from the
+    `proj:*` keys of `stac_discovery` `properties` — the only place the Zarr
+    V3 baselines (N0512) declare it. The origin is the bbox's (min-x, max-y)
+    corner. Returns None when any of the three is missing or malformed.
+    """
+    properties = root.attributes.stac_discovery.get("properties")
+    if not isinstance(properties, dict):
+        return None
+    bbox = properties.get("proj:bbox")
+    code = properties.get("proj:code")
+    wkt2 = properties.get("proj:wkt2")
+    if (
+        not isinstance(bbox, (list, tuple))
+        or len(bbox) < 4
+        or not all(isinstance(value, (int, float)) for value in bbox[:4])
+        or not isinstance(code, str)
+        or not code.startswith("EPSG:")
+        or not isinstance(wkt2, str)
+    ):
+        return None
+    return (float(bbox[0]), float(bbox[3])), int(code.removeprefix("EPSG:")), wkt2
+
+
 def _shard_and_inner(shape: tuple[int, ...]) -> tuple[tuple[int, ...], tuple[int, ...]]:
     """
     The (shard, inner chunk) shapes for a band array: inner chunks of
@@ -194,7 +222,7 @@ def _plan_band(
 def _band_array(
     attributes: dict[str, object],
     shape: tuple[int, ...],
-    data_type: str | FixedLengthUtf32Object,
+    data_type: str | FixedLengthUtf32Object | NullTerminatedBytesObject,
     fill_value: FillValue,
     dimension_names: tuple[str, ...],
     typesize: int,
@@ -412,17 +440,26 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
         msg = "The product's reflectance group holds none of the known resolution datasets"
         raise ValueError(msg)
 
-    # the georeferencing of the pyramid: origin and EPSG from any finest-level band
+    # the georeferencing of the pyramid: origin and EPSG from any finest-level
+    # band, else from the product-level declaration (Zarr V3 baselines carry
+    # proj attributes only on stac_discovery, not on the band arrays)
     finest = input_levels[min(input_levels)]
     first_band_name = next(k for k in finest.members if k.startswith("b"))
     first_band_attrs: Mapping[str, object] = finest.members[first_band_name].attributes
-    transform = first_band_attrs["proj:transform"]
-    if not isinstance(transform, (list, tuple)) or len(transform) < 6:
-        msg = f"Band {first_band_name!r} carries no usable proj:transform"
-        raise ValueError(msg)
-    origin = (float(transform[2]), float(transform[5]))
-    epsg = int(first_band_attrs["proj:epsg"])  # type: ignore[call-overload]
-    wkt2 = str(first_band_attrs["proj:wkt2"])
+    transform = first_band_attrs.get("proj:transform")
+    if isinstance(transform, (list, tuple)) and len(transform) >= 6:
+        origin = (float(transform[2]), float(transform[5]))
+        epsg = int(first_band_attrs["proj:epsg"])  # type: ignore[call-overload]
+        wkt2 = str(first_band_attrs["proj:wkt2"])
+    else:
+        product = _product_proj(root)
+        if product is None:
+            msg = (
+                f"Band {first_band_name!r} carries no usable proj:transform and the "
+                "product declares no stac_discovery proj georeferencing"
+            )
+            raise ValueError(msg)
+        origin, epsg, wkt2 = product
 
     # per-level planned bands: name -> (source attrs, shape, dtype itemsize)
     planned_levels: dict[int, dict[str, DataArray]] = {}
@@ -585,12 +622,17 @@ def _doc_attrs(doc: Mapping[str, Any]) -> Mapping[str, object]:
     return attributes
 
 
-def _v3_data_type(dtype_v2: str) -> str | FixedLengthUtf32Object:
+def _v3_data_type(dtype_v2: str) -> str | FixedLengthUtf32Object | NullTerminatedBytesObject:
     """The Zarr V3 data type of a Zarr V2 dtype string."""
     parsed = np.dtype(dtype_v2)
     if parsed.kind == "U":
         return {
             "name": "fixed_length_utf32",
+            "configuration": {"length_bytes": parsed.itemsize},
+        }
+    if parsed.kind == "S":
+        return {
+            "name": "null_terminated_bytes",
             "configuration": {"length_bytes": parsed.itemsize},
         }
     return parsed.name
@@ -631,7 +673,7 @@ def _plan_carried_array(name: str, doc: _ArrayDoc, *, spatial: bool) -> DataArra
         return _plan_coordinate(name, shape[0])
     parsed = np.dtype(str(doc["dtype"]))
     data_type = _v3_data_type(str(doc["dtype"]))
-    fill_value: FillValue = "NaN" if parsed.kind == "f" else "" if parsed.kind == "U" else 0
+    fill_value: FillValue = "NaN" if parsed.kind == "f" else "" if parsed.kind in "US" else 0
     attributes = _carried_array_attributes(
         attrs,
         is_float=parsed.kind == "f",
@@ -717,7 +759,10 @@ def _plan_dataset(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
 
 
 def _plan_aux_multiscale(
-    group: _GroupDoc, path: str, scale_levels: tuple[int, ...]
+    group: _GroupDoc,
+    path: str,
+    scale_levels: tuple[int, ...],
+    product_proj: tuple[tuple[float, float], int, str] | None = None,
 ) -> AnyGroupSpec:
     """
     Plan an auxiliary multiscale group (a classification mask or the cloud
@@ -742,11 +787,16 @@ def _plan_aux_multiscale(
         if name not in ("x", "y")
     }
     anchor = _spatial_anchor(finest_arrays)
-    if anchor is None:
+    if anchor is not None:
+        transform, epsg, wkt2 = _proj_of(*anchor)
+        origin = (transform[2], transform[5])
+    elif product_proj is not None:
+        # Zarr V3 baselines carry no proj attributes on the mask arrays; the
+        # pyramid is georeferenced from the product-level declaration instead
+        origin, epsg, wkt2 = product_proj
+    else:
         msg = f"The {path} group's finest level carries no proj attributes"
         raise ValueError(msg)
-    transform, epsg, wkt2 = _proj_of(*anchor)
-    origin = (transform[2], transform[5])
 
     planned_levels: dict[int, dict[str, DataArray]] = {}
     level_attributes: dict[int, SpatialGroupAttrs] = {}
@@ -850,7 +900,11 @@ def _plan_aux_multiscale(
     return GroupSpecV3(attributes=group_attributes, members=members_out)
 
 
-def _plan_subtree(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
+def _plan_subtree(
+    group: _GroupDoc,
+    path: str,
+    product_proj: tuple[tuple[float, float], int, str] | None = None,
+) -> AnyGroupSpec | None:
     """
     Plan one conditions/quality subtree: aux multiscale groups by their specs,
     leaf datasets carried, dropped and empty groups skipped.
@@ -858,7 +912,7 @@ def _plan_subtree(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
     if path in _DROPPED_GROUPS:
         return None
     if path in AUX_MULTISCALE_LEVELS:
-        return _plan_aux_multiscale(group, path, AUX_MULTISCALE_LEVELS[path])
+        return _plan_aux_multiscale(group, path, AUX_MULTISCALE_LEVELS[path], product_proj)
     members = group.get("members") or {}
     subgroups = {
         name: member
@@ -869,7 +923,7 @@ def _plan_subtree(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
         return _plan_dataset(group, path)
     planned: dict[str, AnyGroupSpec] = {}
     for name, member in subgroups.items():
-        sub = _plan_subtree(member, f"{path}/{name}")
+        sub = _plan_subtree(member, f"{path}/{name}", product_proj)
         if sub is not None:
             planned[name] = sub
     if not planned:
@@ -890,11 +944,12 @@ def plan_geozarr(root: Sentinel2Root) -> AnyGroupSpec:
     members: dict[str, AnyGroupSpec] = {
         "measurements": GroupSpecV3(attributes={}, members={"reflectance": plan_reflectance(root)}),
     }
+    product_proj = _product_proj(root)
     for top in ("conditions", "quality"):
         member = root.members.get(top)
         if member is None:
             continue
-        planned = _plan_subtree(member.model_dump(), top)
+        planned = _plan_subtree(member.model_dump(), top, product_proj)
         if planned is not None:
             members[top] = planned
     return GroupSpecV3(attributes={}, members=members)

@@ -1,32 +1,34 @@
 """
-Parity tests for the plan-driven writer (`eopf_geozarr.data_api.s2_write`):
-the store it writes is compared file by file against the store the DataTree
-writer (`create_multiscale_from_datatree`) produces from the same input.
+Tests for the plan-driven writer (`eopf_geozarr.data_api.s2_write`).
+
+`write_geozarr` replaced the DataTree-based writer after reproducing its
+stores byte for byte, file by file, on these fixtures (the parity test lived
+here until that writer was removed). These tests pin what the writer
+guarantees on its own: the stored documents are exactly the plan, and the
+chunk data follows the copy / inject / coarsen semantics, checked against
+independently formulated references.
 """
 
 from __future__ import annotations
 
-import json
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
-import xarray as xr
 import zarr
-from pyproj import CRS
-from structlog.testing import capture_logs
+from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
+
+from eopf_geozarr.data_api.s2_plan import load_sentinel2
+from eopf_geozarr.data_api.s2_write import _coarsen, write_geozarr
+
+from ..conftest import create_zarrv2_group_from_json, get_stem, s2_example_json_paths
 
 if TYPE_CHECKING:
     import pathlib
 
-from eopf_geozarr.data_api.s2_plan import load_sentinel2
-from eopf_geozarr.data_api.s2_write import write_geozarr
-from eopf_geozarr.s2_optimization.s2_multiscale import create_multiscale_from_datatree
-
-from ..conftest import create_zarrv2_group_from_json, get_stem, s2_example_json_paths
-
 # Fallback footprint for coordinate arrays in groups that carry no proj
-# attributes (geometry, meteorology), where both writers only copy the values.
+# attributes (geometry, meteorology), where the writer only copies the values.
 _TILE_X_MIN = 300000.0
 _TILE_Y_MAX = 5000040.0
 _TILE_EXTENT = 109800.0
@@ -35,12 +37,17 @@ _TILE_EXTENT = 109800.0
 #: resampling arithmetic is exercised on values, not only on nodata fill.
 _PATTERN_MAX_ELEMENTS = 1830 * 1830
 
-#: Larger arrays seeded anyway: the scene classifications, so the
-#: window-centre subsampling is exercised on real values.
+#: Larger arrays seeded anyway: the scene classification and one finest band,
+#: so the window-centre subsampling and the band injection are exercised on
+#: real values.
 _PATTERNED_PATHS = (
     "conditions/mask/l2a_classification/r20m/scl",
     "conditions/mask/l1c_classification/r60m/b00",
+    "measurements/reflectance/r10m/b08",
 )
+
+#: The L2A product used for the value-semantics checks.
+_L2A_PATH = next(path for path in s2_example_json_paths if "MSIL2A" in path.stem)
 
 
 def _walk_groups(group: zarr.Group, prefix: str = "") -> list[tuple[str, zarr.Group]]:
@@ -62,13 +69,20 @@ def _group_transform(group: zarr.Group) -> tuple[float, ...] | None:
     return None
 
 
+def _pattern(shape: tuple[int, ...], dtype: np.dtype) -> np.ndarray:
+    """Deterministic 2-D test values, with occasional zeros (the nodata fill)."""
+    modulus = min(999, int(np.iinfo(dtype).max))
+    rows = np.arange(shape[0], dtype="uint16")[:, None]
+    cols = np.arange(shape[1], dtype="uint16")[None, :]
+    return ((rows * np.uint16(7) + cols) % np.uint16(modulus)).astype(dtype)
+
+
 def _seed_input_store(group: zarr.Group) -> None:
     """Give the metadata-only fixture store coordinates and array values.
 
     Coordinates are the pixel centres of each group's own `proj:transform`
-    (the georeferencing the plan derives from attributes, and the DataTree
-    writer re-derives from these values), and real products store them as
-    float64, so the fixtures' int64 declarations are recreated in that form.
+    (real products store them as float64, so the fixtures' int64 declarations
+    are recreated in that form), and selected arrays get deterministic values.
     """
     patterned = set(_PATTERNED_PATHS)
     for group_path, subgroup in _walk_groups(group):
@@ -99,71 +113,104 @@ def _seed_input_store(group: zarr.Group) -> None:
                 replacement[:] = values
             elif array.ndim == 2 and np.issubdtype(array.dtype, np.integer):
                 if array.size <= _PATTERN_MAX_ELEMENTS or path in patterned:
-                    modulus = min(999, int(np.iinfo(array.dtype).max))
-                    array[...] = (np.arange(array.size) % modulus).reshape(array.shape)
+                    array[...] = _pattern(array.shape, array.dtype)
 
 
-def _store_files(root: pathlib.Path) -> set[str]:
-    return {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()}
-
-
-@pytest.mark.filterwarnings("ignore:.*:RuntimeWarning")
-@pytest.mark.filterwarnings("ignore:.*:FutureWarning")
-@pytest.mark.filterwarnings("ignore:.*:UserWarning")
-@pytest.mark.parametrize("source_path", s2_example_json_paths, ids=get_stem)
-def test_write_geozarr_matches_datatree_writer(
-    source_path: pathlib.Path, tmp_path: pathlib.Path
-) -> None:
-    """
-    `write_geozarr` reproduces the DataTree writer's store from the same
-    input: the same files (so the same chunk existence), the same metadata
-    documents, and the same bytes in every chunk — across the copied native
-    levels, the injected bands, the generated pyramid levels (mean and
-    window-centre resampling exercised on seeded values), the coordinates,
-    and the carried conditions/quality datasets.
-    """
+def _written_store(source_path: pathlib.Path, tmp_path: pathlib.Path):
+    """Seed the fixture store, write it with `write_geozarr`, open both."""
     input_path = create_zarrv2_group_from_json(source_path, tmp_path)
     _seed_input_store(zarr.open_group(input_path, mode="r+", zarr_format=2))
-    input_group = zarr.open_group(input_path, mode="r", zarr_format=2)
+    source = zarr.open_group(input_path, mode="r", zarr_format=2)
+    output_path = tmp_path / "planned.zarr"
+    plan = write_geozarr(load_sentinel2(source), source, str(output_path))
+    return plan, source, zarr.open_group(output_path, mode="r", use_consolidated=False)
 
-    band = input_group["measurements/reflectance/r10m/b02"]
-    assert isinstance(band, zarr.Array)
-    crs = CRS.from_epsg(int(band.attrs["proj:epsg"]))  # type: ignore[arg-type]
 
-    datatree_path = tmp_path / "datatree.zarr"
-    dt_input = xr.open_datatree(
-        input_group.store,  # pyright: ignore[reportArgumentType]
-        engine="zarr",
-        chunks={},
-        mask_and_scale=False,
-        decode_coords="all",
+def _reference_block_mean(values: np.ndarray, factor: int, fill: int) -> np.ndarray:
+    """The converter's masked block mean, formulated independently (nanmean)."""
+    rows = values.shape[0] // factor * factor
+    cols = values.shape[1] // factor * factor
+    windows = values[:rows, :cols].reshape(rows // factor, factor, cols // factor, factor)
+    masked = np.where(windows == fill, np.nan, windows.astype("float64"))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        mean = np.nanmean(masked, axis=(1, 3))
+    return np.where(np.isnan(mean), fill, np.round(mean)).astype(values.dtype)
+
+
+@pytest.mark.parametrize("source_path", s2_example_json_paths, ids=get_stem)
+def test_write_geozarr_realizes_the_plan(source_path: pathlib.Path, tmp_path: pathlib.Path) -> None:
+    """
+    The written store holds exactly the planned hierarchy: reading it back
+    gives documents equal to the plan, for every group and array.
+    """
+    plan, _, output = _written_store(source_path, tmp_path)
+    observed = GroupSpecV3.from_zarr(output).model_dump(mode="json")
+    assert observed == plan.model_dump(mode="json")
+
+
+def test_write_geozarr_data_semantics(tmp_path: pathlib.Path) -> None:
+    """
+    The written chunk data follows the writer's semantics, checked on seeded
+    values: native arrays are copied, injected bands are the masked block
+    mean of the finest input level holding them, generated levels chain from
+    the previous level (mean for bands and probabilities, window-centre pixel
+    for the classification), coordinates take window means, and grid-mapping
+    arrays hold zero.
+    """
+    _, source, output = _written_store(_L2A_PATH, tmp_path)
+
+    def read(group: zarr.Group, path: str) -> np.ndarray:
+        member = group[path]
+        assert isinstance(member, zarr.Array)
+        return np.asarray(member[...])
+
+    # a native array is copied (b01 r60m is small enough to carry the pattern)
+    native = read(output, "measurements/reflectance/r60m/b01")
+    np.testing.assert_array_equal(native, read(source, "measurements/reflectance/r60m/b01"))
+
+    # an injected band is the masked block mean of its finest input level
+    injected = read(output, "measurements/reflectance/r60m/b08")
+    reference = _reference_block_mean(read(source, "measurements/reflectance/r10m/b08"), 6, 0)
+    np.testing.assert_array_equal(injected, reference)
+
+    # a generated band level is the masked block mean of the previous level
+    generated = read(output, "measurements/reflectance/r120m/b01")
+    np.testing.assert_array_equal(generated, _reference_block_mean(native, 2, 0))
+
+    # a generated classification level takes each window's centre pixel
+    scl_native = read(output, "conditions/mask/l2a_classification/r60m/scl")
+    scl_generated = read(output, "conditions/mask/l2a_classification/r120m/scl")
+    np.testing.assert_array_equal(scl_generated, scl_native[1::2, 1::2])
+
+    # a generated level's coordinates are the window means of the previous level's
+    x_native = read(output, "measurements/reflectance/r60m/x")
+    x_generated = read(output, "measurements/reflectance/r120m/x")
+    np.testing.assert_array_equal(
+        x_generated, x_native[: x_generated.shape[0] * 2].reshape(-1, 2).mean(axis=1)
     )
-    with capture_logs():
-        create_multiscale_from_datatree(
-            dt_input,
-            output_group=zarr.create_group(str(datatree_path)),
-            enable_sharding=True,
-            spatial_chunk=1024,
-            crs=crs,
-        )
 
-    planned_path = tmp_path / "planned.zarr"
-    write_geozarr(load_sentinel2(input_group), input_group, str(planned_path))
+    # grid-mapping arrays hold zero
+    assert read(output, "measurements/reflectance/r120m/spatial_ref") == 0
 
-    datatree_files = _store_files(datatree_path)
-    planned_files = _store_files(planned_path)
-    assert sorted(planned_files) == sorted(datatree_files)
 
-    mismatched = []
-    for key in sorted(datatree_files):
-        expected = (datatree_path / key).read_bytes()
-        observed = (planned_path / key).read_bytes()
-        if key.rsplit("/", 1)[-1] == "zarr.json":
-            if json.loads(observed) != json.loads(expected):
-                mismatched.append(key)
-        elif observed != expected:
-            mismatched.append(key)
-    assert mismatched == []
+@pytest.mark.parametrize("factor", [2, 3])
+@pytest.mark.parametrize("var_name", ["scl", "b00"])
+def test_coarsen_classification_takes_the_window_centre(var_name: str, factor: int) -> None:
+    """Classification variables (SCL, L1C cloud bitmask) take the centre pixel
+    of each window; for an even factor, the lower-right of the middle pixels."""
+    size = 2 * factor
+    data = np.arange(size * size, dtype="uint8").reshape(size, size)
+    result = _coarsen(data, factor, var_name, fill=0)
+    centre = factor // 2
+    np.testing.assert_array_equal(result, data[centre::factor, centre::factor])
+
+
+def test_coarsen_refuses_quality_masks() -> None:
+    """Quality-mask downsampling is not implemented, so it is refused."""
+    data = np.zeros((4, 4), dtype="uint8")
+    with pytest.raises(ValueError, match="quality_mask"):
+        _coarsen(data, 2, "quality_cirrus", fill=0)
 
 
 def test_write_geozarr_refuses_a_source_missing_the_planned_arrays(

@@ -71,7 +71,7 @@ _SUPPORTED_MODES = ("w", "w-")
 
 #: Default spatial chunk size per pipeline, matching the eopf-geozarr CLI.
 _DEFAULT_SPATIAL_CHUNK = {
-    "s2-optimized": 256,
+    "s2-optimized": 1024,
     "s3-olci-optimized": 1024,
     "generic": 4096,
     "generic-rechunker": 1024,
@@ -255,12 +255,13 @@ class GeoZarrWriter(EOWriter):
         )
 
         if selected_pipeline == "s2-optimized":
+            # The plan-driven S2 writer has a fixed write policy, so the
+            # layout options (enable_sharding, spatial_chunk,
+            # compression_level) are not forwarded; scale_offset_codec is,
+            # so an explicit True is refused with the policy message.
             return convert_s2_optimized(
                 dt_input=dtree,
                 output_path=output_path,
-                enable_sharding=enable_sharding,
-                spatial_chunk=resolved_spatial_chunk,
-                compression_level=compression_level,
                 validate_output=validate_output,
                 scale_offset_codec=scale_offset_codec,
                 max_retries=max_retries,

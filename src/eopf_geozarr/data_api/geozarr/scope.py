@@ -35,6 +35,20 @@ class FixedLengthUtf32Object(TypedDict, closed=True):
     must_understand: NotRequired[bool]
 
 
+class NullTerminatedBytesConfiguration(TypedDict, closed=True):
+    """The configuration of zarr-python's ``null_terminated_bytes`` data type."""
+
+    length_bytes: int
+
+
+class NullTerminatedBytesObject(TypedDict, closed=True):
+    """``null_terminated_bytes`` data type metadata in object form."""
+
+    name: Literal["null_terminated_bytes"]
+    configuration: NullTerminatedBytesConfiguration
+    must_understand: NotRequired[bool]
+
+
 FIXED_LENGTH_UTF32 = DataTypeDefinition(
     name="fixed_length_utf32",
     configuration=FixedLengthUtf32Configuration,
@@ -42,9 +56,21 @@ FIXED_LENGTH_UTF32 = DataTypeDefinition(
 )
 """zarr-python's provisional fixed-length unicode data type (numpy's ``U``)."""
 
+NULL_TERMINATED_BYTES = DataTypeDefinition(
+    name="null_terminated_bytes",
+    configuration=NullTerminatedBytesConfiguration,
+    fill_value=str,
+)
+"""zarr-python's provisional fixed-length bytes data type (numpy's ``S``);
+the fill value is the base64 spelling of the bytes."""
+
 GEOZARR_SCOPE = CORE_AND_EXTENSIONS.update(
-    # update() replaces a slot whole, so splice the new definition in after
+    # update() replaces a slot whole, so splice the new definitions in after
     # the default scope's own data types
-    data_types=[*CORE_AND_EXTENSIONS.data_types.values(), FIXED_LENGTH_UTF32],
+    data_types=[
+        *CORE_AND_EXTENSIONS.data_types.values(),
+        FIXED_LENGTH_UTF32,
+        NULL_TERMINATED_BYTES,
+    ],
 )
 """The default scope plus the data types zarr-python writes that it lacks."""
