@@ -16,6 +16,7 @@ from eopf_geozarr.data_api.geozarr.common import (
     check_valid_coordinates,
 )
 from eopf_geozarr.data_api.geozarr.multiscales import MultiscaleGroupAttrs
+from eopf_geozarr.data_api.geozarr.scope import GEOZARR_SCOPE
 
 
 class DataArray(ArraySpec[BaseDataArrayAttrs]):
@@ -34,6 +35,16 @@ class DataArray(ArraySpec[BaseDataArrayAttrs]):
     # GeoZarr requires dimension names, so tighten the parent's optional
     # `tuple[str | None, ...] | None` field to a required tuple of strings.
     dimension_names: tuple[str, ...]  # pyright: ignore[reportGeneralTypeIssues, reportIncompatibleVariableOverride]
+
+    # Every extension-point name (data type, chunk grid, chunk key encoding,
+    # codecs, storage transformers) must be claimed by a definition in the
+    # validation scope, instead of passing unjudged: a GeoZarr DataArray is a
+    # conformance contract, so a typo'd or unknown codec or data type name is
+    # refused at validation. The scope is the default plus the data types
+    # zarr-python writes that it lacks (fixed_length_utf32 band/angle
+    # coordinates); an explicit pydantic validation context still overrides.
+    zarr_scope = GEOZARR_SCOPE
+    zarr_scope_strict = True
 
     @property
     def array_dimensions(self) -> tuple[str, ...]:
