@@ -44,60 +44,97 @@ def _read(path: pathlib.Path) -> dict[str, Any]:
     return data
 
 
-def _planned_reflectance(path: pathlib.Path) -> dict[str, Any]:
+def _planned_root(path: pathlib.Path) -> dict[str, Any]:
     root = Sentinel2Root.model_validate(_read(path))
-    plan = plan_geozarr(root).model_dump(mode="json")
-    return plan["members"]["measurements"]["members"]["reflectance"]
+    return plan_geozarr(root).model_dump(mode="json")
 
 
-def _snapshot_reflectance(path: pathlib.Path) -> dict[str, Any]:
+def _snapshot_root(path: pathlib.Path) -> dict[str, Any]:
     snapshot = GroupSpecV3.model_validate(_read(_SNAPSHOT_DIR / path.name))
-    dumped = snapshot.model_dump(mode="json")
-    return dumped["members"]["measurements"]["members"]["reflectance"]
+    return snapshot.model_dump(mode="json")
 
 
-def _mask_harness_georef(reflectance: dict[str, Any]) -> None:
+def _planned_reflectance(path: pathlib.Path) -> dict[str, Any]:
+    return _planned_root(path)["members"]["measurements"]["members"]["reflectance"]
+
+
+def _mask_harness_georef(node: dict[str, Any]) -> None:
     """Blank the attribute values the snapshot harness injects (in place)."""
-
-    def mask_attrs(attributes: dict[str, Any]) -> None:
+    attributes = node.get("attributes")
+    if isinstance(attributes, dict):
         for key in _HARNESS_GEOREF_KEYS:
             attributes.pop(key, None)
         multiscales = attributes.get("multiscales")
         if isinstance(multiscales, dict):
             for entry in multiscales.get("layout", ()):
                 entry.pop("spatial:transform", None)
-
-    mask_attrs(reflectance["attributes"])
-    for level in reflectance["members"].values():
-        mask_attrs(level["attributes"])
+    members = node.get("members")
+    if isinstance(members, dict):
         # the whole grid-mapping array carries the harness CRS
-        level["members"].pop("spatial_ref", None)
+        members.pop("spatial_ref", None)
+        for member in members.values():
+            _mask_harness_georef(member)
+
+
+def _mask_generated_aux_chunking(node: dict[str, Any], input_doc: dict[str, Any]) -> None:
+    """
+    Blank the chunk and shard shapes of the *generated* aux pyramid levels
+    (in place). The converter derives them from the dask chunking of whatever
+    object the level was coarsened from, which is incoherent across products
+    (inner chunks of 915, 512 and 1830 for the same situation); the plan uses
+    its uniform rule, so these values cannot be pinned by the snapshots.
+    """
+    from eopf_geozarr.data_api.s2_plan import AUX_MULTISCALE_LEVELS
+
+    for group_path in AUX_MULTISCALE_LEVELS:
+        planned_group: dict[str, Any] | None = node
+        input_group: dict[str, Any] | None = input_doc
+        for part in group_path.split("/"):
+            planned_group = (planned_group or {}).get("members", {}).get(part)
+            input_group = (input_group or {}).get("members", {}).get(part)
+        if planned_group is None or input_group is None:
+            continue
+        for level_name, level in planned_group.get("members", {}).items():
+            if level_name in input_group.get("members", {}):
+                continue  # a native level: its chunking is pinned
+            for name, member in level.get("members", {}).items():
+                if name in ("x", "y", "spatial_ref") or "shape" not in member:
+                    continue
+                member.pop("chunk_grid", None)
+                codecs = member.get("codecs")
+                if codecs and codecs[0].get("name") == "sharding_indexed":
+                    codecs[0]["configuration"].pop("chunk_shape", None)
 
 
 @pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
 def test_plan_matches_snapshot(path: pathlib.Path) -> None:
     """
-    The planned reflectance tree reproduces the stored converter snapshot:
-    the member tree, every array document (shapes, dtypes, shards, codecs,
-    dimension names) and every attribute, except the georeferencing values
-    the snapshot harness injects from its synthetic tile, which the
-    self-consistency test pins to the product's own metadata instead.
+    The planned tree reproduces the stored converter snapshot — the member
+    tree, every array document (shapes, dtypes, shards, codecs, dimension
+    names) and every attribute, across measurements, conditions and quality —
+    except the georeferencing values the snapshot harness injects from its
+    synthetic tile (pinned to the product's own metadata by the
+    self-consistency test instead), and the chunk shapes of the generated aux
+    pyramid levels (incoherent in the snapshots; see
+    `_mask_generated_aux_chunking`).
     """
-    planned = _planned_reflectance(path)
-    expected = _snapshot_reflectance(path)
-    _mask_harness_georef(planned)
-    _mask_harness_georef(expected)
+    input_doc = _read(path)
+    planned = _planned_root(path)
+    expected = _snapshot_root(path)
+    for tree in (planned, expected):
+        _mask_harness_georef(tree)
+        _mask_generated_aux_chunking(tree, input_doc)
     assert planned == expected
 
 
 def test_plan_matches_snapshot_exactly() -> None:
     """
     For the product whose tile the snapshot harness's synthetic coordinates
-    model, the plan reproduces the snapshot byte for byte, georeferencing
-    included.
+    model, the plan reproduces the whole snapshot byte for byte,
+    georeferencing included.
     """
     path = _INPUT_DIR / f"{_EXACT_PRODUCT}.json"
-    assert _planned_reflectance(path) == _snapshot_reflectance(path)
+    assert _planned_root(path) == _snapshot_root(path)
 
 
 @pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])

@@ -23,20 +23,22 @@ The reflectance pyramid follows the converter's policy
 reused, coarser levels are derived from the level before them, and finer
 bands are injected into the coarser native levels (`b08` everywhere; for L1C
 also the other 10 m and 20 m bands) so they propagate through the overview
-chain.
-
-Only the `measurements/reflectance` subtree is planned so far; the
-`conditions` and `quality` subtrees still go through the DataTree-based
-converter (a follow-up migrates them onto this plan).
+chain. The `conditions` and `quality` subtrees are carried: their own
+multiscale groups (the classification masks and the cloud probabilities) are
+planned by `AUX_MULTISCALE_LEVELS`, georeferenced datasets get their spatial
+attributes and `spatial_ref` grid mappings, and the quicklook groups and
+scalar arrays are dropped, as the converter drops them.
 """
 
 from __future__ import annotations
 
 import base64
 import struct
+from collections.abc import Mapping
 from math import ceil
 from typing import TYPE_CHECKING, Any, Literal
 
+import numpy as np
 from pydantic_zarr.v3 import ArraySpec as ArraySpecV3
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
 
@@ -44,8 +46,6 @@ from eopf_geozarr.data_api.geozarr.v3 import DataArray
 from eopf_geozarr.data_api.s2 import Sentinel2Root
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     import zarr
     from pydantic_zarr.v3 import AnyGroupSpec
 
@@ -186,7 +186,7 @@ def _plan_band(
 def _band_array(
     attributes: dict[str, object],
     shape: tuple[int, ...],
-    data_type: str,
+    data_type: str | dict[str, object],
     fill_value: object,
     dimension_names: tuple[str, ...],
     typesize: int,
@@ -294,6 +294,26 @@ def _plan_spatial_ref(wkt2: str, *, native: bool) -> ArraySpecV3:
     )
 
 
+def _spatial_dataset_attributes(
+    transform: tuple[float, float, float, float, float, float],
+    shape: tuple[int, ...],
+    epsg: int,
+) -> dict[str, object]:
+    """The spatial/proj convention attributes of one spatial dataset's group."""
+    res_x, _, x0, _, res_y, y0 = transform
+    rows, cols = shape
+    return {
+        "grid_mapping": "spatial_ref",
+        "proj:code": f"EPSG:{epsg}",
+        "spatial:bbox": [x0, y0 + rows * res_y, x0 + cols * res_x, y0],
+        "spatial:dimensions": ["y", "x"],
+        "spatial:registration": "pixel",
+        "spatial:shape": list(shape),
+        "spatial:transform": list(transform),
+        "zarr_conventions": [_SPATIAL_CONVENTION, _PROJ_CONVENTION],
+    }
+
+
 def _level_spatial_attributes(
     *,
     meters: int,
@@ -303,18 +323,8 @@ def _level_spatial_attributes(
 ) -> dict[str, object]:
     """The spatial/proj convention attributes of one pyramid level's group."""
     x0, y0 = origin
-    rows, cols = shape
     resolution = float(meters)
-    return {
-        "grid_mapping": "spatial_ref",
-        "proj:code": f"EPSG:{epsg}",
-        "spatial:bbox": [x0, y0 - rows * resolution, x0 + cols * resolution, y0],
-        "spatial:dimensions": ["y", "x"],
-        "spatial:registration": "pixel",
-        "spatial:shape": list(shape),
-        "spatial:transform": [resolution, 0.0, x0, 0.0, -resolution, y0],
-        "zarr_conventions": [_SPATIAL_CONVENTION, _PROJ_CONVENTION],
-    }
+    return _spatial_dataset_attributes((resolution, 0.0, x0, 0.0, -resolution, y0), shape, epsg)
 
 
 def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
@@ -344,13 +354,16 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
     first_band_name = next(k for k in finest.members if k.startswith("b"))
     first_band_attrs: Mapping[str, object] = finest.members[first_band_name].attributes
     transform = first_band_attrs["proj:transform"]
-    assert isinstance(transform, (list, tuple))
+    if not isinstance(transform, (list, tuple)) or len(transform) < 6:
+        msg = f"Band {first_band_name!r} carries no usable proj:transform"
+        raise ValueError(msg)
     origin = (float(transform[2]), float(transform[5]))
     epsg = int(first_band_attrs["proj:epsg"])  # type: ignore[call-overload]
     wkt2 = str(first_band_attrs["proj:wkt2"])
 
     # per-level planned bands: name -> (source attrs, shape, dtype itemsize)
     planned_levels: dict[int, dict[str, DataArray]] = {}
+    level_attributes: dict[int, dict[str, object]] = {}
     previous_meters: int | None = None
     layout: list[dict[str, object]] = []
     members_out: dict[str, AnyGroupSpec] = {}
@@ -392,13 +405,17 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
                     )
                     break
         else:
-            assert previous_meters is not None
+            if previous_meters is None:
+                msg = (
+                    f"The finest pyramid level (r{meters}m) is not in the input, "
+                    "so there is nothing to derive the coarser levels from"
+                )
+                raise ValueError(msg)
             factor = meters // previous_meters
             for name, previous in planned_levels[previous_meters].items():
                 shape = tuple(dim // factor for dim in previous.shape)
                 # a coarsened band keeps its attributes verbatim
-                dims = previous.dimension_names
-                assert dims is not None
+                dims = previous.dimension_names or ("y", "x")
                 bands[name] = _band_array(
                     previous.attributes.model_dump(),
                     shape,
@@ -417,10 +434,11 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
         level_members["y"] = _plan_coordinate("y", rows)
         level_members["spatial_ref"] = _plan_spatial_ref(wkt2, native=native)
 
+        level_attributes[meters] = _level_spatial_attributes(
+            meters=meters, shape=shape2d, origin=origin, epsg=epsg
+        )
         members_out[f"r{meters}m"] = GroupSpecV3(
-            attributes=_level_spatial_attributes(
-                meters=meters, shape=shape2d, origin=origin, epsg=epsg
-            ),
+            attributes=level_attributes[meters],
             members=level_members,
         )
 
@@ -442,12 +460,11 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
         previous_meters = meters
 
     finest_meters = REFLECTANCE_SCALE_LEVELS[0]
-    finest_attrs = members_out[f"r{min(input_levels)}m"].attributes
-    assert isinstance(finest_attrs, dict)
+    finest_level_attrs = level_attributes[min(input_levels)]
     group_attributes: dict[str, object] = {
         "multiscales": {"layout": layout, "resampling_method": "average"},
         "proj:code": f"EPSG:{epsg}",
-        "spatial:bbox": finest_attrs["spatial:bbox"],
+        "spatial:bbox": finest_level_attrs["spatial:bbox"],
         "spatial:dimensions": ["y", "x"],
         "spatial:registration": "pixel",
         "spatial:transform": [
@@ -463,20 +480,356 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
     return GroupSpecV3(attributes=group_attributes, members=members_out)
 
 
+# ---------------------------------------------------------------------------
+# conditions and quality
+
+#: Groups that get a multiscale pyramid, with their levels in metres (the
+#: converter's aux multiscale specs); levels present in the input are reused,
+#: the rest are coarsened from the level before them.
+AUX_MULTISCALE_LEVELS: dict[str, tuple[int, ...]] = {
+    "conditions/mask/l1c_classification": (60, 120, 360, 720),
+    "conditions/mask/l2a_classification": (20, 60, 120, 360, 720),
+    "quality/probability": (20, 60, 120, 360, 720),
+}
+
+#: Groups the output drops: the quicklooks duplicate RGB data derivable from
+#: the reflectance bands (EOPF-Explorer/data-model#81).
+_DROPPED_GROUPS = frozenset({"quality/l1c_quicklook", "quality/l2a_quicklook"})
+
+#: Attribute keys never carried into the output: xarray's dimension
+#: bookkeeping, the EOPF source bag, the fill value (which lives in the array
+#: document, re-added as a CF attribute only for floats), and the geo-proj
+#: convention keys that belong on the enclosing group.
+_DROPPED_ATTRS = frozenset(
+    {"_ARRAY_DIMENSIONS", "_eopf_attrs", "_FillValue", "proj:code", "proj:wkt2", "proj:projjson"}
+)
+
+# The conditions/quality planner walks the input model's *dump* — plain Zarr
+# V2 documents — because the input model types those subtrees loosely, so
+# their nodes are a mix of spec models and raw mappings. A node holding
+# "members" is a group; one holding "shape" is an array.
+_ArrayDoc = Mapping[str, Any]
+_GroupDoc = Mapping[str, Any]
+
+
+def _doc_attrs(doc: Mapping[str, Any]) -> Mapping[str, object]:
+    attributes = doc.get("attributes") or {}
+    if not isinstance(attributes, Mapping):
+        msg = f"Attributes are not a mapping: {type(attributes)!r}"
+        raise TypeError(msg)
+    return attributes
+
+
+def _v3_data_type(dtype_v2: str) -> str | dict[str, object]:
+    """The Zarr V3 data type of a Zarr V2 dtype string."""
+    parsed = np.dtype(dtype_v2)
+    if parsed.kind == "U":
+        return {
+            "name": "fixed_length_utf32",
+            "configuration": {"length_bytes": parsed.itemsize},
+        }
+    return parsed.name
+
+
+def _carried_array_attributes(
+    attrs: Mapping[str, object], *, is_float: bool, grid_mapping: bool, name: str
+) -> dict[str, object]:
+    """The output attributes of a carried array: sanitized, with the CF float
+    fill, the grid-mapping reference and the SCL flag table added."""
+    out = {key: value for key, value in attrs.items() if key not in _DROPPED_ATTRS}
+    if is_float:
+        out["_FillValue"] = _NAN_FLOAT64_B64
+    if grid_mapping:
+        out["grid_mapping"] = "spatial_ref"
+    if name == "scl":
+        # the converter's SCL flag table and NO_DATA fill declaration
+        from eopf_geozarr.s2_optimization.s2_multiscale import SCL_ATTRS, SCL_NODATA
+
+        out.update(SCL_ATTRS)
+        out["_FillValue"] = SCL_NODATA
+    return out
+
+
+def _plan_carried_array(name: str, doc: _ArrayDoc, *, spatial: bool) -> DataArray:
+    """
+    One carried (non-reflectance) array, translated to its output document:
+    `x`/`y` become the float64 coordinate arrays, other coordinate arrays
+    (an array whose only dimension is its own name) keep their data type
+    uncompressed, and data arrays are sharded with the blosc policy.
+    """
+    attrs = _doc_attrs(doc)
+    dims_raw = attrs.get("_ARRAY_DIMENSIONS")
+    if not isinstance(dims_raw, (list, tuple)):
+        msg = f"Array {name!r} carries no _ARRAY_DIMENSIONS attribute"
+        raise TypeError(msg)
+    dims = tuple(str(dim) for dim in dims_raw)
+    shape = tuple(doc["shape"])
+    if name in ("x", "y") and dims == (name,):
+        return _plan_coordinate(name, shape[0])
+    parsed = np.dtype(str(doc["dtype"]))
+    data_type = _v3_data_type(str(doc["dtype"]))
+    fill_value: object = "NaN" if parsed.kind == "f" else "" if parsed.kind == "U" else 0
+    attributes = _carried_array_attributes(
+        attrs,
+        is_float=parsed.kind == "f",
+        grid_mapping=spatial and "proj:epsg" in attrs,
+        name=name,
+    )
+    if dims == (name,):
+        # a coordinate array: one chunk, uncompressed
+        return DataArray.model_validate(
+            {
+                "attributes": attributes,
+                "shape": shape,
+                "data_type": data_type,
+                "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": shape}},
+                "chunk_key_encoding": _CHUNK_KEY_ENCODING,
+                "fill_value": fill_value,
+                "codecs": ({"name": "bytes", "configuration": {"endian": "little"}},),
+                "dimension_names": dims,
+            }
+        )
+    return _band_array(attributes, shape, data_type, fill_value, dims, typesize=parsed.itemsize)
+
+
+def _carried_arrays(group: _GroupDoc) -> dict[str, _ArrayDoc]:
+    """The group's non-scalar arrays (scalar arrays are dropped)."""
+    members = group.get("members") or {}
+    return {
+        name: member
+        for name, member in members.items()
+        if isinstance(member, Mapping) and "shape" in member and len(member["shape"]) > 0
+    }
+
+
+def _spatial_anchor(arrays: Mapping[str, _ArrayDoc]) -> tuple[str, _ArrayDoc] | None:
+    """The first array carrying proj attributes, with its name, if any."""
+    for name, member in arrays.items():
+        if "proj:epsg" in _doc_attrs(member):
+            return name, member
+    return None
+
+
+_Transform6 = tuple[float, float, float, float, float, float]
+
+
+def _proj_of(name: str, doc: _ArrayDoc) -> tuple[_Transform6, int, str]:
+    """The (transform, EPSG, WKT2) a proj-bearing input array carries."""
+    attrs = _doc_attrs(doc)
+    transform = attrs.get("proj:transform")
+    if not isinstance(transform, (list, tuple)) or len(transform) < 6:
+        msg = f"Array {name!r} carries no usable proj:transform"
+        raise ValueError(msg)
+    a, b, c, d, e, f = (float(part) for part in transform[:6])
+    return (
+        (a, b, c, d, e, f),
+        int(attrs["proj:epsg"]),  # type: ignore[call-overload]
+        str(attrs["proj:wkt2"]),
+    )
+
+
+def _plan_dataset(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
+    """
+    Plan one carried leaf dataset: every non-scalar array translated, and —
+    when the dataset is georeferenced (an array carries proj attributes) —
+    the group's spatial attributes and a `spatial_ref` grid-mapping array.
+    Returns `None` for a dataset with no arrays to carry.
+    """
+    arrays = _carried_arrays(group)
+    if not arrays:
+        return None
+    anchor = _spatial_anchor(arrays)
+    members: dict[str, DataArray | ArraySpecV3] = {
+        name: _plan_carried_array(name, member, spatial=anchor is not None)
+        for name, member in arrays.items()
+    }
+    if anchor is None:
+        return GroupSpecV3(attributes=dict(_doc_attrs(group)), members=members)
+    transform, epsg, wkt2 = _proj_of(*anchor)
+    members["spatial_ref"] = _plan_spatial_ref(wkt2, native=True)
+    return GroupSpecV3(
+        attributes=_spatial_dataset_attributes(transform, tuple(anchor[1]["shape"]), epsg),
+        members=members,
+    )
+
+
+def _plan_aux_multiscale(
+    group: _GroupDoc, path: str, scale_levels: tuple[int, ...]
+) -> AnyGroupSpec:
+    """
+    Plan an auxiliary multiscale group (a classification mask or the cloud
+    probabilities): levels present in the input are carried, coarser levels
+    derive from the level before them with their arrays' attributes verbatim,
+    and the group gets the multiscales layout — resampled `nearest` when the
+    arrays carry a flag table, `average` otherwise.
+    """
+    group_members = group.get("members") or {}
+    input_levels: dict[int, _GroupDoc] = {}
+    for meters in scale_levels:
+        member = group_members.get(f"r{meters}m")
+        if member is not None:
+            input_levels[meters] = member
+    if not input_levels:
+        msg = f"The {path} group holds none of the known resolution datasets"
+        raise ValueError(msg)
+
+    finest_arrays = {
+        name: member
+        for name, member in _carried_arrays(input_levels[min(input_levels)]).items()
+        if name not in ("x", "y")
+    }
+    anchor = _spatial_anchor(finest_arrays)
+    if anchor is None:
+        msg = f"The {path} group's finest level carries no proj attributes"
+        raise ValueError(msg)
+    transform, epsg, wkt2 = _proj_of(*anchor)
+    origin = (transform[2], transform[5])
+
+    planned_levels: dict[int, dict[str, DataArray]] = {}
+    level_attributes: dict[int, dict[str, object]] = {}
+    members_out: dict[str, AnyGroupSpec] = {}
+    layout: list[dict[str, object]] = []
+    previous_meters: int | None = None
+    uses_flags = False
+
+    for meters in scale_levels:
+        variables: dict[str, DataArray] = {}
+        native = meters in input_levels
+        if native:
+            for name, member in _carried_arrays(input_levels[meters]).items():
+                if name in ("x", "y"):
+                    continue
+                variables[name] = _plan_carried_array(name, member, spatial=True)
+            if not variables:
+                msg = f"The {path} r{meters}m dataset holds no arrays"
+                raise ValueError(msg)
+        else:
+            if previous_meters is None:
+                msg = (
+                    f"The finest {path} level (r{meters}m) is not in the input, "
+                    "so there is nothing to derive the coarser levels from"
+                )
+                raise ValueError(msg)
+            factor = meters // previous_meters
+            for name, previous in planned_levels[previous_meters].items():
+                shape = tuple(dim // factor for dim in previous.shape)
+                data_type = previous.data_type
+                if not isinstance(data_type, str):
+                    msg = f"Cannot coarsen {path} variable {name!r} of data type {data_type!r}"
+                    raise TypeError(msg)
+                # a coarsened variable keeps its attributes verbatim
+                variables[name] = _band_array(
+                    previous.attributes.model_dump(),
+                    shape,
+                    data_type,
+                    previous.fill_value,
+                    previous.dimension_names or ("y", "x"),
+                    typesize=np.dtype(data_type).itemsize,
+                )
+        uses_flags = uses_flags or any(
+            not {"flag_values", "flag_meanings", "flag_masks"}.isdisjoint(
+                variable.attributes.model_dump()
+            )
+            for variable in variables.values()
+        )
+        planned_levels[meters] = variables
+        rows, cols = next(iter(variables.values())).shape
+        level_members: dict[str, DataArray | ArraySpecV3] = dict(variables)
+        level_members["x"] = _plan_coordinate("x", cols)
+        level_members["y"] = _plan_coordinate("y", rows)
+        level_members["spatial_ref"] = _plan_spatial_ref(wkt2, native=native)
+        level_attributes[meters] = _level_spatial_attributes(
+            meters=meters, shape=(rows, cols), origin=origin, epsg=epsg
+        )
+        members_out[f"r{meters}m"] = GroupSpecV3(
+            attributes=level_attributes[meters], members=level_members
+        )
+
+        entry: dict[str, object] = {
+            "asset": f"r{meters}m",
+            "spatial:shape": [rows, cols],
+            "spatial:transform": [float(meters), 0.0, origin[0], 0.0, -float(meters), origin[1]],
+        }
+        if previous_meters is not None:
+            factor = meters // previous_meters
+            entry = {
+                "asset": entry["asset"],
+                "derived_from": f"r{previous_meters}m",
+                "spatial:shape": entry["spatial:shape"],
+                "spatial:transform": entry["spatial:transform"],
+                "transform": {"scale": [factor, factor], "translation": [0.0, 0.0]},
+            }
+        layout.append(entry)
+        previous_meters = meters
+
+    finest_meters = scale_levels[0]
+    group_attributes: dict[str, object] = {
+        "multiscales": {
+            "layout": layout,
+            "resampling_method": "nearest" if uses_flags else "average",
+        },
+        "proj:code": f"EPSG:{epsg}",
+        "spatial:bbox": level_attributes[min(input_levels)]["spatial:bbox"],
+        "spatial:dimensions": ["y", "x"],
+        "spatial:registration": "pixel",
+        "spatial:transform": [
+            float(finest_meters),
+            0.0,
+            origin[0],
+            0.0,
+            -float(finest_meters),
+            origin[1],
+        ],
+        "zarr_conventions": [_MULTISCALES_CONVENTION, _SPATIAL_CONVENTION, _PROJ_CONVENTION],
+    }
+    return GroupSpecV3(attributes=group_attributes, members=members_out)
+
+
+def _plan_subtree(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
+    """
+    Plan one conditions/quality subtree: aux multiscale groups by their specs,
+    leaf datasets carried, dropped and empty groups skipped.
+    """
+    if path in _DROPPED_GROUPS:
+        return None
+    if path in AUX_MULTISCALE_LEVELS:
+        return _plan_aux_multiscale(group, path, AUX_MULTISCALE_LEVELS[path])
+    members = group.get("members") or {}
+    subgroups = {
+        name: member
+        for name, member in members.items()
+        if isinstance(member, Mapping) and "members" in member
+    }
+    if not subgroups:
+        return _plan_dataset(group, path)
+    planned: dict[str, AnyGroupSpec] = {}
+    for name, member in subgroups.items():
+        sub = _plan_subtree(member, f"{path}/{name}")
+        if sub is not None:
+            planned[name] = sub
+    if not planned:
+        return None
+    return GroupSpecV3(attributes=dict(_doc_attrs(group)), members=planned)
+
+
 def plan_geozarr(root: Sentinel2Root) -> AnyGroupSpec:
     """
     Plan the GeoZarr hierarchy to write for a Sentinel-2 product.
 
     Pure: reads only the validated input model, returns the output tree as a
-    Zarr V3 `GroupSpec`. Only `measurements/reflectance` is planned so far;
-    the `conditions` and `quality` subtrees still come from the
-    DataTree-based converter.
+    Zarr V3 `GroupSpec` — `measurements/reflectance` as the sharded multiscale
+    pyramid, and the `conditions` and `quality` subtrees carried (their own
+    multiscale groups planned by `AUX_MULTISCALE_LEVELS`, the quicklooks and
+    scalar arrays dropped).
     """
-    return GroupSpecV3(
-        attributes={},
-        members={
-            "measurements": GroupSpecV3(
-                attributes={}, members={"reflectance": plan_reflectance(root)}
-            ),
-        },
-    )
+    members: dict[str, AnyGroupSpec] = {
+        "measurements": GroupSpecV3(attributes={}, members={"reflectance": plan_reflectance(root)}),
+    }
+    for top in ("conditions", "quality"):
+        member = root.members.get(top)
+        if member is None:
+            continue
+        planned = _plan_subtree(member.model_dump(), top)
+        if planned is not None:
+            members[top] = planned
+    return GroupSpecV3(attributes={}, members=members)
