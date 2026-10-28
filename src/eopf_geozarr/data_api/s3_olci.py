@@ -70,14 +70,16 @@ class Sentinel3OlciRootMembers(TypedDict, closed=True, total=False):
         Mapping[str, object],
         Mapping[
             str,
-            GroupSpec[Mapping[str, object], Mapping[str, ArraySpec[Mapping[str, object]]]] | ArraySpec[Mapping[str, object]],
+            GroupSpec[Mapping[str, object], Mapping[str, ArraySpec[Mapping[str, object]]]]
+            | ArraySpec[Mapping[str, object]],
         ],
     ]
     conditions: GroupSpec[
         Mapping[str, object],
         Mapping[
             str,
-            GroupSpec[Mapping[str, object], Mapping[str, ArraySpec[Mapping[str, object]]]] | ArraySpec[Mapping[str, object]],
+            GroupSpec[Mapping[str, object], Mapping[str, ArraySpec[Mapping[str, object]]]]
+            | ArraySpec[Mapping[str, object]],
         ],
     ]
 

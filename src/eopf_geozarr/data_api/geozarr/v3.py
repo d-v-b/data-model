@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Self, cast
+from typing import Self, cast
 
 from pydantic import model_validator
 from pydantic_zarr.v3 import AnyGroupSpec, ArraySpec, GroupSpec

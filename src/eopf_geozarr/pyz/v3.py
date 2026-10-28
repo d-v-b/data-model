@@ -20,10 +20,9 @@ class MyGroup(GroupSpec[Any, MyMembers])
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Generic, TypeAlias, TypeVar, Union
+from typing import Any, TypeAlias, Union
 
 from pydantic import Field
-
 from pydantic_zarr.v3 import ArraySpec as ArraySpecV3
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
 from pydantic_zarr.v3 import TBaseItem as TBaseItemV3
@@ -38,11 +37,8 @@ from eopf_geozarr.pyz.common import (
 
 TBaseMember: TypeAlias = Mapping[str, Union["GroupSpec[Any, Any]", "ArraySpec[Any]"]]  # noqa: UP040
 
-TAttr = TypeVar("TAttr", bound=TBaseAttr)
-TMembers = TypeVar("TMembers", bound=TBaseMember)
 
-
-class GroupSpec(GroupSpecV3[TAttr, TBaseItemV3], Generic[TAttr, TMembers]):
+class GroupSpec[TAttr: TBaseAttr, TMembers: TBaseMember](GroupSpecV3[TAttr, TBaseItemV3]):
     # The parent is parameterized at its widest member type, and TMembers (the
     # full members mapping, e.g. a closed TypedDict) narrows the *field*: a
     # legal override, since pydantic-zarr's parameters are covariant and the
@@ -72,7 +68,7 @@ class GroupSpec(GroupSpecV3[TAttr, TBaseItemV3], Generic[TAttr, TMembers]):
         )
 
 
-class ArraySpec(ArraySpecV3[TAttr], Generic[TAttr]):
+class ArraySpec[TAttr: TBaseAttr](ArraySpecV3[TAttr]):
     """
     Zarr V3 ArraySpec with enhanced HTML representation for Jupyter/IPython.
 
