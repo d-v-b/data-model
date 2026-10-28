@@ -4496,8 +4496,8 @@ wheels = [
 
 [[package]]
 name = "pydantic-zarr"
-version = "0.10.1.dev32+gd11289a9f"
-source = { git = "https://github.com/zarr-developers/pydantic-zarr.git?rev=main#d11289a9f1e21d12e329cf55f809b3e8ad631ab5" }
+version = "0.10.1.dev34+g66cf23990"
+source = { git = "https://github.com/zarr-developers/pydantic-zarr.git?rev=main#66cf23990b122f2d4272829243095bce6b9ca233" }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },

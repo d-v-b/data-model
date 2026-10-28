@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Self, cast
 
 from pydantic import model_validator
-from pydantic_zarr.v3 import ArraySpec, GroupSpec
+from pydantic_zarr.v3 import AnyGroupSpec, ArraySpec, GroupSpec
 
 from eopf_geozarr.data_api.geozarr.common import (
     BaseDataArrayAttrs,
@@ -51,7 +51,7 @@ class DataArray(ArraySpec[BaseDataArrayAttrs]):
         return self.dimension_names
 
 
-class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
+class Dataset(GroupSpec[DatasetAttrs, AnyGroupSpec | DataArray]):
     """
     A GeoZarr Dataset.
     """
@@ -66,7 +66,7 @@ class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
 
         Returns
         -------
-        GroupSpec[Any, Any]
+        AnyGroupSpec
             The validated GeoZarr DataSet.
         """
         # ``self`` structurally satisfies the ``GroupLike`` protocol, but mypy cannot bind the
@@ -82,7 +82,7 @@ class Dataset(GroupSpec[DatasetAttrs, GroupSpec[Any, Any] | DataArray]):
         return self
 
 
-class MultiscaleGroup(GroupSpec[MultiscaleGroupAttrs, DataArray | GroupSpec[Any, Any]]):
+class MultiscaleGroup(GroupSpec[MultiscaleGroupAttrs, DataArray | AnyGroupSpec]):
     """
     A GeoZarr Multiscale Group.
     """
