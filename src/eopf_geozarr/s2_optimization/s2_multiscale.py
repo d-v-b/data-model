@@ -1,10 +1,11 @@
 """
 The Sentinel-2 multiscale policy tables.
 
-This module holds the declarative side of the S2 multiscale layout: which
-groups get a pyramid (`REFLECTANCE_MULTISCALE`, `_AUX_MULTISCALES`), at which
-scale levels, and the SCL flag vocabulary. The pyramids themselves are planned
-by `eopf_geozarr.data_api.s2_plan` and written by
+This module holds the declarative side of the S2 multiscale layout: the aux
+pyramid groups and levels (`_AUX_MULTISCALES`, mirrored by the plan's
+`AUX_MULTISCALE_LEVELS`) and the SCL flag vocabulary. The pyramids themselves
+are planned by `eopf_geozarr.data_api.s2_plan` (whose
+`REFLECTANCE_SCALE_LEVELS` is the reflectance policy) and written by
 `eopf_geozarr.data_api.s2_write`; the former DataTree-based write path was
 removed once the plan-driven writer reproduced its stores byte for byte.
 """
@@ -89,11 +90,6 @@ class MultiscaleSpec:
     def applies_to(self, s2_type: S2Type | None) -> bool:
         return self.product_levels is None or s2_type in self.product_levels
 
-
-REFLECTANCE_MULTISCALE = MultiscaleSpec(
-    base_path="/measurements/reflectance",
-    scale_levels=(10, 20, 60, 120, 360, 720),
-)
 
 # Auxiliary (non-reflectance) groups. Groups missing from the input are skipped.
 _AUX_MULTISCALES: tuple[MultiscaleSpec, ...] = (

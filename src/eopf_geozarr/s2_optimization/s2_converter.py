@@ -23,8 +23,6 @@ from eopf_geozarr.data_api.s2 import Sentinel2Root
 from eopf_geozarr.data_api.s2_plan import load_sentinel2
 from eopf_geozarr.data_api.s2_write import write_geozarr
 
-from .s2_multiscale import _AUX_MULTISCALES
-
 if TYPE_CHECKING:
     from collections.abc import Hashable, Sequence
 
@@ -324,8 +322,9 @@ def simple_root_consolidation(
     """Simple root-level metadata consolidation with proper zarr group creation.
 
     `datasets` maps every written dataset group path to its data variable
-    names (multiscale roots map to None), and `reflectance_shape` is the
-    finest reflectance level's (rows, cols) for the STAC asset's proj:shape.
+    names, with multiscale roots mapped to None — each None root gets its own
+    consolidated metadata. `reflectance_shape` is the finest reflectance
+    level's (rows, cols) for the STAC asset's proj:shape.
     """
 
     # create missing intermediary groups (/conditions, /quality, etc.)
@@ -405,13 +404,12 @@ def simple_root_consolidation(
             input_root_attrs=cast("dict[str, dict[str, Any]]", dt_input.attrs),
         )
 
-    # consolidate reflectance group metadata
-    # add consolidation for other MS arrays
-    zarr.consolidate_metadata(output_path + "/measurements/reflectance", zarr_format=ZARR_FORMAT)
-    # also cosnolidate the non-measuremetn MS -> only the pyramids that were actually written (i.e. have levels in `datasets`) are consolidated
-    for aux in _AUX_MULTISCALES:
-        if any(path.startswith(aux.base_path + "/") for path in datasets):
-            zarr.consolidate_metadata(output_path + aux.base_path, zarr_format=ZARR_FORMAT)
+    # consolidate every multiscale pyramid's root group — the paths `datasets`
+    # maps to None (reflectance and the written aux pyramids alike), so the
+    # consolidated set follows the plan instead of a second policy table
+    for group_path, variable_names in datasets.items():
+        if variable_names is None:
+            zarr.consolidate_metadata(output_path + group_path, zarr_format=ZARR_FORMAT)
 
     # consolidate root group metadata
     zarr.consolidate_metadata(output_path, zarr_format=ZARR_FORMAT)

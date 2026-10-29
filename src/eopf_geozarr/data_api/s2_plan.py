@@ -454,20 +454,31 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
     # the georeferencing of the pyramid: origin and EPSG from any finest-level
     # band, else from the product-level declaration (Zarr V3 baselines carry
     # proj attributes only on stac_discovery, not on the band arrays)
-    finest = input_levels[min(input_levels)]
-    first_band_name = next(k for k in finest.members if k.startswith("b"))
+    finest_meters_in = min(input_levels)
+    finest = input_levels[finest_meters_in]
+    first_band_name = next((k for k in finest.members if k.startswith("b")), None)
+    if first_band_name is None:
+        msg = f"The r{finest_meters_in}m resolution dataset holds no band arrays"
+        raise ValueError(msg)
     first_band_attrs: Mapping[str, object] = finest.members[first_band_name].attributes
     transform = first_band_attrs.get("proj:transform")
-    if isinstance(transform, (list, tuple)) and len(transform) >= 6:
+    band_epsg = first_band_attrs.get("proj:epsg")
+    band_wkt2 = first_band_attrs.get("proj:wkt2")
+    if (
+        isinstance(transform, (list, tuple))
+        and len(transform) >= 6
+        and isinstance(band_epsg, (int, str))
+        and isinstance(band_wkt2, str)
+    ):
         origin = (float(transform[2]), float(transform[5]))
-        epsg = int(first_band_attrs["proj:epsg"])  # type: ignore[call-overload]
-        wkt2 = str(first_band_attrs["proj:wkt2"])
+        epsg = int(band_epsg)
+        wkt2 = band_wkt2
     else:
         product = _product_proj(root)
         if product is None:
             msg = (
-                f"Band {first_band_name!r} carries no usable proj:transform and the "
-                "product declares no stac_discovery proj georeferencing"
+                f"Band {first_band_name!r} carries no usable proj:transform/proj:epsg/proj:wkt2 "
+                "and the product declares no stac_discovery proj georeferencing"
             )
             raise ValueError(msg)
         origin, epsg, wkt2 = product
@@ -937,6 +948,10 @@ def _plan_subtree(
         sub = _plan_subtree(member, f"{path}/{name}", product_proj)
         if sub is not None:
             planned[name] = sub
+    # a group holding arrays next to its subgroups keeps those arrays too
+    own = _plan_dataset(group, path)
+    if own is not None:
+        return GroupSpecV3(attributes=own.attributes, members={**dict(own.members), **planned})
     if not planned:
         return None
     return GroupSpecV3(attributes=dict(_doc_attrs(group)), members=planned)

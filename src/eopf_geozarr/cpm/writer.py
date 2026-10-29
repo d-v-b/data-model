@@ -255,13 +255,17 @@ class GeoZarrWriter(EOWriter):
         )
 
         if selected_pipeline == "s2-optimized":
-            # The plan-driven S2 writer has a fixed write policy, so the
-            # layout options (enable_sharding, spatial_chunk,
-            # compression_level) are not forwarded; scale_offset_codec is,
-            # so an explicit True is refused with the policy message.
+            # The plan-driven S2 writer has a fixed write policy. The options
+            # whose explicit deviation is detectable (spatial_chunk,
+            # compression_level, scale_offset_codec) are forwarded so the
+            # policy check refuses them loudly; enable_sharding is not,
+            # because sharding is fixed on and this writer's own default
+            # (False) is indistinguishable from an explicit False.
             return convert_s2_optimized(
                 dt_input=dtree,
                 output_path=output_path,
+                spatial_chunk=resolved_spatial_chunk,
+                compression_level=compression_level,
                 validate_output=validate_output,
                 scale_offset_codec=scale_offset_codec,
                 max_retries=max_retries,

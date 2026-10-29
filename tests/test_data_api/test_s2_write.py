@@ -213,6 +213,20 @@ def test_coarsen_classification_takes_the_window_centre(var_name: str, factor: i
     np.testing.assert_array_equal(result, data[centre::factor, centre::factor])
 
 
+def test_coarsen_float_keeps_all_nan_windows_nan() -> None:
+    """The float block mean skips NaN, and a window holding nothing but NaN
+    stays NaN (it is nodata, not zero)."""
+    data = np.array(
+        [
+            [1.0, 2.0, np.nan, np.nan],
+            [3.0, np.nan, np.nan, np.nan],
+        ],
+        dtype="float32",
+    )
+    result = _coarsen(data, 2, "b02", fill=None)
+    np.testing.assert_array_equal(result, np.array([[2.0, np.nan]], dtype="float32"))
+
+
 def test_coarsen_refuses_quality_masks() -> None:
     """Quality-mask downsampling is not implemented, so it is refused."""
     data = np.zeros((4, 4), dtype="uint8")

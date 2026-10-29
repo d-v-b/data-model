@@ -27,18 +27,6 @@ _INPUT_DIR = pathlib.Path("tests/_test_data/s2_examples")
 _SNAPSHOT_DIR = pathlib.Path("tests/_test_data/optimized_geozarr_examples")
 _INPUT_PATHS = sorted(_INPUT_DIR.glob("*.json"))
 
-# The snapshot harness (test_s2_multiscale) feeds one fixed, synthetic tile
-# CRS and coordinate set to every product, because the metadata-only input
-# fixtures carry no coordinate data; the plan instead derives georeferencing
-# from each product's own band attributes. These are the snapshot attribute
-# keys that carry the harness's tile rather than the product's, masked in the
-# cross-product comparison and pinned by the self-consistency test instead.
-_HARNESS_GEOREF_KEYS = ("proj:code", "spatial:bbox", "spatial:transform")
-
-# The one product whose real tile matches the harness's synthetic tile, so its
-# snapshot is byte-for-byte reproducible from metadata alone.
-_EXACT_PRODUCT = "S2B_MSIL1C_20250113T103309_N0511_R108_T32TLQ_20250113T122458"
-
 
 def _read(path: pathlib.Path) -> dict[str, Any]:
     data = json.loads(path.read_text())
@@ -60,56 +48,21 @@ def _planned_reflectance(path: pathlib.Path) -> dict[str, Any]:
     return _planned_root(path)["members"]["measurements"]["members"]["reflectance"]
 
 
-def _mask_harness_georef(node: dict[str, Any]) -> None:
-    """Blank the attribute values the snapshot harness injects (in place)."""
-    attributes = node.get("attributes")
-    if isinstance(attributes, dict):
-        for key in _HARNESS_GEOREF_KEYS:
-            attributes.pop(key, None)
-        multiscales = attributes.get("multiscales")
-        if isinstance(multiscales, dict):
-            for entry in multiscales.get("layout", ()):
-                entry.pop("spatial:transform", None)
-    members = node.get("members")
-    if isinstance(members, dict):
-        # the whole grid-mapping array carries the harness CRS
-        members.pop("spatial_ref", None)
-        for member in members.values():
-            _mask_harness_georef(member)
-
-
 @pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
 def test_plan_matches_snapshot(path: pathlib.Path) -> None:
     """
-    The planned tree reproduces the stored converter snapshot — the member
-    tree, every array document (shapes, dtypes, shards, codecs, dimension
-    names) and every attribute, across measurements, conditions and quality —
-    except the georeferencing values the snapshot harness injects from its
-    synthetic tile, which the self-consistency test pins to the product's own
-    metadata instead.
+    The planned tree reproduces the stored snapshot whole — the member tree,
+    every array document (shapes, dtypes, shards, codecs, dimension names)
+    and every attribute, georeferencing included, across measurements,
+    conditions and quality. The plan is the snapshots' source of truth
+    (REGENERATE_SNAPSHOTS=1 rewrites them), and the self-consistency test
+    below pins the georeferencing to the product's own metadata.
     """
     planned = _planned_root(path)
     if os.environ.get("REGENERATE_SNAPSHOTS"):
-        # The plan is the snapshots' source of truth now that the writer
-        # realizes it directly. Note that regenerating replaces the historical
-        # harness-tile georeferencing with each product's own, after which the
-        # masking below (and `_EXACT_PRODUCT`) can be retired.
         snapshot_path = _SNAPSHOT_DIR / path.name
         snapshot_path.write_text(json.dumps(planned, indent=2, sort_keys=True) + "\n")
-    expected = _snapshot_root(path)
-    for tree in (planned, expected):
-        _mask_harness_georef(tree)
-    assert planned == expected
-
-
-def test_plan_matches_snapshot_exactly() -> None:
-    """
-    For the product whose tile the snapshot harness's synthetic coordinates
-    model, the plan reproduces the whole snapshot byte for byte,
-    georeferencing included.
-    """
-    path = _INPUT_DIR / f"{_EXACT_PRODUCT}.json"
-    assert _planned_root(path) == _snapshot_root(path)
+    assert planned == _snapshot_root(path)
 
 
 @pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
@@ -149,7 +102,7 @@ def test_load_sentinel2_keeps_the_model(tmp_path: pathlib.Path) -> None:
     `load_sentinel2` reads a Zarr store into the validated input model, and
     the plan built from it equals the plan built from the source document.
     """
-    path = _INPUT_DIR / f"{_EXACT_PRODUCT}.json"
+    path = _INPUT_PATHS[0]
     document = _read(path)
     store_path = tmp_path / "s2.zarr"
     GroupSpecV2.model_validate(document).to_zarr(store_path, path="")  # type: ignore[arg-type]
@@ -176,6 +129,53 @@ def test_product_level_requires_stac_discovery_evidence() -> None:
     root = Sentinel2Root.model_validate(document)
     with pytest.raises(ValueError, match="product level"):
         product_level(root)
+
+
+def test_plan_carries_a_mixed_groups_own_arrays() -> None:
+    """A conditions/quality group holding arrays next to its subgroups keeps
+    those arrays in the plan instead of dropping them silently."""
+    path = _INPUT_PATHS[0]
+    document = _read(path)
+    mixed = document["members"]["conditions"]["members"]["mask"]["members"]["detector_footprint"]
+    assert any("members" in member for member in mixed["members"].values()), (
+        "fixture precondition: detector_footprint holds subgroups"
+    )
+    mixed["members"]["extra"] = {
+        "zarr_format": 2,
+        "shape": [4, 4],
+        "chunks": [4, 4],
+        "dtype": "<u2",
+        "fill_value": 0,
+        "order": "C",
+        "filters": None,
+        "compressor": None,
+        "dimension_separator": "/",
+        "attributes": {"_ARRAY_DIMENSIONS": ["y", "x"]},
+    }
+    root = Sentinel2Root.model_validate(document)
+    planned = plan_geozarr(root).model_dump(mode="json")
+    mask_members = planned["members"]["conditions"]["members"]["mask"]["members"]
+    planned_mixed = mask_members["detector_footprint"]["members"]
+    assert "extra" in planned_mixed
+    assert planned_mixed["extra"]["shape"] == [4, 4]
+    # the subgroups survive alongside the carried array
+    assert any("members" in member for member in planned_mixed.values())
+
+
+def test_plan_reflectance_requires_product_georeferencing() -> None:
+    """A product whose bands carry no proj attributes and whose stac_discovery
+    declares none is refused with a ValueError, not a KeyError."""
+    path = _INPUT_PATHS[0]
+    document = _read(path)
+    reflectance = document["members"]["measurements"]["members"]["reflectance"]
+    for level in reflectance["members"].values():
+        for member in level["members"].values():
+            for key in ("proj:transform", "proj:epsg", "proj:wkt2"):
+                member["attributes"].pop(key, None)
+    document["attributes"]["stac_discovery"].get("properties", {}).pop("proj:bbox", None)
+    root = Sentinel2Root.model_validate(document)
+    with pytest.raises(ValueError, match="proj"):
+        plan_reflectance(root)
 
 
 def test_plan_reflectance_requires_a_resolution_dataset() -> None:

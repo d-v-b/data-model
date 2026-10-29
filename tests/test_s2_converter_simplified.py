@@ -220,8 +220,9 @@ class TestCRSInitialization:
 
 def test_simple_root_consolidation_success(tmp_path: Path) -> None:
     """
-    Test that simple_root_consolidation produces consolidated metadata at the root, and for the
-    measurements/reflectance group, but not for other groups.
+    Test that simple_root_consolidation produces consolidated metadata at the
+    root and for the multiscale roots `datasets` maps to None (here
+    measurements/reflectance), but not for other groups.
     """
 
     written = {
@@ -239,9 +240,9 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
         for k, v in written.items()
     ]
 
-    simple_root_consolidation(
-        output_path=str(tmp_path / "test.zarr"), datasets=dict.fromkeys(written, ())
-    )
+    datasets: dict[str, tuple[str, ...] | None] = dict.fromkeys(written, ())
+    datasets["/measurements/reflectance"] = None
+    simple_root_consolidation(output_path=str(tmp_path / "test.zarr"), datasets=datasets)
 
     root_z_meta = json.loads((tmp_path / "test.zarr/zarr.json").read_text())
     reflectance_zmeta = json.loads(
@@ -272,9 +273,10 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
 def test_simple_root_consolidation_aux_multiscales(
     tmp_path: Path, aux_groups: tuple[str, ...]
 ) -> None:
-    """Each written auxiliary pyramid gets its own consolidated metadata listing its levels.
-
-    Pyramids missing from `datasets` (the L2A-only ones for an L1C product) are skipped.
+    """Each written auxiliary pyramid root (mapped to None in `datasets`, as
+    the plan maps multiscale roots) gets its own consolidated metadata listing
+    its levels. Pyramids missing from `datasets` (the L2A-only ones for an L1C
+    product) are skipped.
     """
     output_path = tmp_path / "test.zarr"
     levels = ("r60m", "r120m")
@@ -286,7 +288,12 @@ def test_simple_root_consolidation_aux_multiscales(
     for k, v in written.items():
         v.to_zarr(str(output_path) + k, mode="a", zarr_format=3, consolidated=False)
 
-    datasets = {path: tuple(str(name) for name in ds.data_vars) for path, ds in written.items()}
+    datasets: dict[str, tuple[str, ...] | None] = {
+        path: tuple(str(name) for name in ds.data_vars) for path, ds in written.items()
+    }
+    datasets["/measurements/reflectance"] = None
+    for base_path in aux_groups:
+        datasets[base_path] = None
     simple_root_consolidation(output_path=str(output_path), datasets=datasets)
 
     for base_path in aux_groups:

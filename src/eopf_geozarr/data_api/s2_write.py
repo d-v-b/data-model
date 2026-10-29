@@ -313,10 +313,12 @@ def _coarsen(values: np.ndarray, factor: int, var: str, fill: int | None) -> np.
 def _window_mean(windows: np.ndarray, fill: int | None) -> np.ndarray:
     """The converter's block-mean reduction over one (i, factor, j, factor) view."""
     if np.issubdtype(windows.dtype, np.floating):
-        # decoded values: nodata is NaN, and the NaN-skipping mean excludes it
+        # float values: nodata is NaN, the NaN-skipping mean excludes it, and
+        # an all-NaN window stays NaN (as xarray's skipna mean leaves it)
         total = np.nansum(windows.astype("float64"), axis=(1, 3))
         count = np.sum(~np.isnan(windows), axis=(1, 3))
-        return (total / np.maximum(count, 1)).astype(windows.dtype)
+        mean = total / np.maximum(count, 1)
+        return np.where(count > 0, mean, np.nan).astype(windows.dtype)
     as_float = windows.astype("float64")
     if fill is None:
         return np.round(as_float.mean(axis=(1, 3))).astype(windows.dtype)
