@@ -4,10 +4,8 @@ Main S2 optimization converter.
 
 from __future__ import annotations
 
-import tempfile
 import time
 from collections.abc import Mapping
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import structlog
@@ -180,9 +178,11 @@ def convert_s2_optimized(
     values; a deviating value is refused.
 
     Args:
-        dt_input: Input Sentinel-2 DataTree. A tree opened from a Zarr store
-            is read through its backing store; a tree built in memory (the
-            CPM SAFE reader) is first materialized to a scratch store.
+        dt_input: Input Sentinel-2 DataTree. A tree opened from a Zarr V2
+            store is read through its backing store; any other tree (built in
+            memory by the CPM SAFE reader, or backed by a Zarr V3 store) is
+            read through the tree itself, with its variables taken as
+            xarray's zarr writer would store them.
         output_path: Output path
         enable_sharding: Must be True (the plan's policy).
         spatial_chunk: Must be 1024 (the plan's policy).
@@ -227,31 +227,23 @@ def convert_s2_optimized(
     # Initialize CRS from dataset
     crs = initialize_crs_from_dataset(dt_input)
 
-    with tempfile.TemporaryDirectory() as scratch:
-        try:
-            source: zarr.Group | None = get_zarr_group(dt_input)
-        except TypeError:
-            # A tree built in memory (the CPM SAFE reader) has no backing store.
-            source = None
-        if source is not None and source.metadata.zarr_format != 2:
-            # The Sentinel-2 input model reads Zarr V2 EOPF products; a tree
-            # backed by another format goes through the same scratch copy as
-            # an in-memory tree (reading V3 inputs natively is a follow-up on
-            # the input model).
-            source = None
-        if source is None:
-            log.info("Materializing the input to a scratch Zarr V2 store for the plan-driven writer")
-            scratch_path = str(Path(scratch) / "input.zarr")
-            _without_zarr_storage_encoding(dt_input).to_zarr(
-                scratch_path, zarr_format=2, consolidated=False
-            )
-            source = zarr.open_group(scratch_path, mode="r", zarr_format=2)
+    try:
+        backing: zarr.Group | None = get_zarr_group(dt_input)
+    except TypeError:
+        # A tree built in memory (the CPM SAFE reader) has no backing store.
+        backing = None
+    # A Zarr V2 store is the input model's native domain and is read directly;
+    # everything else (an in-memory tree, a V3-backed tree) is read through
+    # the tree's GroupSpec-shaped view — no scratch copy.
+    source: zarr.Group | xr.DataTree = (
+        backing if backing is not None and backing.metadata.zarr_format == 2 else dt_input
+    )
 
-        log.info("Step 1: Validating the input against the Sentinel-2 model")
-        root = load_sentinel2(source)
+    log.info("Step 1: Validating the input against the Sentinel-2 model")
+    root = load_sentinel2(source)
 
-        log.info("Step 2: Writing the planned GeoZarr hierarchy")
-        plan = write_geozarr(root, source, output_path)
+    log.info("Step 2: Writing the planned GeoZarr hierarchy")
+    plan = write_geozarr(root, source, output_path)
 
     # Step 3: Root-level consolidation
     log.info("Step 3: Final root-level metadata consolidation")
@@ -279,33 +271,6 @@ def convert_s2_optimized(
     utils.optimization_summary(dt_input, result_dt, output_path)
 
     return result_dt
-
-
-#: Per-variable encoding keys that tie a variable to its source store's zarr
-#: format and layout; everything else (dtype, CF packing, fill) is kept.
-_ZARR_STORAGE_ENCODING_KEYS = (
-    "chunks",
-    "preferred_chunks",
-    "compressor",
-    "compressors",
-    "filters",
-    "serializer",
-    "shards",
-)
-
-
-def _without_zarr_storage_encoding(dt_input: xr.DataTree) -> xr.DataTree:
-    """Drop the zarr storage encoding a tree read from a store carries, so the
-    tree can be materialized to a scratch Zarr V2 store whatever format it was
-    read from (a V3 `serializer`, say, is refused by a V2 write)."""
-
-    def clean(ds: xr.Dataset) -> xr.Dataset:
-        for variable in ds.variables.values():
-            for key in _ZARR_STORAGE_ENCODING_KEYS:
-                variable.encoding.pop(key, None)
-        return ds
-
-    return dt_input.map_over_datasets(clean)
 
 
 def _planned_dataset_index(plan: AnyGroupSpec) -> dict[str, tuple[str, ...] | None]:

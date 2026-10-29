@@ -11,11 +11,14 @@ independently formulated references.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
+import xarray as xr
 import zarr
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
 
@@ -26,6 +29,8 @@ from ..conftest import create_zarrv2_group_from_json, get_stem, s2_example_json_
 
 if TYPE_CHECKING:
     import pathlib
+
+    from pydantic_zarr.v3 import AnyGroupSpec
 
 # Fallback footprint for coordinate arrays in groups that carry no proj
 # attributes (geometry, meteorology), where the writer only copies the values.
@@ -116,7 +121,9 @@ def _seed_input_store(group: zarr.Group) -> None:
                     array[...] = _pattern(array.shape, array.dtype)
 
 
-def _written_store(source_path: pathlib.Path, tmp_path: pathlib.Path):
+def _written_store(
+    source_path: pathlib.Path, tmp_path: pathlib.Path
+) -> tuple[AnyGroupSpec, zarr.Group, zarr.Group]:
     """Seed the fixture store, write it with `write_geozarr`, open both."""
     input_path = create_zarrv2_group_from_json(source_path, tmp_path)
     _seed_input_store(zarr.open_group(input_path, mode="r+", zarr_format=2))
@@ -221,5 +228,52 @@ def test_write_geozarr_refuses_a_source_missing_the_planned_arrays(
     input_group = zarr.open_group(input_path, mode="r", zarr_format=2)
     root = load_sentinel2(input_group)
     empty_source = zarr.create_group(tmp_path / "empty.zarr", zarr_format=2)
-    with pytest.raises(ValueError, match="input store"):
+    with pytest.raises(ValueError, match="input source"):
         write_geozarr(root, empty_source, str(tmp_path / "out.zarr"))
+
+
+def _store_contents(path: pathlib.Path) -> dict[str, object]:
+    """Every file of a store: metadata documents as parsed JSON (their key
+    order is not semantic), chunk files as content digests."""
+    contents: dict[str, object] = {}
+    for file in sorted(path.rglob("*")):
+        if not file.is_file():
+            continue
+        relative = str(file.relative_to(path))
+        if file.name in ("zarr.json", ".zattrs", ".zgroup", ".zarray", ".zmetadata"):
+            contents[relative] = json.loads(file.read_text())
+        else:
+            contents[relative] = hashlib.sha256(file.read_bytes()).hexdigest()
+    return contents
+
+
+@pytest.mark.parametrize("source_path", s2_example_json_paths, ids=get_stem)
+def test_write_geozarr_from_a_datatree_matches_the_store_write(
+    source_path: pathlib.Path, tmp_path: pathlib.Path
+) -> None:
+    """
+    A DataTree source produces the same store as the Zarr-store source, chunk
+    for chunk: the tree's GroupSpec-shaped view validates into the same input
+    model, and the tree reader feeds the writer the same values — whether the
+    tree holds the raw packed values (`mask_and_scale=False`) or the decoded
+    ones, which the reader re-encodes as xarray's own writer would.
+    """
+    input_path = create_zarrv2_group_from_json(source_path, tmp_path)
+    _seed_input_store(zarr.open_group(input_path, mode="r+", zarr_format=2))
+    source = zarr.open_group(input_path, mode="r", zarr_format=2)
+    store_output = tmp_path / "from_store.zarr"
+    write_geozarr(load_sentinel2(source), source, str(store_output))
+    reference = _store_contents(store_output)
+
+    for mask_and_scale in (False, True):
+        tree = xr.open_datatree(
+            str(input_path),
+            engine="zarr",
+            chunks={},
+            consolidated=False,
+            mask_and_scale=mask_and_scale,
+            decode_coords="all",
+        )
+        tree_output = tmp_path / f"from_tree_{mask_and_scale}.zarr"
+        write_geozarr(load_sentinel2(tree), tree, str(tree_output))
+        assert _store_contents(tree_output) == reference, f"{mask_and_scale=}"

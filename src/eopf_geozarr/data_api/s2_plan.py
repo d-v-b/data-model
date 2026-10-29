@@ -39,6 +39,7 @@ from math import ceil
 from typing import TYPE_CHECKING, Any, Final, Literal
 
 import numpy as np
+import xarray as xr
 from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
 from pydantic_zarr.v3 import ArraySpec as ArraySpecV3
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
@@ -53,6 +54,7 @@ from zarr_metadata.typed_json import check
 
 from eopf_geozarr.data_api.geozarr.v3 import DataArray
 from eopf_geozarr.data_api.s2 import Sentinel2Root
+from eopf_geozarr.pyz.datatree import group_spec_from_datatree
 from eopf_geozarr.s2_optimization.s2_multiscale import SCL_ATTRS, SCL_NODATA
 
 if TYPE_CHECKING:
@@ -122,16 +124,25 @@ _BYTES_LITTLE: Final[BytesCodecObject] = {"name": "bytes", "configuration": {"en
 _CRC32C: Final[Crc32cCodecObject] = {"name": "crc32c"}
 
 
-def load_sentinel2(group: zarr.Group) -> Sentinel2Root:
+def load_sentinel2(source: zarr.Group | xr.DataTree) -> Sentinel2Root:
     """
-    Read a Zarr group into the validated `Sentinel2Root` input model.
+    Read a Zarr group or an xarray DataTree into the validated
+    `Sentinel2Root` input model.
 
     The model is the carrier for the conversion: it holds exactly the members
     and attributes the GeoZarr plan reads, validated (member structure by the
-    closed TypedDicts, attributes by the attribute models). Raises
-    `pydantic.ValidationError` when the group is not a Sentinel-2 product.
+    closed TypedDicts, attributes by the attribute models). A DataTree is
+    read through its GroupSpec-shaped view (`group_spec_from_datatree`), so a
+    tree built in memory or backed by a non-V2 store validates like a V2
+    store does. Raises `pydantic.ValidationError` when the source is not a
+    Sentinel-2 product.
     """
-    return Sentinel2Root.model_validate(GroupSpecV2.from_zarr(group).model_dump())
+    spec = (
+        group_spec_from_datatree(source)
+        if isinstance(source, xr.DataTree)
+        else GroupSpecV2.from_zarr(source)
+    )
+    return Sentinel2Root.model_validate(spec.model_dump())
 
 
 def product_level(root: Sentinel2Root) -> S2Level:
