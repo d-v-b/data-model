@@ -6,17 +6,15 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import structlog
-import xarray as xr
 import zarr
 from pydantic import TypeAdapter
 from pydantic_zarr.v3 import is_array_spec, is_group_spec
 from pyproj import CRS
 
 from eopf_geozarr.conversion import utils
-from eopf_geozarr.conversion.constants import ZARR_FORMAT
 from eopf_geozarr.conversion.geozarr import get_zarr_group
 from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
@@ -24,8 +22,9 @@ from eopf_geozarr.data_api.s2_plan import load_sentinel2
 from eopf_geozarr.data_api.s2_write import write_geozarr
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Sequence
+    from collections.abc import Sequence
 
+    import xarray as xr
     from pydantic_zarr.v3 import AnyGroupSpec
 
 log = structlog.get_logger()
@@ -139,13 +138,6 @@ def _validate_s2_input(dt_input: xr.DataTree) -> None:
         raise ValueError("Input dataset is not a Sentinel-2 product")
 
 
-class ConvertS2Params(TypedDict):
-    enable_sharding: bool
-    spatial_chunk: int
-    compression_level: int
-    max_retries: int
-
-
 #: The write policy the spec-level plan fixes; `convert_s2_optimized` refuses
 #: option values that deviate from it.
 _PLAN_POLICY = (
@@ -163,7 +155,6 @@ def convert_s2_optimized(
     compression_level: int = 3,
     validate_output: bool = True,
     scale_offset_codec: bool = False,
-    max_retries: int = 3,
 ) -> xr.DataTree:
     """
     Convert a Sentinel-2 product to the optimized GeoZarr layout.
@@ -189,7 +180,6 @@ def convert_s2_optimized(
         scale_offset_codec: Must be False: the output is written as in the
             ESA product (packed integers with CF `scale_factor` /
             `add_offset` / `_FillValue`).
-        max_retries: Accepted for compatibility; unused.
 
     Returns:
         Optimized DataTree
@@ -245,12 +235,20 @@ def convert_s2_optimized(
 
     # Step 3: Root-level consolidation
     log.info("Step 3: Final root-level metadata consolidation")
-    simple_root_consolidation(
-        output_path,
-        _planned_dataset_index(plan),
-        dt_input,
-        crs=crs,
-        reflectance_shape=_planned_reflectance_shape(plan),
+    datasets = _planned_dataset_index(plan)
+    add_s2_stac_assets(
+        dt_input, datasets, crs=crs, reflectance_shape=_planned_reflectance_shape(plan)
+    )
+    utils.updated_root_consolidation(
+        dt_input=dt_input,
+        output_path=output_path,
+        datasets=datasets,
+        # the paths the plan maps to None are the multiscale pyramid roots
+        # (reflectance and the written aux pyramids alike), so the consolidated
+        # set follows the plan instead of a second policy table
+        additional_consolidate_paths=[
+            path for path, variable_names in datasets.items() if variable_names is None
+        ],
     )
 
     # Step 4: Validation
@@ -275,7 +273,7 @@ def _planned_dataset_index(plan: AnyGroupSpec) -> dict[str, tuple[str, ...] | No
     """
     The planned dataset paths, each mapped to its data variable names (an
     array that is not a coordinate or the grid mapping), with multiscale
-    roots mapped to None — the bookkeeping `simple_root_consolidation` reads,
+    roots mapped to None — the bookkeeping the root consolidation reads,
     matching what the DataTree writer's `processed_groups` carried.
     """
     index: dict[str, tuple[str, ...] | None] = {}
@@ -312,141 +310,51 @@ def _planned_reflectance_shape(plan: AnyGroupSpec) -> tuple[int, ...] | None:
     return None
 
 
-def simple_root_consolidation(
-    output_path: str,
+def add_s2_stac_assets(
+    dt_input: xr.DataTree,
     datasets: Mapping[str, Sequence[str] | None],
-    dt_input: xr.DataTree | None = None,
     crs: CRS | None = None,
     reflectance_shape: tuple[int, ...] | None = None,
 ) -> None:
-    """Simple root-level metadata consolidation with proper zarr group creation.
+    """Add the S2 pyramid levels and the reflectance pyramid as STAC assets.
 
-    `datasets` maps every written dataset group path to its data variable
-    names, with multiscale roots mapped to None — each None root gets its own
-    consolidated metadata. `reflectance_shape` is the finest reflectance
-    level's (rows, cols) for the STAC asset's proj:shape.
+    `datasets` is the planned dataset index: every dataset group path mapped
+    to its data variable names, with multiscale roots mapped to None.
+    `reflectance_shape` is the finest reflectance level's (rows, cols) for the
+    asset's proj:shape. Updates `dt_input.attrs["stac_discovery"]` in place,
+    so call it before `updated_root_consolidation` writes the root metadata
+    from those attributes. This is a temporary fix that should move to
+    eopf-stac.
     """
+    if not dt_input.attrs:
+        return
 
-    # create missing intermediary groups (/conditions, /quality, etc.)
-    # using the keys of the datasets dict
-    missing_groups = set()
-    for group_path in datasets:
-        # extract all the parent paths
-        parts = group_path.strip("/").split("/")
-        for i in range(1, len(parts)):
-            parent_path = "/" + "/".join(parts[:i])
-            if parent_path not in datasets:
-                missing_groups.add(parent_path)
+    # this can be used to add multiscale paths to the stac attributes
+    updated_stac_attrs = utils.add_multiscale_pyramids_to_stac_metadata(datasets, dt_input.attrs)
 
-    for group_path in missing_groups:
-        dt_parent = xr.DataTree()
-        dt_parent.to_zarr(
-            output_path + group_path,
-            mode="a",
-            zarr_format=ZARR_FORMAT,
-            consolidated=False,
-        )
+    # Reference the pyramid root group, not the individual levels. That
+    # group carries the `multiscales` attribute, and the
+    # `profile=multiscales` media-type parameter tells a consumer to look
+    # for it there and resolve the levels from the convention itself.
+    stac = updated_stac_attrs.get("stac_discovery")
+    if stac is None:
+        return
 
-    # Create root zarr group if it doesn't exist
-    log.info("Creating root zarr group")
-    dt_root = xr.DataTree()
-    dt_root.to_zarr(
-        output_path,
-        mode="a",
-        consolidated=False,
-        zarr_format=ZARR_FORMAT,
-    )
-    dt_root = xr.DataTree()
-    for group_path in datasets:
-        dt_root[group_path] = xr.DataTree()
+    reflectance_asset: dict[str, Any] = {
+        "href": "/measurements/reflectance",
+        "type": "application/vnd.zarr; version=3; profile=multiscales",
+        "title": "Surface Reflectance",
+        "roles": ["data", "reflectance"],
+        "gsd": 10,
+    }
 
-    dt_root.to_zarr(
-        output_path,
-        mode="r+",
-        consolidated=False,
-        zarr_format=ZARR_FORMAT,
-    )
-    log.info("Root zarr group created")
+    if crs is not None and crs.to_epsg() is not None:
+        reflectance_asset.update(utils.proj_attrs_for_crs(crs))
 
-    # Write the store-root spatial footprint (geozarr minispec, Store Root section).
-    # Aggregates child-group `spatial:bbox` values, reprojects them to EPSG:4326
-    # and writes the union on the root `zarr.json`.
-    write_store_root_bbox(output_path)
+    if reflectance_shape is not None:
+        reflectance_asset["proj:shape"] = list(reflectance_shape)
 
-    if dt_input and dt_input.attrs:
-        # this can be used to add multiscale paths to the stac attributes
-        updated_stac_attrs = add_multiscale_pyramids_to_stac_metadata(datasets, dt_input.attrs)
-
-        # Reference the pyramid root group, not the individual levels. That
-        # group carries the `multiscales` attribute, and the
-        # `profile=multiscales` media-type parameter tells a consumer to look
-        # for it there and resolve the levels from the convention itself.
-        stac = updated_stac_attrs.get("stac_discovery")
-        if stac is not None:
-            reflectance_asset: dict[str, Any] = {
-                "href": "/measurements/reflectance",
-                "type": "application/vnd.zarr; version=3; profile=multiscales",
-                "title": "Surface Reflectance",
-                "roles": ["data", "reflectance"],
-                "gsd": 10,
-            }
-
-            if crs is not None and crs.to_epsg() is not None:
-                reflectance_asset.update(utils.proj_attrs_for_crs(crs))
-
-            if reflectance_shape is not None:
-                reflectance_asset["proj:shape"] = list(reflectance_shape)
-
-            stac.setdefault("assets", {})["reflectance"] = reflectance_asset
-
-        utils.write_store_stac_metadata(
-            output_path,
-            input_root_attrs=cast("dict[str, dict[str, Any]]", dt_input.attrs),
-        )
-
-    # consolidate every multiscale pyramid's root group — the paths `datasets`
-    # maps to None (reflectance and the written aux pyramids alike), so the
-    # consolidated set follows the plan instead of a second policy table
-    for group_path, variable_names in datasets.items():
-        if variable_names is None:
-            zarr.consolidate_metadata(output_path + group_path, zarr_format=ZARR_FORMAT)
-
-    # consolidate root group metadata
-    zarr.consolidate_metadata(output_path, zarr_format=ZARR_FORMAT)
-
-
-def add_multiscale_pyramids_to_stac_metadata(
-    datasets: Mapping[str, Sequence[str] | None], dt_attributes: dict[Hashable, Any]
-) -> dict[Hashable, Any]:
-    stac_attrs = dt_attributes.get("stac_discovery", {}).get("assets")
-    if not stac_attrs:
-        return dt_attributes
-
-    # a bit messy but effective split to get group parent from stac attrs
-    existing_group_paths = {"/".join(v["href"].split("/")[:-1]) for v in stac_attrs.values()}
-
-    for group_path, var_names in datasets.items():
-        # datasets the input's own assets reference need no new entries, and
-        # multiscale roots (mapped to None) hold no variables of their own
-        if group_path in existing_group_paths or var_names is None:
-            continue
-        resolution = group_path.rsplit("/", 1)[-1]  # "r120m"
-        for var_name in var_names:
-            if var_name == "spatial_ref":
-                continue
-            asset_key = f"{var_name}_{resolution}"
-            stac_attrs[asset_key] = {"href": f"{group_path}/{var_name}", "title": asset_key}
-
-    return dt_attributes
-
-
-def write_store_root_bbox(output_path: str) -> None:
-    """Write the minispec store-root metadata (bbox, CRS, conventions).
-
-    Thin wrapper kept for backwards compatibility; the implementation lives in
-    :func:`eopf_geozarr.conversion.utils.write_store_root_geo_metadata`.
-    """
-    utils.write_store_geo_metadata(output_path)
+    stac.setdefault("assets", {})["reflectance"] = reflectance_asset
 
 
 def is_sentinel2_dataset(group: zarr.Group) -> bool:

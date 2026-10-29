@@ -5,6 +5,7 @@ Tests the new simplified approach that uses only xarray and proper metadata cons
 """
 
 import json
+import uuid
 from pathlib import Path
 from typing import cast
 
@@ -12,15 +13,18 @@ import numpy as np
 import pytest
 import xarray as xr
 import zarr
-from pyproj import CRS
+from zarr.core.group import ConsolidatedMetadata
 
+from eopf_geozarr.conversion.utils import (
+    add_multiscale_pyramids_to_stac_metadata,
+    updated_root_consolidation,
+    write_store_geo_metadata,
+)
 from eopf_geozarr.s2_optimization.s2_converter import (
     _validate_s2_input,
-    add_multiscale_pyramids_to_stac_metadata,
+    add_s2_stac_assets,
     convert_s2_optimized,
     initialize_crs_from_dataset,
-    simple_root_consolidation,
-    write_store_root_bbox,
 )
 
 
@@ -218,44 +222,64 @@ class TestCRSInitialization:
         assert crs.to_epsg() == 32632
 
 
-def test_simple_root_consolidation_success(tmp_path: Path) -> None:
+@pytest.mark.parametrize("store", ["local", "memory"])
+def test_updated_root_consolidation_success(tmp_path: Path, store: str) -> None:
     """
-    Test that simple_root_consolidation produces consolidated metadata at the
-    root and for the multiscale roots `datasets` maps to None (here
-    measurements/reflectance), but not for other groups.
+    Test that updated_root_consolidation consolidates the root and each group passed in
+    `additional_consolidate_paths` (here the reflectance and an auxiliary pyramid), but
+    not other groups. Also runs on an fsspec store, where a `//` in a group path fails.
     """
-
-    written = {
+    # `None` marks the pyramid parent groups, as returned by `generic_multiscales`
+    datasets: dict[str, xr.Dataset | None] = {
         "/measurements/reflectance/r10m": xr.Dataset(),
+        "/measurements/reflectance": None,
+        "/conditions/mask/l2a_classification/r20m": xr.Dataset(),
+        "/conditions/mask/l2a_classification": None,
         "/quality/atmosphere": xr.Dataset(),
     }
 
-    [
-        v.to_zarr(
-            str(tmp_path / f"test.zarr{k}/"),
-            mode="a",
-            zarr_format=3,
-            consolidated=False,
-        )
-        for k, v in written.items()
-    ]
-
-    datasets: dict[str, tuple[str, ...] | None] = dict.fromkeys(written, ())
-    datasets["/measurements/reflectance"] = None
-    simple_root_consolidation(output_path=str(tmp_path / "test.zarr"), datasets=datasets)
-
-    root_z_meta = json.loads((tmp_path / "test.zarr/zarr.json").read_text())
-    reflectance_zmeta = json.loads(
-        (tmp_path / "test.zarr/measurements/reflectance/zarr.json").read_text()
+    # Write every group into one store, as the pipeline does: zarr then creates
+    # the root and all parent groups, which `updated_root_consolidation` expects.
+    output_path = (
+        str(tmp_path / "test.zarr") if store == "local" else f"memory://{uuid.uuid4().hex}.zarr"
     )
-    atmos_zmeta = json.loads((tmp_path / "test.zarr/quality/zarr.json").read_text())
+    for k, v in datasets.items():
+        if v is not None:
+            v.to_zarr(output_path, group=k.lstrip("/"), mode="a", zarr_format=3, consolidated=False)
+    zarr.open_group(f"{output_path}/measurements/reflectance", mode="r+").attrs["title"] = "refl"
 
-    assert "consolidated_metadata" in root_z_meta
-    assert isinstance(root_z_meta["consolidated_metadata"], dict)
-    assert "consolidated_metadata" in reflectance_zmeta
-    assert isinstance(reflectance_zmeta["consolidated_metadata"], dict)
-    if "consolidated_metadata" in atmos_zmeta:
-        assert atmos_zmeta["consolidated_metadata"] is None
+    updated_root_consolidation(
+        dt_input=xr.DataTree(),
+        output_path=output_path,
+        datasets=datasets,
+        additional_consolidate_paths=[
+            "/measurements/reflectance",
+            "/conditions/mask/l2a_classification",
+        ],
+    )
+
+    def consolidated_metadata(group_path: str) -> ConsolidatedMetadata | None:
+        group = zarr.open_group(f"{output_path}/{group_path}".rstrip("/"), mode="r")
+        return group.metadata.consolidated_metadata
+
+    root_consolidated = consolidated_metadata("")
+    assert root_consolidated is not None
+    for group_path, level in [
+        ("measurements/reflectance", "r10m"),
+        ("conditions/mask/l2a_classification", "r20m"),
+    ]:
+        group_consolidated = consolidated_metadata(group_path)
+        assert group_consolidated is not None, f"{group_path}: not consolidated"
+        assert level in group_consolidated.metadata
+    assert consolidated_metadata("quality") is None
+
+    # Order guard: the root is consolidated last, so its view of the reflectance
+    # group has the same attributes as the group itself.
+    reflectance = zarr.open_group(
+        f"{output_path}/measurements/reflectance", mode="r", use_consolidated=False
+    )
+    root_view = root_consolidated.flattened_metadata["measurements/reflectance"]
+    assert root_view.attributes == reflectance.metadata.attributes == {"title": "refl"}
 
 
 @pytest.mark.parametrize(
@@ -268,33 +292,40 @@ def test_simple_root_consolidation_success(tmp_path: Path) -> None:
         ),
         ("/conditions/mask/l1c_classification",),
     ],
-    ids=["l2a", "l1c"],
+    ids=["all", "l1c_classification_only"],
 )
-def test_simple_root_consolidation_aux_multiscales(
+def test_updated_root_consolidation_aux_multiscales(
     tmp_path: Path, aux_groups: tuple[str, ...]
 ) -> None:
-    """Each written auxiliary pyramid root (mapped to None in `datasets`, as
-    the plan maps multiscale roots) gets its own consolidated metadata listing
-    its levels. Pyramids missing from `datasets` (the L2A-only ones for an L1C
-    product) are skipped.
+    """Each written auxiliary pyramid gets its own consolidated metadata listing its levels.
+
+    The converter derives the consolidated set from the paths the plan maps to
+    None, so a pyramid missing from `datasets` (e.g. an L2A product whose
+    processing baseline lacks a group) is never passed on for consolidation.
     """
     output_path = tmp_path / "test.zarr"
     levels = ("r60m", "r120m")
-    written = {"/measurements/reflectance/r10m": xr.Dataset()}
-    for base_path in aux_groups:
-        for level in levels:
-            written[f"{base_path}/{level}"] = xr.Dataset({"b00": (["y", "x"], np.zeros((2, 2)))})
-
-    for k, v in written.items():
-        v.to_zarr(str(output_path) + k, mode="a", zarr_format=3, consolidated=False)
-
-    datasets: dict[str, tuple[str, ...] | None] = {
-        path: tuple(str(name) for name in ds.data_vars) for path, ds in written.items()
+    datasets: dict[str, xr.Dataset | None] = {
+        "/measurements/reflectance/r10m": xr.Dataset(),
+        "/measurements/reflectance": None,
     }
-    datasets["/measurements/reflectance"] = None
     for base_path in aux_groups:
         datasets[base_path] = None
-    simple_root_consolidation(output_path=str(output_path), datasets=datasets)
+        for level in levels:
+            datasets[f"{base_path}/{level}"] = xr.Dataset({"b00": (["y", "x"], np.zeros((2, 2)))})
+
+    # Write every group into one store, as the pipeline does.
+    for k, v in datasets.items():
+        if v is not None:
+            v.to_zarr(output_path, group=k.lstrip("/"), mode="a", zarr_format=3, consolidated=False)
+
+    dt_input = xr.DataTree(name="S2A_MSIL2A_20250811T112131")
+    updated_root_consolidation(
+        dt_input=dt_input,
+        output_path=str(output_path),
+        datasets=datasets,
+        additional_consolidate_paths=[path for path, ds in datasets.items() if ds is None],
+    )
 
     for base_path in aux_groups:
         zmeta = json.loads((output_path / base_path.lstrip("/") / "zarr.json").read_text())
@@ -305,18 +336,17 @@ def test_simple_root_consolidation_aux_multiscales(
             *(f"{level}/b00" for level in levels),
         }, f"{base_path}: {sorted(consolidated['metadata'])}"
 
-    # Intermediate parents of the pyramids are not consolidated on their own.
-    for parent in ("conditions", "conditions/mask", "quality"):
-        zarr_json = output_path / parent / "zarr.json"
-        if zarr_json.exists():
-            assert json.loads(zarr_json.read_text()).get("consolidated_metadata") is None, parent
+    # The reflectance pyramid is consolidated through the same list.
+    zmeta = json.loads((output_path / "measurements/reflectance/zarr.json").read_text())
+    assert "r10m" in zmeta["consolidated_metadata"]["metadata"]
 
     if "/quality/probability" not in aux_groups:
         assert not (output_path / "quality/probability").exists()
 
 
-def test_write_store_root_bbox_reprojects_utm_to_wgs84(tmp_path: Path) -> None:
+def test_write_store_geo_metadata_reprojects_utm_to_wgs84(tmp_path: Path) -> None:
     """Store-root bbox unions child-group bboxes and outputs EPSG:4326 coords."""
+    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -325,7 +355,7 @@ def test_write_store_root_bbox_reprojects_utm_to_wgs84(tmp_path: Path) -> None:
     child.attrs["spatial:bbox"] = [300000.0, 4890240.0, 409800.0, 5000040.0]
     child.attrs["proj:code"] = "EPSG:32632"
 
-    write_store_root_bbox(str(store_path))
+    write_store_geo_metadata(str(store_path))
 
     root_attrs = dict(zarr.open_group(store_path, mode="r").attrs)
     bbox = root_attrs["spatial:bbox"]
@@ -342,8 +372,9 @@ def test_write_store_root_bbox_reprojects_utm_to_wgs84(tmp_path: Path) -> None:
     assert root_attrs["proj:code"] == "EPSG:4326"
 
 
-def test_write_store_root_bbox_unions_multiple_children(tmp_path: Path) -> None:
+def test_write_store_geo_metadata_unions_multiple_children(tmp_path: Path) -> None:
     """Store-root bbox is the union across multiple child-group footprints."""
+    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -354,15 +385,16 @@ def test_write_store_root_bbox_unions_multiple_children(tmp_path: Path) -> None:
     b.attrs["spatial:bbox"] = [2.0, 2.0, 3.0, 3.0]
     b.attrs["proj:code"] = "EPSG:4326"
 
-    write_store_root_bbox(str(store_path))
+    write_store_geo_metadata(str(store_path))
 
     root_attrs = dict(zarr.open_group(store_path, mode="r").attrs)
     assert root_attrs["spatial:bbox"] == [0.0, 0.0, 3.0, 3.0]
     assert root_attrs["proj:code"] == "EPSG:4326"
 
 
-def test_write_store_root_bbox_densifies_edges(tmp_path: Path) -> None:
+def test_write_store_geo_metadata_densifies_edges(tmp_path: Path) -> None:
     """Reprojection uses transform_bounds, not just the two diagonal corners."""
+    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -370,7 +402,7 @@ def test_write_store_root_bbox_densifies_edges(tmp_path: Path) -> None:
     child.attrs["spatial:bbox"] = [699960.0, 4890240.0, 809760.0, 5000040.0]
     child.attrs["proj:code"] = "EPSG:32632"
 
-    write_store_root_bbox(str(store_path))
+    write_store_geo_metadata(str(store_path))
 
     bbox = dict(zarr.open_group(store_path, mode="r").attrs)["spatial:bbox"]
     assert isinstance(bbox, list)
@@ -381,8 +413,10 @@ def test_write_store_root_bbox_densifies_edges(tmp_path: Path) -> None:
     assert ymax > 45.11, bbox
 
 
-def test_write_store_root_bbox_resolves_wkt2_only_crs(tmp_path: Path) -> None:
+def test_write_store_geo_metadata_resolves_wkt2_only_crs(tmp_path: Path) -> None:
     """A group carrying only proj:wkt2 is reprojected, not assumed to be degrees."""
+    import zarr
+    from pyproj import CRS
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -390,15 +424,16 @@ def test_write_store_root_bbox_resolves_wkt2_only_crs(tmp_path: Path) -> None:
     child.attrs["spatial:bbox"] = [300000.0, 4890240.0, 409800.0, 5000040.0]
     child.attrs["proj:wkt2"] = CRS.from_epsg(32632).to_wkt()
 
-    write_store_root_bbox(str(store_path))
+    write_store_geo_metadata(str(store_path))
 
     bbox = dict(zarr.open_group(store_path, mode="r").attrs)["spatial:bbox"]
     assert isinstance(bbox, list)
     assert all(-180.0 <= float(cast("float", v)) <= 180.0 for v in bbox), bbox
 
 
-def test_write_store_root_bbox_skips_group_without_crs(tmp_path: Path) -> None:
+def test_write_store_geo_metadata_skips_group_without_crs(tmp_path: Path) -> None:
     """A bbox with no resolvable CRS must not be unioned as if it were degrees."""
+    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -408,14 +443,15 @@ def test_write_store_root_bbox_skips_group_without_crs(tmp_path: Path) -> None:
     bad = root.create_group("bad")
     bad.attrs["spatial:bbox"] = [300000.0, 4890240.0, 409800.0, 5000040.0]  # metres, no CRS
 
-    write_store_root_bbox(str(store_path))
+    write_store_geo_metadata(str(store_path))
 
     root_attrs = dict(zarr.open_group(store_path, mode="r").attrs)
     assert root_attrs["spatial:bbox"] == [0.0, 0.0, 1.0, 1.0]
 
 
-def test_write_store_root_bbox_invalid_code_does_not_raise(tmp_path: Path) -> None:
+def test_write_store_geo_metadata_invalid_code_does_not_raise(tmp_path: Path) -> None:
     """An unresolvable proj:code is skipped with a warning, never raised."""
+    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -426,14 +462,15 @@ def test_write_store_root_bbox_invalid_code_does_not_raise(tmp_path: Path) -> No
     bad.attrs["spatial:bbox"] = [1.0, 1.0, 2.0, 2.0]
     bad.attrs["proj:code"] = "EPSG:999999"
 
-    write_store_root_bbox(str(store_path))  # must not raise
+    write_store_geo_metadata(str(store_path))  # must not raise
 
     root_attrs = dict(zarr.open_group(store_path, mode="r").attrs)
     assert root_attrs["spatial:bbox"] == [0.0, 0.0, 1.0, 1.0]
 
 
-def test_write_store_root_bbox_antimeridian_falls_back_to_full_range(tmp_path: Path) -> None:
+def test_write_store_geo_metadata_antimeridian_falls_back_to_full_range(tmp_path: Path) -> None:
     """A footprint crossing the antimeridian widens the root bbox to +/-180."""
+    import zarr
 
     store_path = tmp_path / "root.zarr"
     root = zarr.open_group(store_path, mode="w")
@@ -442,7 +479,7 @@ def test_write_store_root_bbox_antimeridian_falls_back_to_full_range(tmp_path: P
     child.attrs["spatial:bbox"] = [299940.0, 6390220.0, 409740.0, 6500020.0]
     child.attrs["proj:code"] = "EPSG:32601"
 
-    write_store_root_bbox(str(store_path))
+    write_store_geo_metadata(str(store_path))
 
     bbox = dict(zarr.open_group(store_path, mode="r").attrs)["spatial:bbox"]
     assert isinstance(bbox, list)
@@ -471,27 +508,33 @@ def test_convert_s2_optimized_refuses_non_policy_options(deviation: dict) -> Non
         )
 
 
-def test_simple_root_consolidation_adds_reflectance_stac_asset(tmp_path: Path) -> None:
+def test_add_s2_stac_assets_writes_reflectance_asset_to_root(tmp_path: Path) -> None:
+    """The reflectance asset added by `add_s2_stac_assets` ends up in the consolidated root."""
+    from pyproj import CRS
 
-    # initialise an empty dataset to mimic the process and write to tmp
+    # initialise an empty dataset to mimic the process and write it into the store as
+    # the pipeline does, so zarr creates the root and parent groups
+    output_path = str(tmp_path / "test.zarr")
     r10m = xr.Dataset(coords={"y": np.arange(10), "x": np.arange(20)})
     r10m.to_zarr(
-        str(tmp_path / "test.zarr/measurements/reflectance/r10m"),
+        output_path,
+        group="measurements/reflectance/r10m",
         mode="a",
         zarr_format=3,
         consolidated=False,
     )
+    datasets: dict[str, tuple[str, ...] | None] = {"/measurements/reflectance/r10m": ()}
+
     # adding dummy data to dt_input to mimic input reference dtreee
     dt_input = xr.DataTree(xr.Dataset({"dummy": (["y"], np.zeros(10))}))
     dt_input.attrs = {"stac_discovery": {"properties": {"mission": "sentinel-2"}}}
 
-    # test execution of func
-    simple_root_consolidation(
-        output_path=str(tmp_path / "test.zarr"),
-        datasets={"/measurements/reflectance/r10m": ()},
+    # test execution of func: the S2 assets are added before the root metadata is written
+    add_s2_stac_assets(dt_input, datasets, crs=CRS.from_epsg(32632), reflectance_shape=(10, 20))
+    updated_root_consolidation(
+        output_path=output_path,
+        datasets=datasets,
         dt_input=dt_input,
-        crs=CRS.from_epsg(32632),
-        reflectance_shape=(10, 20),
     )
 
     # read in the consolidated dTree root to cross-check with expected outcome
@@ -511,16 +554,24 @@ def test_simple_root_consolidation_adds_reflectance_stac_asset(tmp_path: Path) -
 
 
 def test_add_multiscale_pyramids_to_stac_metadata_adds_missing_levels() -> None:
-    """Pyramid levels absent from existing STAC assets get one asset per data variable."""
+    """Pyramid levels absent from existing STAC assets get one asset per data
+    variable, whether the level is given as a dataset or as its variable names."""
     existing_asset = {"href": "/measurements/reflectance/r10m/b02", "title": "B02"}
     attrs: dict = {"stac_discovery": {"assets": {"b02": dict(existing_asset)}}}
-    datasets: dict[str, tuple[str, ...] | None] = {
+    datasets: dict[str, xr.Dataset | tuple[str, ...] | None] = {
         # already referenced by an existing asset -> must not be duplicated
-        "/measurements/reflectance/r10m": ("b02",),
+        "/measurements/reflectance/r10m": xr.Dataset({"b02": (["y", "x"], np.zeros((4, 4)))}),
         # new pyramid level -> assets added, spatial_ref skipped
-        "/measurements/reflectance/r20m": ("b02", "b05", "spatial_ref"),
-        # a multiscale root carries no variables of its own
-        "/measurements/reflectance/r60m": None,
+        "/measurements/reflectance/r20m": xr.Dataset(
+            {
+                "b02": (["y", "x"], np.zeros((2, 2))),
+                "b05": (["y", "x"], np.zeros((2, 2))),
+                "spatial_ref": ((), 0),
+            }
+        ),
+        # the plan-driven converter passes variable names instead of datasets
+        "/measurements/reflectance/r60m": ("b01", "spatial_ref"),
+        "/measurements/reflectance": None,
     }
 
     result = add_multiscale_pyramids_to_stac_metadata(datasets, attrs)
@@ -530,13 +581,16 @@ def test_add_multiscale_pyramids_to_stac_metadata_adds_missing_levels() -> None:
         "b02": existing_asset,
         "b02_r20m": {"href": "/measurements/reflectance/r20m/b02", "title": "b02_r20m"},
         "b05_r20m": {"href": "/measurements/reflectance/r20m/b05", "title": "b05_r20m"},
+        "b01_r60m": {"href": "/measurements/reflectance/r60m/b01", "title": "b01_r60m"},
     }
 
 
 @pytest.mark.parametrize("attrs", [{}, {"stac_discovery": {}}, {"stac_discovery": {"assets": {}}}])
 def test_add_multiscale_pyramids_to_stac_metadata_without_assets_is_noop(attrs: dict) -> None:
     """Missing stac_discovery/assets returns the attributes unchanged instead of raising."""
-    datasets = {"/measurements/reflectance/r20m": ("b02",)}
+    datasets = {
+        "/measurements/reflectance/r20m": xr.Dataset({"b02": (["y", "x"], np.zeros((2, 2)))})
+    }
     expected = json.loads(json.dumps(attrs))
 
     assert add_multiscale_pyramids_to_stac_metadata(datasets, attrs) == expected
