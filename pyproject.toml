@@ -61,6 +61,7 @@ dependencies = [
     "boto3>=1.43.116",
     "pyproj>=3.7.0",
     "pystac>=1.8.0",
+    "shapely>=2.0",
     "structlog>=25.5.0",
     "pygit2>=1.20.1",
 ]
@@ -250,7 +251,7 @@ constraint-dependencies = [
     "requests>=2.33.0",
     "cryptography>=46.0.6",
     "tornado>=6.5.9",
-    "msgpack>=1.2.1",
+    "msgpack>=1.2.3",
     "multidict>=6.9.1",
     "filelock>=3.20.3",
     "virtualenv>=21.7.13",

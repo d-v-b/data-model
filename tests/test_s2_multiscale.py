@@ -21,8 +21,10 @@ from zarr.core.metadata import ArrayV3Metadata
 
 from eopf_geozarr.conversion.utils import (
     _rechunk_ds,
+    calculate_aligned_chunk_size,
     create_uniform_encoding,
     rechunk_dataset_for_encoding,
+    write_dataset_geo_metadata,
 )
 from eopf_geozarr.s2_optimization.s2_converter import convert_s2_optimized
 from eopf_geozarr.s2_optimization.s2_multiscale import (
@@ -31,13 +33,10 @@ from eopf_geozarr.s2_optimization.s2_multiscale import (
     S2Type,
     _coarsen_variable,
     _declare_scl_nodata,
-    calculate_aligned_chunk_size,
-    calculate_simple_shard_dimensions,
     create_downsampled_resolution_group,
     create_multiscale_from_datatree,
     generic_multiscales,
     inject_missing_bands,
-    write_geo_metadata,
 )
 
 from .conftest import create_zarrv2_group_from_json, get_stem, s2_example_json_paths
@@ -92,7 +91,7 @@ def test_generic_multiscales_prefers_coordinate_transform_for_inconsistent_rio(
         ),
         1024,
     )
-    write_geo_metadata(r10m, crs=crs)
+    r10m = write_dataset_geo_metadata(r10m, crs=crs)
     # A GeoTransform on `spatial_ref` is carried into every coarsened level, where
     # the rio transform then no longer matches the coordinate grid.
     r10m.rio.write_transform(Affine(10.0, 0.0, 599995.0, 0.0, -10.0, 4900025.0), inplace=True)
@@ -138,31 +137,6 @@ def test_generic_multiscales_prefers_coordinate_transform_for_inconsistent_rio(
 
     # The parent footprint covers the pixel edges of the finest level (#266).
     assert parent_group.attrs["spatial:bbox"] == [599995.0, 4899785.0, 600235.0, 4900025.0]
-
-
-def test_calculate_simple_shard_dimensions() -> None:
-    """Test simplified shard dimensions calculation."""
-    # Test 3D data (time, y, x) - shards are multiples of chunks
-    data_shape: tuple[int, ...] = (5, 1024, 1024)
-    chunks: tuple[int, ...] = (1, 256, 256)
-
-    shard_dims = calculate_simple_shard_dimensions(data_shape, chunks)
-
-    assert len(shard_dims) == 3
-    assert shard_dims[0] == 1  # Time dimension should be 1
-    assert shard_dims[1] == 1024  # Y dimension matches exactly (divisible by 256)
-    assert shard_dims[2] == 1024  # X dimension matches exactly (divisible by 256)
-
-    # Test 2D data (y, x) with non-divisible dimensions
-    data_shape = (1000, 1000)
-    chunks = (256, 256)
-
-    shard_dims = calculate_simple_shard_dimensions(data_shape, chunks)
-
-    assert len(shard_dims) == 2
-    # Should use largest multiple of chunk_size that fits
-    assert shard_dims[0] == 768  # 3 * 256 = 768 (largest multiple that fits in 1000)
-    assert shard_dims[1] == 768  # 3 * 256 = 768
 
 
 @pytest.mark.parametrize("mask_and_scale", [False, True], ids=["raw", "decoded"])
@@ -704,7 +678,7 @@ def test_create_multiscale_from_datatree_behavior(
 def test_create_multiscale_reuses_native_reflectance_levels(tmp_path: pathlib.Path) -> None:
     """Native r20m/r60m reflectance groups are reused, not coarsened again from r10m.
 
-    The "skip existing path" guard in `stream_write_s2dataset` would hide a
+    The "skip existing path" guard in `stream_write_dataset` would hide a
     regression on disk, so the created levels are checked through the logs and
     the native groups through their variables and values.
     """
@@ -729,6 +703,88 @@ def test_create_multiscale_reuses_native_reflectance_levels(tmp_path: pathlib.Pa
         assert set(ds.data_vars) == {var_name}, f"{group_path}: {set(ds.data_vars)}"
         expected = _decoded(dt_input[group_path].to_dataset()[var_name])
         np.testing.assert_allclose(ds[var_name].values, expected, atol=_SCALE_FACTOR, rtol=0)
+
+
+@pytest.mark.parametrize("enable_sharding", [False, True])
+def test_create_multiscale_applies_compression_level_to_all_levels(
+    tmp_path: pathlib.Path, enable_sharding: bool
+) -> None:
+    """A non-default `compression_level` reaches the coarsened levels, not only the native ones."""
+    from zarr.codecs import BloscCodec
+
+    dt_input = _make_minimal_s2_datatree(raw=False)
+    output_path = str(tmp_path / "output.zarr")
+    create_multiscale_from_datatree(
+        dt_input,
+        output_group=zarr.create_group(output_path),
+        enable_sharding=enable_sharding,
+        spatial_chunk=_BEHAVIOR_SPATIAL_CHUNK,
+        crs=CRS.from_epsg(32632),
+        compression_level=7,
+    )
+
+    levels: dict[str, set[int]] = {}
+    for group_path in (*_ORIGINAL_GROUPS, *_DOWNSAMPLED_GROUPS):
+        level = zarr.open_group(f"{output_path}/{group_path}", mode="r")
+        for name, array in level.arrays():
+            if name in ("x", "y", "spatial_ref"):
+                continue
+            assert isinstance(array.metadata, ArrayV3Metadata)
+            codecs = [
+                inner
+                for codec in array.metadata.codecs
+                for inner in (codec, *getattr(codec, "codecs", ()))
+            ]
+            levels[f"{group_path}/{name}"] = {
+                codec.clevel for codec in codecs if isinstance(codec, BloscCodec)
+            }
+    assert levels, "no data arrays found"
+    assert all(clevels == {7} for clevels in levels.values()), levels
+
+
+def test_create_multiscale_reuses_native_aux_levels(tmp_path: pathlib.Path) -> None:
+    """Native r60m levels of the auxiliary pyramids are reused, not coarsened again from r20m.
+
+    Checked through the logs and the stored values, so the test does not rely on
+    the "skip existing path" guard in `stream_write_dataset`, which would hide a
+    coarsened level on disk.
+    """
+    dt_input = _make_minimal_s2_datatree(raw=False)
+    dt_input.name = "S2A_MSIL2A_20250811T112131"
+    rng = np.random.default_rng(1)
+    aux_vars = {"conditions/mask/l2a_classification": "scl", "quality/probability": "cld"}
+    for base_path, var_name in aux_vars.items():
+        for level, size in (("r20m", 60), ("r60m", 20)):
+            coords = {"x": np.arange(float(size)), "y": np.arange(float(size))}
+            data = rng.integers(0, 12, size=(size, size), dtype="uint8")
+            band = xr.DataArray(data, dims=["y", "x"], coords=coords)
+            dt_input[f"{base_path}/{level}"] = xr.DataTree(xr.Dataset({var_name: band}))
+    output_path = str(tmp_path / "output.zarr")
+
+    with capture_logs() as logs:
+        create_multiscale_from_datatree(
+            dt_input,
+            output_group=zarr.create_group(output_path),
+            enable_sharding=False,
+            spatial_chunk=_BEHAVIOR_SPATIAL_CHUNK,
+            crs=CRS.from_epsg(32632),
+        )
+
+    for base_path, var_name in aux_vars.items():
+        created = {
+            e["level"]
+            for e in logs
+            if e["event"] == "Creating level with resolution" and e["base_path"] == f"/{base_path}"
+        }
+        assert created == {"r120m", "r360m", "r720m"}, base_path
+
+        # The native r60m level holds the source values, not r20m values sampled down.
+        group_path = f"{base_path}/r60m"
+        ds = xr.open_dataset(
+            output_path, engine="zarr", group=group_path, mask_and_scale=False, decode_coords="all"
+        )
+        expected = dt_input[group_path].to_dataset()[var_name].values
+        np.testing.assert_array_equal(ds[var_name].values, expected)
 
 
 # ---------------------------------------------------------------------------

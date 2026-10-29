@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, TypeGuard, cast, runtime_checkable
 
 import numpy as np
 import structlog
 import xarray as xr
 import zarr
 import zarr_cm
+from pyproj import CRS
+from pyproj.exceptions import CRSError
 from zarr_cm import GeoProjAttrs, MultiConventionAttrs, MultiscalesAttrs, SpatialAttrs
 from zarr_cm import geo_proj as geo_proj_cm
 from zarr_cm import spatial as spatial_cm
@@ -20,9 +22,7 @@ from eopf_geozarr.data_api.geozarr.types import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Hashable, Iterable, Mapping
-
-    from xarray.core.types import ZarrWriteModes
+    from collections.abc import Hashable, Iterable, Mapping, Sequence
 
 
 from importlib.util import find_spec
@@ -37,6 +37,217 @@ UNSET: Any = object()
 BAND_LIKE_DIM_NAMES = frozenset({"polarization"})
 
 log = structlog.get_logger()
+
+
+GeoTransform = tuple[float, float, float, float, float, float]
+"""Affine transform as GDAL-style 6-tuple `(a, b, c, d, e, f)`."""
+Bbox = tuple[float, float, float, float]
+"""Bounding box `(xmin, ymin, xmax, ymax)`."""
+
+
+def _has_regular_xy_grid(dataset: xr.Dataset) -> bool:
+    """Whether `dataset` has x/y coordinates with at least two pixels along each axis.
+
+    Then the pixel size is known and `_transform_from_coordinates` can be called.
+    """
+    return (
+        "x" in dataset.coords
+        and "y" in dataset.coords
+        and len(dataset.coords["x"].values) >= 2
+        and len(dataset.coords["y"].values) >= 2
+    )
+
+
+def _transform_from_coordinates(dataset: xr.Dataset) -> GeoTransform:
+    """Affine transform of the dataset's x/y grid. Requires `_has_regular_xy_grid(dataset)`."""
+    x_coords = dataset.coords["x"].values
+    y_coords = dataset.coords["y"].values
+    pixel_size_x = float(np.abs(x_coords[1] - x_coords[0]))
+    pixel_size_y = float(np.abs(y_coords[1] - y_coords[0]))
+    # Coordinates are pixel centres; the transform origin is the outer pixel edge.
+    x_min = float(x_coords.min()) - pixel_size_x / 2
+    y_max = float(y_coords.max()) + pixel_size_y / 2
+    return (pixel_size_x, 0.0, x_min, 0.0, -pixel_size_y, y_max)
+
+
+def _bbox_from_coordinates(dataset: xr.Dataset) -> list[float]:
+    """Outer pixel edges ``[xmin, ymin, xmax, ymax]`` of the dataset's x/y grid.
+
+    Falls back to the coordinate extent when the grid has fewer than two pixels
+    along an axis, because the pixel size is then unknown.
+    """
+    if not _has_regular_xy_grid(dataset):
+        x_coords = dataset.coords["x"].values
+        y_coords = dataset.coords["y"].values
+        return [
+            float(x_coords.min()),
+            float(y_coords.min()),
+            float(x_coords.max()),
+            float(y_coords.max()),
+        ]
+
+    pixel_size_x, _, x_min, _, neg_pixel_size_y, y_max = _transform_from_coordinates(dataset)
+    x_max = x_min + dataset.sizes["x"] * pixel_size_x
+    y_min = y_max + dataset.sizes["y"] * neg_pixel_size_y
+    return [x_min, y_min, x_max, y_max]
+
+
+def _rio_transform(dataset: xr.Dataset) -> GeoTransform:
+    """Affine transform from the rio accessor.
+
+    Raises AttributeError, TypeError or ValueError when the dataset has no usable
+    one; check `_has_rio_transform(dataset)` first.
+    """
+    rio_value = dataset.rio.transform
+    if callable(rio_value):
+        rio_value = rio_value()
+    # rio transform value is dynamically typed; it is iterable at runtime.
+    rio_iter = cast("tuple[float, ...]", tuple(rio_value))  # pyright: ignore[reportArgumentType]
+    a, b, c, d, e, f = (float(value) for value in rio_iter[:6])
+    return (a, b, c, d, e, f)
+
+
+def _has_rio_transform(dataset: xr.Dataset) -> bool:
+    """Whether `_rio_transform(dataset)` can be called."""
+    try:
+        _rio_transform(dataset)
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return True
+
+
+def _has_spatial_transform(dataset: xr.Dataset) -> bool:
+    """Whether `_preferred_spatial_transform(dataset)` can be called."""
+    return _has_regular_xy_grid(dataset) or _has_rio_transform(dataset)
+
+
+def _rio_transform_matches_coordinates(
+    transform: GeoTransform, coordinate_transform: GeoTransform
+) -> bool:
+    """Check whether rio-derived metadata matches the current x/y grid."""
+    return all(np.isclose(a, b) for a, b in zip(transform, coordinate_transform, strict=False))
+
+
+def _preferred_spatial_transform(dataset: xr.Dataset) -> GeoTransform:
+    """Prefer rio metadata only when it matches the current coordinate grid.
+
+    Requires `_has_spatial_transform(dataset)`.
+    """
+    if not _has_rio_transform(dataset):
+        return _transform_from_coordinates(dataset)
+    rio_transform = _rio_transform(dataset)
+    if not _has_regular_xy_grid(dataset):
+        return rio_transform
+
+    coordinate_transform = _transform_from_coordinates(dataset)
+    if not all(value == 0 for value in rio_transform) and _rio_transform_matches_coordinates(
+        rio_transform, coordinate_transform
+    ):
+        return rio_transform
+    return coordinate_transform
+
+
+def _band_like_dim_index(var_data: xr.DataArray) -> int | None:
+    """Index of the band-like dimension (see `BAND_LIKE_DIM_NAMES`) of `var_data`.
+
+    Only arrays with more than two dimensions can have one; returns None otherwise
+    or when no dimension is band-like.
+    """
+    if len(var_data.dims) <= 2:
+        log.info(
+            "Band-like dimension index is only looked up for arrays with more than two dimensions",
+            dims=var_data.dims,
+            band_like_dim=BAND_LIKE_DIM_NAMES,
+        )
+    else:
+        for i, dim in enumerate(var_data.dims):
+            if dim in BAND_LIKE_DIM_NAMES:
+                return i
+    return None
+
+
+def _rechunk_ds(ds: xr.Dataset, spatial_chunk: int) -> xr.Dataset:
+    chunks = {dim: (min(spatial_chunk, size)) for dim, size in ds.sizes.items()}
+    return ds.chunk(chunks)
+
+
+def _rechunk_iterable(
+    iterable: Iterable, encoding: dict[str, XarrayDataArrayEncoding]
+) -> dict[Hashable, xr.DataArray]:
+    collector: dict[Hashable, xr.DataArray] = {}
+    for var_name, var_data in iterable:
+        if str(var_name) in encoding:
+            var_encoding = encoding[str(var_name)]
+
+            # If sharding is enabled, rechunk based on shard dimensions
+            shards_encoding = var_encoding.get("shards")
+            chunks_encoding = var_encoding.get("chunks")
+            if shards_encoding is not None:
+                target_chunks = shards_encoding  # Use shard dimensions for rechunking
+            elif chunks_encoding is not None:
+                target_chunks = chunks_encoding  # Fallback to chunk dimensions
+            else:
+                # No specific chunking needed, use original variable
+                collector[var_name] = var_data
+                continue
+
+            # Create chunk dict using the actual dimensions of the variable
+            if len(var_data.dims) == len(target_chunks):
+                chunk_dict = dict(zip(var_data.dims, target_chunks, strict=True))
+
+                # Rechunk the variable to match the target dimensions
+                collector[var_name] = var_data.chunk(chunk_dict)
+            else:
+                raise ValueError(
+                    f"Given dataarray '{var_name}' with dimension '{var_data.dims}' has different shape than chunks '{target_chunks}'"
+                )
+        else:
+            # No specific chunking needed, use original variable
+            collector[var_name] = var_data
+    return collector
+
+
+def _is_bbox(value: object) -> TypeGuard[Sequence[float]]:
+    """Whether *value* is a ``spatial:bbox``: a list or tuple of four numbers.
+
+    ``spatial:bbox`` is read from stored metadata, so its type is not known
+    statically; this verifies the shape at runtime rather than asserting it.
+    """
+    return (
+        isinstance(value, (list, tuple))
+        and len(value) == 4
+        and all(isinstance(v, (int, float)) for v in value)
+    )
+
+
+def _as_bbox(value: Sequence[float]) -> Bbox:
+    """Return *value* as a 4-tuple of floats. Requires `_is_bbox(value)`."""
+    return (float(value[0]), float(value[1]), float(value[2]), float(value[3]))
+
+
+def _has_proj_crs(attrs: Mapping[str, Any]) -> bool:
+    """Whether a group's attributes declare a CRS with ``proj:code``, ``proj:wkt2`` or ``proj:projjson``."""
+    return (
+        isinstance(attrs.get("proj:code"), str)
+        or isinstance(attrs.get("proj:wkt2"), str)
+        or isinstance(attrs.get("proj:projjson"), dict)
+    )
+
+
+def _crs_from_attrs(attrs: Mapping[str, Any]) -> CRS:
+    """Resolve a pyproj CRS from a group's ``proj:*`` attributes. Requires `_has_proj_crs(attrs)`.
+
+    Uses ``proj:code``, else ``proj:wkt2``, else ``proj:projjson``. Raises
+    `pyproj.exceptions.CRSError` for a malformed value, since the attributes come
+    from stored metadata.
+    """
+    code = attrs.get("proj:code")
+    if isinstance(code, str):
+        return CRS.from_user_input(code)
+    wkt2 = attrs.get("proj:wkt2")
+    if isinstance(wkt2, str):
+        return CRS.from_wkt(wkt2)
+    return CRS.from_json_dict(attrs["proj:projjson"])
 
 
 def optimization_summary(dt_input: xr.DataTree, dt_output: xr.DataTree, output_path: str) -> None:
@@ -66,43 +277,61 @@ def create_result_datatree(output_path: str) -> xr.DataTree:
 
 
 def updated_root_consolidation(
-    dt_input: xr.DataTree, output_path: str, datasets: Mapping[str, object]
+    dt_input: xr.DataTree,
+    output_path: str,
+    datasets: Mapping[str, object],
+    additional_consolidate_paths: list[str] | None = None,
 ) -> None:
     """
     Simple root-level and sub-root level metadata consolidation with proper zarr group creation.
     Consolidation has to happen from child first to prevent possible overwriting issues if root is consolidated first.
+    The root (and subroot) metadata is written from `dt_input.attrs`, so product-specific STAC
+    additions (e.g. the S2 assets) have to be applied to them before calling this function.
+    Three steps have to be done to achieve a uniform processing of all modes:
+        1.) Create consolidated 'measurement' groups for S1, S2 (in reflectance), and S3
+        2.) Consolidate any additional groups which are added (this is reserved for multiscale groups)
+        3.) Write metadata for subroots (first) and roots, and consolidate subroots OR root
+    Note: The addition of multiscale induced assets to STAC has to be implemented before this function call with add_multiscale_pyramids_to_stac_metadata(...)
+    Note: Nothing may write group attributes after this call, else the root's consolidated metadata becomes stale
     """
-    output_path = output_path.rstrip("/") + "/"
+    # this might be a potential issue for s3, as many paths added to output_path are '/*' which will lead to '*//*'
+    output_path = output_path.rstrip("/")
 
-    # create missing intermediary groups (/conditions, /quality, etc.) using the keys of the datasets dict
-    # also gather potential measurement groups for consolidating
+    def _group_url(group_path: str) -> str:
+        return f"{output_path}/{group_path.strip('/')}"
+
+    # step 1: consolidate all /measurements (inlcuding subroots and S2 reflectance)
     for group_path in datasets:
-        # extract all the parent paths and names
-        parent, _, name = group_path.rstrip("/").rpartition("/")
-        if parent not in datasets:
-            init_zarr_group(output_path + group_path)
-
-        # consolidate all measurement groups
+        _, _, name = group_path.rstrip("/").rpartition("/")
         if name == "measurements":
-            zarr.consolidate_metadata(output_path + group_path, zarr_format=constants.ZARR_FORMAT)
+            zarr.consolidate_metadata(_group_url(group_path), zarr_format=constants.ZARR_FORMAT)
 
-    # check and get possible subroots for consolidation
+    # step 2: consolidate any additional groups (multiscales, ...) which are passed to this function
+    if additional_consolidate_paths:
+        for additional_path in additional_consolidate_paths:
+            zarr.consolidate_metadata(
+                _group_url(additional_path), zarr_format=constants.ZARR_FORMAT
+            )
+
+    # step 3: add metadata to subroots and roots, consolidated either one
+    # subroot groups are only present for s1, and we need to consolidate its measurements with /subgroup/measurements
+    # its guaranteed, that this is the deepest consolidation for the dtree, above it is only the subroot
     subroot_groups = get_subroots(dt_input.groups)
-
-    # also add some geo- and stac-root metadata
     if subroot_groups:
         for subroot in subroot_groups:
+            # add spatial and stac related metadata
             write_store_root_metadata(
-                output_path + subroot,
+                _group_url(subroot),
                 attrs=cast("dict[str, dict[str, Any]]", dt_input[subroot].attrs),
             )
-            zarr.consolidate_metadata(output_path + subroot, zarr_format=constants.ZARR_FORMAT)
 
-    # Create root zarr group if it doesn't existand add the subroot/subgroup groups as zarr arrays
-    init_root_zarr_group(
+            # consolidate the subroot itself
+            zarr.consolidate_metadata(_group_url(subroot), zarr_format=constants.ZARR_FORMAT)
+
+    # also add the geo and stac metadata to the root
+    write_store_root_metadata(
         output_path,
-        datasets=datasets,
-        dt_input_attrs=cast("dict[str, dict[str, Any]]", dt_input.attrs),
+        attrs=cast("dict[str, dict[str, Any]]", dt_input.attrs),
     )
 
     # consolidate metadata in root OR in each subroot
@@ -110,45 +339,8 @@ def updated_root_consolidation(
         zarr.consolidate_metadata(output_path, zarr_format=constants.ZARR_FORMAT)
 
 
-def init_zarr_group(
-    output_path: str, mode: ZarrWriteModes = "a", root_tree: xr.DataTree | None = None
-) -> None:
-    """Instantiate a new zarr group with xarray. A model `root_tree` can be passed as a reference, which will construct the full tree as the zarr store."""
-    dt_parent = root_tree or xr.DataTree()
-
-    dt_parent.to_zarr(
-        output_path,
-        mode=mode,
-        zarr_format=constants.ZARR_FORMAT,
-        consolidated=False,
-    )
-
-
-def init_root_zarr_group(
-    output_path: str, datasets: Mapping[str, object], dt_input_attrs: dict[str, dict[str, Any]]
-) -> None:
-    """
-    Instantiates an EOPF zarr group with xarray, with a root tree and additional root trees for all datasets passed to this function.
-    Also writes any root store metadata, namely geo metadata and stac metadata.
-    """
-    log.info("Creating root zarr group")
-    init_zarr_group(output_path)
-
-    dt_root = xr.DataTree()
-    for group_path in datasets:
-        dt_root[group_path] = xr.DataTree()
-
-    init_zarr_group(output_path=output_path, mode="r+", root_tree=dt_root)
-    log.info("Root zarr group created")
-
-    # Write the store-root spatial footprint (geozarr minispec, Store Root section).
-    # Aggregates child-group `spatial:bbox` values, reprojects them to EPSG:4326
-    # and writes the union on the root `zarr.json`.
-    write_store_root_metadata(output_path, attrs=dt_input_attrs)
-
-
 def write_store_root_metadata(output_path: str, attrs: dict[str, dict[str, Any]]) -> None:
-    """Function wrapper for calling two metadata writing functions to add geo and stac (incl. geozarr version) metadata to zarr groups."""
+    """Function wrapper for calling two metadata writing functions to add geo and stac metadata to zarr groups."""
     write_store_geo_metadata(output_path, input_root_attrs=attrs)
     write_store_stac_metadata(output_path, input_root_attrs=attrs)
 
@@ -162,14 +354,90 @@ def get_subroots(groups: tuple[str, ...]) -> set[str] | None:
     return subroots or None
 
 
+def write_dataset_geo_metadata(
+    dataset: xr.Dataset,
+    grid_mapping_var_name: str = "spatial_ref",
+    crs: CRS | None = None,
+) -> xr.Dataset:
+    """
+    Return a copy of the dataset with geographic metadata added; `dataset` is not modified.
+    Requires a crs or a dataset from which a CRS can be derived.
+
+    Args:
+        dataset: Dataset to add metadata to
+        grid_mapping_var_name: Name for grid mapping variable
+        crs: Coordinate Reference System to use (if None, attempts to detect from dataset)
+
+    Returns:
+        The dataset with the metadata, or an unchanged copy if no CRS is found.
+    """
+    # Shallow copy: new variables with their own attrs and encoding, data is shared.
+    dataset = dataset.copy(deep=False)
+
+    # Use provided CRS or try to detect from dataset
+    if crs is None:
+        for var in dataset.data_vars.values():
+            if hasattr(var, "rio") and var.rio.crs:
+                crs = var.rio.crs
+                break
+            if "proj:epsg" in var.attrs:
+                epsg = var.attrs["proj:epsg"]
+                crs = CRS.from_epsg(epsg)
+                break
+
+    if crs is not None:
+        # Write CRS using rioxarray
+        # NOTE: for now rioxarray only supports writing grid mapping using CF conventions
+        dataset.rio.write_crs(crs, grid_mapping_name=grid_mapping_var_name, inplace=True)
+        dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
+        dataset.attrs["grid_mapping"] = grid_mapping_var_name
+
+        for var in dataset.data_vars.values():
+            var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
+            var.attrs["grid_mapping"] = grid_mapping_var_name
+
+        # Also add proj: and spatial: zarr conventions at dataset level
+        # TODO : Remove once rioxarray supports writing these conventions directly
+        # https://github.com/corteva/rioxarray/pull/883
+
+        # Assemble spatial convention data
+        spatial_data: spatial_cm.SpatialAttrs = {
+            "spatial:dimensions": ["y", "x"],  # Required field
+            "spatial:registration": "pixel",  # Default registration type
+        }
+
+        # Calculate and add spatial bbox if coordinates are available
+        if "x" in dataset.coords and "y" in dataset.coords:
+            spatial_data["spatial:bbox"] = _bbox_from_coordinates(dataset)
+
+            if _has_spatial_transform(dataset):
+                spatial_transform = _preferred_spatial_transform(dataset)
+                # Only add spatial:transform if we have valid transform data (not all zeros)
+                if not all(t == 0 for t in spatial_transform):
+                    spatial_data["spatial:transform"] = list(spatial_transform)
+
+            # Add spatial shape if data variables exist
+            if dataset.data_vars:
+                first_var = next(iter(dataset.data_vars.values()))
+                if first_var.ndim >= 2:
+                    height, width = first_var.shape[-2:]
+                    spatial_data["spatial:shape"] = [height, width]
+
+        # Build validated spatial + proj convention attrs (data + CMOs) via zarr-cm
+        dataset.attrs.update(build_convention_attrs(spatial=spatial_data, crs=crs))
+
+    return dataset
+
+
 def stream_write_dataset(
     dataset: xr.Dataset,
     *,
     path: str,
     group: zarr.Group,
     encoding: dict[str, XarrayDataArrayEncoding],
-    enable_sharding: bool,
-    chunk_and_shard_coords=True,
+    add_geo_metadata: bool = False,
+    chunk_and_shard_coords: bool = True,
+    crs: CRS | None = None,
 ) -> xr.Dataset:
     """
     Stream write a lazy dataset with advanced chunking and sharding.
@@ -210,6 +478,9 @@ def stream_write_dataset(
     dataset = rechunk_dataset_for_encoding(
         dataset, encoding, chunk_and_shard_coords=chunk_and_shard_coords
     )
+
+    if add_geo_metadata:
+        dataset = write_dataset_geo_metadata(dataset, crs=crs)
 
     # Sanitize NaN values in dataset attributes before writing
     dataset = fs_utils.sanitize_dataset_attributes(dataset)
@@ -264,61 +535,6 @@ def stream_write_dataset(
 
     log.info("Streaming write complete for dataset {}", dataset_path=path)
     return dataset
-
-
-def _band_like_dim_index(var_data: xr.DataArray) -> int | None:
-    """Index of the band-like dimension, if var_data has one. Falls back to
-    None (caller should then skip band-axis sharding, not guess)."""
-    if len(var_data.dims) <= 2:
-        log.info(
-            "Not sharding along bandlike dim if its not dim>2", band_like_dim=BAND_LIKE_DIM_NAMES
-        )
-    else:
-        for i, dim in enumerate(var_data.dims):
-            if dim in BAND_LIKE_DIM_NAMES:
-                return i
-    return None
-
-
-def _rechunk_ds(ds: xr.Dataset, spatial_chunk: int) -> xr.Dataset:
-    chunks = {dim: (min(spatial_chunk, size)) for dim, size in ds.sizes.items()}
-    return ds.chunk(chunks)
-
-
-def _rechunk_iterable(
-    iterable: Iterable, encoding: dict[str, XarrayDataArrayEncoding]
-) -> dict[Hashable, xr.DataArray]:
-    collector: dict[Hashable, xr.DataArray] = {}
-    for var_name, var_data in iterable:
-        if str(var_name) in encoding:
-            var_encoding = encoding[str(var_name)]
-
-            # If sharding is enabled, rechunk based on shard dimensions
-            shards_encoding = var_encoding.get("shards")
-            chunks_encoding = var_encoding.get("chunks")
-            if shards_encoding is not None:
-                target_chunks = shards_encoding  # Use shard dimensions for rechunking
-            elif chunks_encoding is not None:
-                target_chunks = chunks_encoding  # Fallback to chunk dimensions
-            else:
-                # No specific chunking needed, use original variable
-                collector[var_name] = var_data
-                continue
-
-            # Create chunk dict using the actual dimensions of the variable
-            if len(var_data.dims) == len(target_chunks):
-                chunk_dict = dict(zip(var_data.dims, target_chunks, strict=True))
-
-                # Rechunk the variable to match the target dimensions
-                collector[var_name] = var_data.chunk(chunk_dict)
-            else:
-                raise ValueError(
-                    f"Given dataarray '{var_name}' with dimension '{var_data.dims}' has different shape than chunks '{target_chunks}'"
-                )
-        else:
-            # No specific chunking needed, use original variable
-            collector[var_name] = var_data
-    return collector
 
 
 def rechunk_dataset_for_encoding(
@@ -398,6 +614,9 @@ def _forward_unpacked_encoding(
         if nodata is not None:
             var_encoding["_FillValue"] = int(nodata)
             var_encoding.setdefault("fill_value", int(nodata))
+            # Keep it on the variable too: the attributes are sanitized afterwards,
+            # and the coarser pyramid levels are built from this variable.
+            var_data.encoding["_FillValue"] = int(nodata)
 
     for key in XARRAY_ENCODING_KEYS - {"compressors", "shards", "chunks", "fill_value"}:
         if key in var_data.encoding:
@@ -612,6 +831,38 @@ def build_convention_attrs(
     # generic JSON dict; narrow to the combined convention TypedDict.
     result = zarr_cm.create_many(conventions)
     return cast("MultiConventionAttrs", result)
+
+
+def add_multiscale_pyramids_to_stac_metadata(
+    datasets: Mapping[str, object], dt_attributes: dict[Hashable, Any]
+) -> dict[Hashable, Any]:
+    stac_attrs = dt_attributes.get("stac_discovery", {}).get("assets")
+    if not stac_attrs:
+        return dt_attributes
+
+    # a bit messy but effective split to get group parent from stac attrs
+    existing_group_paths = {"/".join(v["href"].split("/")[:-1]) for v in stac_attrs.values()}
+
+    # gEt mismatched ones -> we need pyramids not present
+    missing_group_paths = [
+        path for path, ds in datasets.items() if path not in existing_group_paths and ds is not None
+    ]
+
+    for group_path in missing_group_paths:
+        ds = datasets[group_path]
+
+        # catch object != datAset for typing
+        if isinstance(ds, xr.Dataset):
+            resolution = group_path.rsplit("/", 1)[-1]  # "r120m"
+            for var_name in ds.data_vars:
+                if var_name == "spatial_ref":
+                    continue
+                asset_key = f"{var_name}_{resolution}"
+                stac_attrs[asset_key] = {"href": f"{group_path}/{var_name}", "title": asset_key}
+        else:
+            log.warning("Found non-dataset object in datasets!", dataset=ds)
+
+    return dt_attributes
 
 
 def explicit_fill_value(var: xr.DataArray) -> Any:
@@ -916,52 +1167,6 @@ def compute_overview_gcps(
     )
 
 
-def _as_bbox(value: object) -> tuple[float, float, float, float] | None:
-    """Return *value* as a 4-tuple of floats, or ``None`` if it is not one.
-
-    ``spatial:bbox`` is read from stored metadata, so its type is not known
-    statically; this verifies the shape at runtime rather than asserting it.
-    """
-    if not isinstance(value, (list, tuple)) or len(value) != 4:
-        return None
-    if not all(isinstance(v, (int, float)) for v in value):
-        return None
-    return (float(value[0]), float(value[1]), float(value[2]), float(value[3]))
-
-
-def _crs_from_attrs(attrs: dict[str, Any]) -> Any | None:
-    """Resolve a pyproj CRS from a group's ``proj:*`` attributes, else ``None``.
-
-    Tries ``proj:code``, then ``proj:wkt2``, then ``proj:projjson``. Malformed
-    values are logged and treated as unresolvable rather than raised, since the
-    attributes come from stored metadata.
-    """
-    from pyproj import CRS as PyprojCRS
-
-    code = attrs.get("proj:code")
-    if isinstance(code, str):
-        try:
-            return PyprojCRS.from_user_input(code)
-        except Exception as e:  # malformed stored metadata
-            log.warning("Unresolvable proj:code; skipping group bbox", code=code, error=str(e))
-            return None
-    wkt2 = attrs.get("proj:wkt2")
-    if isinstance(wkt2, str):
-        try:
-            return PyprojCRS.from_wkt(wkt2)
-        except Exception as e:
-            log.warning("Unresolvable proj:wkt2; skipping group bbox", error=str(e))
-            return None
-    projjson = attrs.get("proj:projjson")
-    if isinstance(projjson, dict):
-        try:
-            return PyprojCRS.from_json_dict(projjson)
-        except Exception as e:
-            log.warning("Unresolvable proj:projjson; skipping group bbox", error=str(e))
-            return None
-    return None
-
-
 def write_store_geo_metadata(
     output_path: str,
     input_root_attrs: dict[str, dict[str, Any]] | None = None,
@@ -990,37 +1195,41 @@ def write_store_geo_metadata(
 
     root = zarr.open_group(output_path, mode="r+", storage_options=storage_options)
 
-    bboxes_4326: list[tuple[float, float, float, float]] = []
+    bboxes_4326: list[Bbox] = []
+
+    def _collect_bbox_4326(group: zarr.Group, attrs: Mapping[str, Any], corners: Bbox) -> None:
+        """Append the group's bbox in EPSG:4326, or log why it is skipped."""
+        if not _has_proj_crs(attrs):
+            log.warning(
+                "Group has spatial:bbox but no proj:* CRS; skipping it for the store-root footprint",
+                group=group.path,
+            )
+            return
+        try:
+            crs = _crs_from_attrs(attrs)
+        except CRSError as e:  # malformed stored metadata
+            log.warning(
+                "Unresolvable proj:* CRS; skipping group bbox", group=group.path, error=str(e)
+            )
+            return
+        if crs.to_epsg() == 4326:
+            bboxes_4326.append(corners)
+            return
+        try:
+            transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+            # transform_bounds densifies the edges, which corner-wise
+            # transformation misses (projected edges curve in lon/lat).
+            bboxes_4326.append(transformer.transform_bounds(*corners, densify_pts=21))
+        except Exception as e:  # never abort the write for one group
+            log.warning(
+                "Failed to reproject group bbox; skipping it", group=group.path, error=str(e)
+            )
 
     def _walk(group: zarr.Group) -> None:
         attrs = dict(group.attrs)
-        corners = _as_bbox(attrs.get("spatial:bbox"))
-        if corners is not None:
-            crs = _crs_from_attrs(attrs)
-            if crs is None:
-                if any(k in attrs for k in ("proj:code", "proj:wkt2", "proj:projjson")):
-                    # warning already logged by _crs_from_attrs
-                    pass
-                else:
-                    log.warning(
-                        "Group has spatial:bbox but no proj:* CRS; skipping it "
-                        "for the store-root footprint",
-                        group=group.path,
-                    )
-            elif crs.to_epsg() == 4326:
-                bboxes_4326.append(corners)
-            else:
-                try:
-                    transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
-                    # transform_bounds densifies the edges, which corner-wise
-                    # transformation misses (projected edges curve in lon/lat).
-                    bboxes_4326.append(transformer.transform_bounds(*corners, densify_pts=21))
-                except Exception as e:  # never abort the write for one group
-                    log.warning(
-                        "Failed to reproject group bbox; skipping it",
-                        group=group.path,
-                        error=str(e),
-                    )
+        bbox = attrs.get("spatial:bbox")
+        if _is_bbox(bbox):
+            _collect_bbox_4326(group, attrs, _as_bbox(bbox))
         for child in group.groups():
             _walk(child[1])
 
