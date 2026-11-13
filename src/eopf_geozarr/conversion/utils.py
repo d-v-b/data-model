@@ -384,17 +384,24 @@ def strip_cf_grid_mapping(dataset: xr.Dataset) -> xr.Dataset:
         if isinstance(variable.encoding.get("grid_mapping"), str):
             names.add(variable.encoding["grid_mapping"])
     names = {name for name in names if name in dataset.variables}
-    carried: dict[str, Any] = {}
-    if names and not any(str(key).startswith("proj:") for key in dataset.attrs):
+    attrs = {key: value for key, value in dataset.attrs.items() if key != "grid_mapping"}
+    # the convention's own keys, as the validator reads them (a legacy
+    # `proj:epsg` is not a declaration)
+    if names and geo_proj_cm.CONVENTION_KEYS.isdisjoint(dataset.attrs):
         crs = dataset.rio.crs
         if crs is not None:
             carried = dict(build_convention_attrs(spatial=None, crs=CRS.from_user_input(crs)))
+            # extend the declared conventions rather than replace them
+            declared = list(attrs.get("zarr_conventions") or [])
+            uuids = {entry.get("uuid") for entry in declared if isinstance(entry, dict)}
+            carried_conventions = cast("list[dict[str, Any]]", carried.pop("zarr_conventions", []))
+            declared.extend(
+                entry for entry in carried_conventions if entry.get("uuid") not in uuids
+            )
+            attrs = {**attrs, **carried, "zarr_conventions": declared}
     out = dataset.drop_vars(sorted(names))
     out = out.copy(deep=False)
-    out.attrs = {
-        **{key: value for key, value in out.attrs.items() if key != "grid_mapping"},
-        **carried,
-    }
+    out.attrs = attrs
     for variable in out.variables.values():
         variable.attrs = {k: v for k, v in variable.attrs.items() if k != "grid_mapping"}
         variable.encoding = {k: v for k, v in variable.encoding.items() if k != "grid_mapping"}

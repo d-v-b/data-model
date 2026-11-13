@@ -13,6 +13,7 @@ import zarr
 from affine import Affine
 from zarr_cm import geo_proj
 from zarr_cm import spatial as spatial_cm
+from zarr_cm.spatial import CMO as SPATIAL_CMO
 
 from eopf_geozarr.conversion.utils import (
     _rechunk_ds,
@@ -441,6 +442,8 @@ def _grid_mapped_dataset() -> xr.Dataset:
         ("grid-mapped", "EPSG:32632", False),
         ("grid-mapped-with-proj", "EPSG:4326", False),
         ("unrelated-spatial_ref", None, True),
+        ("grid-mapped-with-legacy-epsg", "EPSG:32632", False),
+        ("grid-mapped-with-spatial-declared", "EPSG:32632", False),
     ],
 )
 def test_strip_cf_grid_mapping(
@@ -457,8 +460,17 @@ def test_strip_cf_grid_mapping(
         ds = _grid_mapped_dataset()
         if case == "grid-mapped-with-proj":
             ds.attrs["proj:code"] = "EPSG:4326"
+        elif case == "grid-mapped-with-legacy-epsg":
+            # a legacy key, not a proj convention declaration
+            ds.attrs["proj:epsg"] = 32632
+        elif case == "grid-mapped-with-spatial-declared":
+            ds.attrs["zarr_conventions"] = [dict(SPATIAL_CMO)]
     result = strip_cf_grid_mapping(ds)
     assert result.attrs.get("proj:code") == expected_code
+    if case == "grid-mapped-with-spatial-declared":
+        # the carried proj declaration extends the declared ones
+        names = [entry["name"] for entry in result.attrs["zarr_conventions"]]
+        assert names == ["spatial", "proj"]
     assert ("spatial_ref" in result.variables) is kept_spatial_ref
     assert all("grid_mapping" not in v.attrs for v in result.variables.values())
     assert all("grid_mapping" not in v.encoding for v in result.variables.values())
