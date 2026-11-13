@@ -7,6 +7,7 @@ import os
 import pathlib
 from typing import Any
 
+import numpy as np
 import pytest
 import zarr
 from pydantic import ValidationError
@@ -17,6 +18,7 @@ from pyproj import CRS
 from eopf_geozarr.data_api.s2 import Sentinel2Root
 from eopf_geozarr.data_api.s2_plan import (
     REFLECTANCE_SCALE_LEVELS,
+    _lat_lon_attributes,
     load_sentinel2,
     plan_geozarr,
     plan_reflectance,
@@ -292,6 +294,94 @@ def test_plan_stores_labels_as_registered_strings(path: pathlib.Path) -> None:
     geometry = _planned_root(path)["members"]["conditions"]["members"]["geometry"]["members"]
     assert geometry["angle"]["data_type"] == "string"
     assert geometry["angle"]["codecs"] == [{"name": "vlen-utf8"}]
+
+
+@pytest.mark.parametrize(
+    ("latitude", "longitude", "expected"),
+    [
+        (
+            [48.0, 47.5, 47.0],
+            [8.0, 8.25, 8.5, 8.75],
+            {
+                "spatial:bbox": [8.0, 47.0, 8.75, 48.0],
+                "spatial:shape": [3, 4],
+                "spatial:transform": [0.25, 0.0, 8.0, 0.0, -0.5, 48.0],
+            },
+        ),
+        (
+            [47.0, 47.5, 48.0],
+            [8.0, 8.25],
+            {
+                "spatial:bbox": [8.0, 47.0, 8.25, 48.0],
+                "spatial:shape": [3, 2],
+                "spatial:transform": [0.25, 0.0, 8.0, 0.0, 0.5, 47.0],
+            },
+        ),
+        (
+            np.linspace(48.0, 44.8, 9, dtype="float32").tolist(),
+            np.linspace(8.0, 11.2, 9, dtype="float32").tolist(),
+            {"spatial:shape": [9, 9]},
+        ),
+    ],
+    ids=["latitude-decreasing", "latitude-increasing", "float32-rounding"],
+)
+def test_lat_lon_attributes(
+    latitude: list[float], longitude: list[float], expected: dict[str, object]
+) -> None:
+    """
+    A regular geographic grid's `proj` and `spatial` attributes follow from
+    its coordinate points (#353): node registration, the transform's origin
+    the first point and its step signed, the bbox spanning the outer points.
+    """
+    attributes = _lat_lon_attributes(np.array(latitude), np.array(longitude))
+    assert {key: attributes[key] for key in expected} == expected
+    assert attributes["proj:code"] == "EPSG:4326"
+    assert attributes["spatial:dimensions"] == ["latitude", "longitude"]
+    assert attributes["spatial:registration"] == "node"
+
+
+def test_lat_lon_attributes_refuse_irregular_spacing() -> None:
+    with pytest.raises(ValueError, match="latitude coordinate is not regularly spaced"):
+        _lat_lon_attributes(np.array([48.0, 47.5, 46.0]), np.array([8.0, 8.25]))
+
+
+def test_lat_lon_attributes_refuse_a_single_point() -> None:
+    with pytest.raises(ValueError, match="longitude coordinate needs at least two values"):
+        _lat_lon_attributes(np.array([48.0, 47.5]), np.array([8.0]))
+
+
+def test_plan_georeferences_the_meteorology_groups_from_their_coordinates() -> None:
+    """
+    The meteorology groups get `proj` and `spatial` attributes derived from
+    their latitude/longitude values, and lose the source `Conventions`
+    claim (#353); without the values, they get no georeferencing but still
+    lose the claim.
+    """
+    path = _INPUT_PATHS[0]
+    root = Sentinel2Root.model_validate(_read(path))
+    values = {
+        f"conditions/meteorology/{group}/{name}": axis
+        for group in ("cams", "ecmwf")
+        for name, axis in (
+            ("latitude", np.linspace(48.0, 46.0, 9)),
+            ("longitude", np.linspace(8.0, 10.0, 9)),
+        )
+    }
+    with_values = plan_geozarr(root, coordinate_values=values.get).model_dump(mode="json")
+    without = plan_geozarr(root).model_dump(mode="json")
+    for group in ("cams", "ecmwf"):
+        attributes = with_values["members"]["conditions"]["members"]["meteorology"]["members"][
+            group
+        ]["attributes"]
+        assert attributes["proj:code"] == "EPSG:4326"
+        assert attributes["spatial:shape"] == [9, 9]
+        assert attributes["spatial:transform"] == [0.25, 0.0, 8.0, 0.0, -0.25, 48.0]
+        assert "Conventions" not in attributes
+        bare = without["members"]["conditions"]["members"]["meteorology"]["members"][group][
+            "attributes"
+        ]
+        assert "proj:code" not in bare
+        assert "Conventions" not in bare
 
 
 def test_plan_reflectance_requires_product_georeferencing() -> None:

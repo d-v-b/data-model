@@ -87,7 +87,8 @@ def _seed_input_store(group: zarr.Group) -> None:
 
     Coordinates are the pixel centres of each group's own `proj:transform`
     (real products store them as float64, so the fixtures' int64 declarations
-    are recreated in that form), and selected arrays get deterministic values.
+    are recreated in that form), latitude/longitude form a regular geographic
+    grid, and selected arrays get deterministic values.
     """
     patterned = set(_PATTERNED_PATHS)
     for group_path, subgroup in _walk_groups(group):
@@ -116,6 +117,12 @@ def _seed_input_store(group: zarr.Group) -> None:
                     overwrite=True,
                 )
                 replacement[:] = values
+            elif name in ("latitude", "longitude") and array.ndim == 1:
+                # a regular geographic grid, as the CAMS/ECMWF meteorology
+                # groups store it (latitude decreasing), from which the plan
+                # derives the groups' georeferencing
+                start, stop = (48.0, 46.0) if name == "latitude" else (8.0, 10.0)
+                array[...] = np.linspace(start, stop, array.shape[0]).astype(array.dtype)
             elif array.ndim == 2 and np.issubdtype(array.dtype, np.integer):
                 if array.size <= _PATTERN_MAX_ELEMENTS or path in patterned:
                     array[...] = _pattern(array.shape, array.dtype)

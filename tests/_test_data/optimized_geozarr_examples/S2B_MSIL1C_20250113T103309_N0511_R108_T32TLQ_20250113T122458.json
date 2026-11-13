@@ -3361,7 +3361,6 @@
           "members": {
             "cams": {
               "attributes": {
-                "Conventions": "CF-1.7",
                 "GRIB_centre": "ecmf",
                 "GRIB_centreDescription": "European Centre for Medium-Range Weather Forecasts",
                 "GRIB_edition": 1,
@@ -4361,7 +4360,6 @@
             },
             "ecmwf": {
               "attributes": {
-                "Conventions": "CF-1.7",
                 "GRIB_centre": "ecmf",
                 "GRIB_centreDescription": "European Centre for Medium-Range Weather Forecasts",
                 "GRIB_edition": 1,

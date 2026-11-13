@@ -35,7 +35,7 @@ from __future__ import annotations
 import base64
 import re
 import struct
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from math import ceil
 from typing import TYPE_CHECKING, Any, Final, Literal
 
@@ -644,6 +644,66 @@ _DROPPED_ATTRS = frozenset(
     {"_ARRAY_DIMENSIONS", "_eopf_attrs", "_FillValue", "proj:code", "proj:wkt2", "proj:projjson"}
 )
 
+#: Group attribute keys never carried: the source's CF `Conventions` claim,
+#: which the output does not make (`proj` and `spatial` are its
+#: georeferencing; EOPF-Explorer/data-model#353).
+_DROPPED_GROUP_ATTRS = frozenset({"Conventions"})
+
+CoordinateValues = Callable[[str], "np.ndarray | None"]
+"""Looks up the stored values of the input array at an output-plan path (the
+writer's `SourceReader.values`); the plan reads only the small 1-D
+coordinate arrays a group's georeferencing is derived from."""
+
+
+def _dims_of(doc: _ArrayDoc) -> tuple[str, ...]:
+    """The dimension names an input array declares (`_ARRAY_DIMENSIONS`)."""
+    dims = _doc_attrs(doc).get("_ARRAY_DIMENSIONS")
+    return tuple(str(dim) for dim in dims) if isinstance(dims, (list, tuple)) else ()
+
+
+def _carried_group_attributes(group: Mapping[str, Any]) -> dict[str, object]:
+    """A carried group's attributes, without the keys never carried."""
+    return {
+        key: value for key, value in _doc_attrs(group).items() if key not in _DROPPED_GROUP_ATTRS
+    }
+
+
+def _lat_lon_attributes(latitude: np.ndarray, longitude: np.ndarray) -> dict[str, object]:
+    """
+    The `proj` and `spatial` attributes of a group on a regular geographic
+    grid, from its 1-D `latitude` and `longitude` coordinate values
+    (EOPF-Explorer/data-model#353). The values are grid points, so the
+    registration is `node`: the transform maps an index to a point, its
+    origin the first point, and a decreasing latitude gives a negative step;
+    the bbox spans the outer points. Refuses irregular spacing, which no
+    affine transform describes.
+    """
+    axes = {}
+    for name, values in (("latitude", latitude), ("longitude", longitude)):
+        values = np.asarray(values, dtype="float64")
+        if values.ndim != 1 or values.size < 2:
+            msg = f"The {name} coordinate needs at least two values, got shape {values.shape}"
+            raise ValueError(msg)
+        # the step from the end points, which averages out the rounding of
+        # coordinates stored as float32; spacing within a thousandth of it is
+        # regular
+        step = float(values[-1] - values[0]) / (values.size - 1)
+        if step == 0 or not np.allclose(np.diff(values), step, rtol=1e-3, atol=0.0):
+            msg = f"The {name} coordinate is not regularly spaced, so no transform describes it"
+            raise ValueError(msg)
+        axes[name] = (values, step)
+    (lat, dlat), (lon, dlon) = axes["latitude"], axes["longitude"]
+    return {
+        "proj:code": "EPSG:4326",
+        "spatial:bbox": [float(lon.min()), float(lat.min()), float(lon.max()), float(lat.max())],
+        "spatial:dimensions": ["latitude", "longitude"],
+        "spatial:registration": "node",
+        "spatial:shape": [int(lat.size), int(lon.size)],
+        "spatial:transform": [dlon, 0.0, float(lon[0]), 0.0, dlat, float(lat[0])],
+        "zarr_conventions": [SPATIAL_CMO, PROJ_CMO],
+    }
+
+
 # The conditions/quality planner walks the input model's *dump* — plain Zarr
 # V2 documents — because the input model types those subtrees loosely, so
 # their nodes are a mix of spec models and raw mappings. A node holding
@@ -801,7 +861,9 @@ def _proj_of(name: str, doc: _ArrayDoc) -> tuple[_Transform6, int, str]:
     )
 
 
-def _plan_dataset(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
+def _plan_dataset(
+    group: _GroupDoc, path: str, coordinate_values: CoordinateValues | None = None
+) -> AnyGroupSpec | None:
     """
     Plan one carried leaf dataset: every non-scalar array translated, and —
     when the dataset is georeferenced (an array carries proj attributes) —
@@ -818,7 +880,22 @@ def _plan_dataset(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
         for name, member in arrays.items()
     }
     if anchor is None:
-        return GroupSpecV3(attributes=dict(_doc_attrs(group)), members=members)
+        attributes = _carried_group_attributes(group)
+        latitude, longitude = arrays.get("latitude"), arrays.get("longitude")
+        if (
+            coordinate_values is not None
+            and latitude is not None
+            and longitude is not None
+            and _dims_of(latitude) == ("latitude",)
+            and _dims_of(longitude) == ("longitude",)
+        ):
+            lat_values = coordinate_values(f"{path}/latitude")
+            lon_values = coordinate_values(f"{path}/longitude")
+            if lat_values is not None and lon_values is not None:
+                # a regular geographic grid (the meteorology groups): its
+                # georeferencing derived from its coordinates
+                attributes = {**attributes, **_lat_lon_attributes(lat_values, lon_values)}
+        return GroupSpecV3(attributes=attributes, members=members)
     transform, epsg, wkt2 = _proj_of(*anchor)
     members["spatial_ref"] = _plan_spatial_ref(wkt2, native=True)
     return GroupSpecV3(
@@ -977,6 +1054,7 @@ def _plan_subtree(
     group: _GroupDoc,
     path: str,
     product_proj: tuple[tuple[float, float], int, str] | None = None,
+    coordinate_values: CoordinateValues | None = None,
 ) -> AnyGroupSpec | None:
     """
     Plan one conditions/quality subtree: aux multiscale groups by their specs,
@@ -993,22 +1071,24 @@ def _plan_subtree(
         if isinstance(member, Mapping) and "members" in member
     }
     if not subgroups:
-        return _plan_dataset(group, path)
+        return _plan_dataset(group, path, coordinate_values)
     planned: dict[str, AnyGroupSpec] = {}
     for name, member in subgroups.items():
-        sub = _plan_subtree(member, f"{path}/{name}", product_proj)
+        sub = _plan_subtree(member, f"{path}/{name}", product_proj, coordinate_values)
         if sub is not None:
             planned[name] = sub
     # a group holding arrays next to its subgroups keeps those arrays too
-    own = _plan_dataset(group, path)
+    own = _plan_dataset(group, path, coordinate_values)
     if own is not None:
         return GroupSpecV3(attributes=own.attributes, members={**dict(own.members), **planned})
     if not planned:
         return None
-    return GroupSpecV3(attributes=dict(_doc_attrs(group)), members=planned)
+    return GroupSpecV3(attributes=_carried_group_attributes(group), members=planned)
 
 
-def plan_geozarr(root: Sentinel2Root) -> AnyGroupSpec:
+def plan_geozarr(
+    root: Sentinel2Root, *, coordinate_values: CoordinateValues | None = None
+) -> AnyGroupSpec:
     """
     Plan the GeoZarr hierarchy to write for a Sentinel-2 product.
 
@@ -1017,6 +1097,12 @@ def plan_geozarr(root: Sentinel2Root) -> AnyGroupSpec:
     pyramid, and the `conditions` and `quality` subtrees carried (their own
     multiscale groups planned by `AUX_MULTISCALE_LEVELS`, the quicklooks and
     scalar arrays dropped).
+
+    The plan reads metadata only, except where georeferencing must be derived
+    from coordinate values: a carried group on a regular geographic grid
+    (1-D `latitude` and `longitude` coordinates, no `proj:*` attributes,
+    such as the meteorology groups) gets its `proj` and `spatial` attributes
+    from the values `coordinate_values` looks up, and none without it.
     """
     members: dict[str, AnyGroupSpec] = {
         "measurements": GroupSpecV3(attributes={}, members={"reflectance": plan_reflectance(root)}),
@@ -1026,7 +1112,7 @@ def plan_geozarr(root: Sentinel2Root) -> AnyGroupSpec:
         member = root.members.get(top)
         if member is None:
             continue
-        planned = _plan_subtree(member.model_dump(), top, product_proj)
+        planned = _plan_subtree(member.model_dump(), top, product_proj, coordinate_values)
         if planned is not None:
             members[top] = planned
     return GroupSpecV3(attributes={}, members=members)
