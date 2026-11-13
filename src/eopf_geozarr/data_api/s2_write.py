@@ -141,7 +141,7 @@ def write_geozarr(
         if isinstance(source, xr.DataTree)
         else ZarrSourceReader(source)
     )
-    plan = plan_geozarr(root)
+    plan = plan_geozarr(root, coordinate_values=reader.values)
     # the metadata plane: every group and array document, exactly as planned
     output = plan.to_zarr(store, path="")  # type: ignore[arg-type]
     _fill_group(plan, reader, output, "")
@@ -163,15 +163,16 @@ def _fill_group(spec: AnyGroupSpec, source: SourceReader, output: zarr.Group, pa
 
 
 def _fill_carried_array(source: SourceReader, output: zarr.Group, path: str) -> None:
-    """Copy one carried array's data from the input (grid mappings hold 0)."""
+    """Copy one carried array's data from the input."""
     out_array = _output_array(output, path)
-    if path.rsplit("/", 1)[-1] == "spatial_ref":
-        out_array[...] = 0
-        return
     values = source.values(path)
     if values is None:
         msg = f"The input source holds no array at {path!r}"
         raise ValueError(msg)
+    if values.dtype.kind == "S":
+        # bytes labels are planned as the `string` data type (#356): decode
+        # them as ASCII rather than leave the conversion to zarr
+        values = np.char.decode(values, "ascii")
     out_array[...] = values
 
 
@@ -197,8 +198,6 @@ def _fill_pyramid(spec: AnyGroupSpec, source: SourceReader, output: zarr.Group, 
         data: dict[str, np.ndarray] = {}
         coords: dict[str, np.ndarray] = {}
         for var, member in level_spec.members.items():
-            if var == "spatial_ref":
-                continue
             if var in ("x", "y"):
                 coords[var] = _level_coordinate(
                     source,
@@ -222,8 +221,6 @@ def _fill_pyramid(spec: AnyGroupSpec, source: SourceReader, output: zarr.Group, 
                 )
         for var, values in {**data, **coords}.items():
             _output_array(output, f"{level_path}/{var}")[...] = values
-        if "spatial_ref" in level_spec.members:
-            _output_array(output, f"{level_path}/spatial_ref")[...] = 0
         previous_data, previous_coords, previous_meters = data, coords, meters
 
 

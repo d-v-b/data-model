@@ -285,9 +285,7 @@ def _planned_dataset_index(plan: AnyGroupSpec) -> dict[str, tuple[str, ...] | No
         names = tuple(
             name
             for name, member in spec.members.items()
-            if is_array_spec(member)
-            and name != "spatial_ref"
-            and (member.dimension_names or ()) != (name,)
+            if is_array_spec(member) and (member.dimension_names or ()) != (name,)
         )
         if names:
             index[path] = names

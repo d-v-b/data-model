@@ -13,8 +13,8 @@ separate, data-plane step.
 Everything the plan emits is derived from the input model's own metadata:
 EOPF products carry `long_name`, the `proj:*` attributes, and the CF packing
 attributes on every band, so the output documents (band arrays retyped and
-sharded, per-level coordinate arrays, `spatial_ref` grid-mapping arrays, the
-spatial/proj convention attributes, and the multiscales layout) are all
+sharded, per-level coordinate arrays, the spatial/proj convention
+attributes, and the multiscales layout) are all
 computable from the input document alone.
 
 The reflectance pyramid follows the converter's policy
@@ -26,33 +26,35 @@ also the other 10 m and 20 m bands) so they propagate through the overview
 chain. The `conditions` and `quality` subtrees are carried: their own
 multiscale groups (the classification masks and the cloud probabilities) are
 planned by `AUX_MULTISCALE_LEVELS`, georeferenced datasets get their spatial
-attributes and `spatial_ref` grid mappings, and the quicklook groups and
-scalar arrays are dropped, as the converter drops them.
+attributes, and the quicklook groups and scalar arrays are dropped, as the
+converter drops them. The `proj` and `spatial` conventions are the only
+georeferencing: no CF `grid_mapping` attribute or `spatial_ref` grid-mapping
+array is written (EOPF-Explorer/data-model#352).
 """
 
 from __future__ import annotations
 
 import base64
+import re
 import struct
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from math import ceil
 from typing import TYPE_CHECKING, Any, Final, Literal
 
 import numpy as np
+import structlog
 import xarray as xr
 from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
-from pydantic_zarr.v3 import ArraySpec as ArraySpecV3
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
 from pydantic_zarr.v3 import parse_dtype_v3
-from pyproj import CRS
 from typing_extensions import TypedDict
 from zarr_cm import ConventionMetadataObject
 from zarr_cm.multiscales import CMO as MULTISCALES_CMO
 from zarr_cm.multiscales import MultiscalesAttrs
 from zarr_cm.proj import CMO as PROJ_CMO
 from zarr_cm.spatial import CMO as SPATIAL_CMO
-from zarr_metadata.typed_json import check
 
+from eopf_geozarr.conversion.utils import normalize_cf_array_attrs
 from eopf_geozarr.data_api.geozarr.scope import GEOZARR_SCOPE
 from eopf_geozarr.data_api.geozarr.v3 import DataArray
 from eopf_geozarr.data_api.s2 import Sentinel2Root
@@ -69,7 +71,8 @@ if TYPE_CHECKING:
     from zarr_metadata.v3.codec.bytes import BytesCodecObject
     from zarr_metadata.v3.codec.crc32c import Crc32cCodecObject
     from zarr_metadata.v3.codec.sharding_indexed import ShardingIndexedCodecObject
-    from zarr_metadata.v3.codec.zstd import ZstdCodecObject
+
+log = structlog.get_logger()
 
 S2Level = Literal["L1C", "L2A"]
 
@@ -92,8 +95,8 @@ BAND_CHUNK = 1024
 
 #: Band attributes carried from the input document, in the order they are
 #: carried; everything else (xarray bookkeeping such as `_ARRAY_DIMENSIONS`
-#: and `_eopf_attrs`, and the per-band `proj:wkt2`, which the per-level
-#: `spatial_ref` array carries instead) is dropped.
+#: and `_eopf_attrs`, and the per-band `proj:wkt2`, which the enclosing
+#: group's `proj:code` replaces) is dropped.
 _BAND_ATTR_CARRY = (
     "add_offset",
     "long_name",
@@ -164,29 +167,27 @@ def product_level(root: Sentinel2Root) -> S2Level:
     raise ValueError(msg)
 
 
-def _product_proj(root: Sentinel2Root) -> tuple[tuple[float, float], int, str] | None:
+def _product_proj(root: Sentinel2Root) -> tuple[tuple[float, float], int] | None:
     """
-    The product-level georeferencing, as (origin, EPSG, WKT2), from the
-    `proj:*` keys of `stac_discovery` `properties` — the only place the Zarr
-    V3 baselines (N0512) declare it. The origin is the bbox's (min-x, max-y)
-    corner. Returns None when any of the three is missing or malformed.
+    The product-level georeferencing, as (origin, EPSG), from the `proj:*`
+    keys of `stac_discovery` `properties` — the only place the Zarr V3
+    baselines (N0512) declare it. The origin is the bbox's (min-x, max-y)
+    corner. Returns None when either is missing or malformed.
     """
     properties = root.attributes.stac_discovery.get("properties")
     if not isinstance(properties, dict):
         return None
     bbox = properties.get("proj:bbox")
     code = properties.get("proj:code")
-    wkt2 = properties.get("proj:wkt2")
     if (
         not isinstance(bbox, (list, tuple))
         or len(bbox) < 4
         or not all(isinstance(value, (int, float)) for value in bbox[:4])
         or not isinstance(code, str)
         or not code.startswith("EPSG:")
-        or not isinstance(wkt2, str)
     ):
         return None
-    return (float(bbox[0]), float(bbox[3])), int(code.removeprefix("EPSG:")), wkt2
+    return (float(bbox[0]), float(bbox[3])), int(code.removeprefix("EPSG:"))
 
 
 def _shard_and_inner(shape: tuple[int, ...]) -> tuple[tuple[int, ...], tuple[int, ...]]:
@@ -218,12 +219,12 @@ def _plan_band(
     """One band array of one *native* level: input attributes mapped and carried."""
     attributes: dict[str, object] = {
         "_FillValue": source_attrs.get("fill_value", fill_value),
-        "grid_mapping": "spatial_ref",
         "units": "1",
     }
     for key in _BAND_ATTR_CARRY:
         if key in source_attrs:
             attributes[key] = source_attrs[key]
+    attributes = normalize_cf_array_attrs(attributes, np.dtype(data_type))
     return _band_array(attributes, shape, data_type, fill_value, dimension_names, typesize)
 
 
@@ -235,7 +236,12 @@ def _band_array(
     dimension_names: tuple[str, ...],
     typesize: int,
 ) -> DataArray:
-    """One band array document: sharded uint16 with the blosc policy."""
+    """
+    One band array document with the blosc policy: sharded, unless the whole
+    array fits in one inner chunk, where a shard would hold that one chunk and
+    cost a reader an index request for nothing (#357); such an array is
+    written in plain chunks with the same codecs.
+    """
     shard, inner = _shard_and_inner(shape)
     compressor: BloscCodecObject = {
         "name": "blosc",
@@ -247,6 +253,19 @@ def _band_array(
             "blocksize": 0,
         },
     }
+    if shard == inner:
+        return DataArray.model_validate(
+            {
+                "attributes": attributes,
+                "shape": shape,
+                "data_type": data_type,
+                "chunk_grid": _regular_grid(inner),
+                "chunk_key_encoding": _CHUNK_KEY_ENCODING,
+                "fill_value": fill_value,
+                "codecs": (_BYTES_LITTLE, compressor),
+                "dimension_names": dimension_names,
+            }
+        )
     sharding: ShardingIndexedCodecObject = {
         "name": "sharding_indexed",
         "configuration": {
@@ -283,80 +302,9 @@ def _plan_coordinate(name: str, size: int) -> DataArray:
     )
 
 
-class GridMappingAttrs(TypedDict, closed=True):
-    """
-    The attributes of a Sentinel-2 `spatial_ref` grid-mapping array: pyproj's
-    CF encoding of the tile's UTM (transverse mercator) CRS, plus the WKT1
-    spellings rioxarray stores (CF's `crs_wkt` and GDAL's `spatial_ref`).
-    """
-
-    crs_wkt: str
-    false_easting: float
-    false_northing: float
-    geographic_crs_name: str
-    grid_mapping_name: str
-    horizontal_datum_name: str
-    inverse_flattening: float
-    latitude_of_projection_origin: float
-    longitude_of_central_meridian: float
-    longitude_of_prime_meridian: float
-    prime_meridian_name: str
-    projected_crs_name: str
-    reference_ellipsoid_name: str
-    scale_factor_at_central_meridian: float
-    semi_major_axis: float
-    semi_minor_axis: float
-    spatial_ref: str
-
-
-def _grid_mapping_attributes(wkt2: str) -> GridMappingAttrs:
-    """
-    The CF grid-mapping attributes of a CRS, rioxarray-style, derived from
-    the product's own `proj:wkt2` (rather than re-deriving from the EPSG
-    code, which is hostage to the installed PROJ database's naming).
-    """
-    # round-trip through CF: the stored grid mapping is exactly what a reader
-    # reconstructs from the CF attributes, with the authority bookkeeping the
-    # CF form cannot carry dropped from the WKT
-    crs = CRS.from_cf(CRS.from_wkt(wkt2).to_cf())
-    attributes: dict[str, object] = dict(crs.to_cf())
-    wkt = crs.to_wkt("WKT1_GDAL")
-    attributes["crs_wkt"] = wkt
-    attributes["spatial_ref"] = wkt
-    checked, problems = check(attributes, GridMappingAttrs)
-    if checked is None or problems:
-        details = "; ".join(f"{'.'.join(map(str, p.loc))}: {p.message}" for p in problems)
-        msg = f"The product CRS is not the expected transverse-mercator grid mapping: {details}"
-        raise ValueError(msg)
-    return checked
-
-
-def _plan_spatial_ref(wkt2: str, *, native: bool) -> ArraySpecV3:
-    """
-    The dimensionless `spatial_ref` grid-mapping array of one level.
-
-    A plain `pydantic_zarr.v3.ArraySpec` rather than a GeoZarr `DataArray`:
-    the grid-mapping array has no dimensions, which `DataArray` requires.
-    The levels written natively carry a zstd codec; the coarsened levels are
-    written uncompressed (mirroring the two write paths of the converter).
-    """
-    codecs: tuple[BytesCodecObject | ZstdCodecObject, ...] = (_BYTES_LITTLE,)
-    if native:
-        codecs = (*codecs, {"name": "zstd", "configuration": {"level": 0, "checksum": False}})
-    # create_default supplies the scalar chunk grid, the `/` chunk key
-    # encoding and the zero fill value
-    return ArraySpecV3.create_default(
-        attributes=_grid_mapping_attributes(wkt2),
-        shape=(),
-        data_type="int64",
-        codecs=codecs,
-    )
-
-
 SpatialGroupAttrs = TypedDict(
     "SpatialGroupAttrs",
     {
-        "grid_mapping": str,
         "proj:code": str,
         "spatial:bbox": list[float],
         "spatial:dimensions": list[str],
@@ -370,6 +318,21 @@ SpatialGroupAttrs = TypedDict(
 resolution dataset or a pyramid level), which always carries every key;
 the per-key value types are zarr-cm's."""
 
+LatLonGroupAttrs = TypedDict(
+    "LatLonGroupAttrs",
+    {
+        "proj:code": str,
+        "spatial:bbox": list[float],
+        "spatial:dimensions": list[str],
+        "spatial:registration": str,
+        "spatial:shape": list[int],
+        "spatial:transform": list[float],
+        "zarr_conventions": list[ConventionMetadataObject],
+    },
+)
+"""The spatial/proj convention attributes of a group on a regular geographic
+grid (`_lat_lon_attributes`), which always carries every key."""
+
 MultiscaleGroupAttrs = TypedDict(
     "MultiscaleGroupAttrs",
     {
@@ -378,13 +341,15 @@ MultiscaleGroupAttrs = TypedDict(
         "spatial:bbox": list[float],
         "spatial:dimensions": list[str],
         "spatial:registration": str,
+        "spatial:shape": list[int],
         "spatial:transform": list[float],
         "zarr_conventions": list[ConventionMetadataObject],
     },
 )
 """The attributes of a multiscale pyramid's root group: zarr-cm's multiscales
-attributes plus the finest level's georeferencing (no `grid_mapping` or
-`spatial:shape`, which belong to the level groups)."""
+attributes plus the finest level's georeferencing, its `spatial:shape` with
+its `spatial:transform` so the transform says what grid it describes
+(EOPF-Explorer/data-model#355)."""
 
 
 def _spatial_dataset_attributes(
@@ -396,7 +361,6 @@ def _spatial_dataset_attributes(
     res_x, _, x0, _, res_y, y0 = transform
     rows, cols = shape
     return {
-        "grid_mapping": "spatial_ref",
         "proj:code": f"EPSG:{epsg}",
         "spatial:bbox": [x0, y0 + rows * res_y, x0 + cols * res_x, y0],
         "spatial:dimensions": ["y", "x"],
@@ -427,7 +391,7 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
     `REFLECTANCE_SCALE_LEVELS`, native levels carried from the input (with
     the product level's finer bands injected), coarser levels derived from
     the level before them, each holding sharded uint16 band arrays, float64
-    `x`/`y` coordinates and a `spatial_ref` grid-mapping array, under a
+    `x`/`y` coordinates, under a
     multiscales layout attribute.
     """
     level = product_level(root)
@@ -454,25 +418,22 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
     first_band_attrs: Mapping[str, object] = finest.members[first_band_name].attributes
     transform = first_band_attrs.get("proj:transform")
     band_epsg = first_band_attrs.get("proj:epsg")
-    band_wkt2 = first_band_attrs.get("proj:wkt2")
     if (
         isinstance(transform, (list, tuple))
         and len(transform) >= 6
         and isinstance(band_epsg, (int, str))
-        and isinstance(band_wkt2, str)
     ):
         origin = (float(transform[2]), float(transform[5]))
         epsg = int(band_epsg)
-        wkt2 = band_wkt2
     else:
         product = _product_proj(root)
         if product is None:
             msg = (
-                f"Band {first_band_name!r} carries no usable proj:transform/proj:epsg/proj:wkt2 "
+                f"Band {first_band_name!r} carries no usable proj:transform/proj:epsg "
                 "and the product declares no stac_discovery proj georeferencing"
             )
             raise ValueError(msg)
-        origin, epsg, wkt2 = product
+        origin, epsg = product
 
     # per-level planned bands: name -> (source attrs, shape, dtype itemsize)
     planned_levels: dict[int, dict[str, DataArray]] = {}
@@ -542,10 +503,9 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
         planned_levels[meters] = bands
         rows, cols = level_shape
         shape2d = (rows, cols)
-        level_members: dict[str, DataArray | ArraySpecV3] = dict(bands)
+        level_members: dict[str, DataArray] = dict(bands)
         level_members["x"] = _plan_coordinate("x", cols)
         level_members["y"] = _plan_coordinate("y", rows)
-        level_members["spatial_ref"] = _plan_spatial_ref(wkt2, native=native)
 
         level_attributes[meters] = _level_spatial_attributes(
             meters=meters, shape=shape2d, origin=origin, epsg=epsg
@@ -582,6 +542,7 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
         "spatial:bbox": finest_level_attrs["spatial:bbox"],
         "spatial:dimensions": ["y", "x"],
         "spatial:registration": "pixel",
+        "spatial:shape": level_attributes[finest_meters]["spatial:shape"],
         "spatial:transform": [
             float(finest_meters),
             0.0,
@@ -619,6 +580,81 @@ _DROPPED_ATTRS = frozenset(
     {"_ARRAY_DIMENSIONS", "_eopf_attrs", "_FillValue", "proj:code", "proj:wkt2", "proj:projjson"}
 )
 
+#: Group attribute keys never carried: the source's CF `Conventions` claim,
+#: which the output does not make (`proj` and `spatial` are its
+#: georeferencing; EOPF-Explorer/data-model#353).
+_DROPPED_GROUP_ATTRS = frozenset({"Conventions"})
+
+CoordinateValues = Callable[[str], "np.ndarray | None"]
+"""Looks up the stored values of the input array at an output-plan path (the
+writer's `SourceReader.values`); the plan reads only the small 1-D
+coordinate arrays a group's georeferencing is derived from."""
+
+
+def _dims_of(doc: _ArrayDoc) -> tuple[str, ...]:
+    """The dimension names an input array declares (`_ARRAY_DIMENSIONS`)."""
+    dims = _doc_attrs(doc).get("_ARRAY_DIMENSIONS")
+    return tuple(str(dim) for dim in dims) if isinstance(dims, (list, tuple)) else ()
+
+
+def _carried_group_attributes(group: Mapping[str, Any]) -> dict[str, object]:
+    """A carried group's attributes, without the keys never carried."""
+    return {
+        key: value for key, value in _doc_attrs(group).items() if key not in _DROPPED_GROUP_ATTRS
+    }
+
+
+def _in_longitude_range(longitude: float) -> float:
+    """`longitude` moved by whole turns into [-180, 180] when outside it, else as it is."""
+    if -180.0 <= longitude <= 180.0:
+        return longitude
+    wrapped = (longitude + 180.0) % 360.0 - 180.0
+    # a positive multiple of 180 lands on the antimeridian's eastern spelling
+    return 180.0 if wrapped == -180.0 and longitude > 0 else wrapped
+
+
+def _lat_lon_attributes(latitude: np.ndarray, longitude: np.ndarray) -> LatLonGroupAttrs:
+    """
+    The `proj` and `spatial` attributes of a group on a regular geographic
+    grid, from its 1-D `latitude` and `longitude` coordinate values
+    (EOPF-Explorer/data-model#353). The values are grid points, so the
+    registration is `node`: the transform maps an index to a point, its
+    origin the first point, and a decreasing latitude gives a negative step;
+    the bbox spans the outer points. Longitudes are unwrapped first, so a grid
+    crossing the antimeridian (or 0/360 degrees) keeps a regular step. Refuses
+    irregular spacing, which no affine transform describes, and NaN values.
+    """
+    axes = {}
+    for name, values in (("latitude", latitude), ("longitude", longitude)):
+        values = np.asarray(values, dtype="float64")
+        if name == "longitude" and values.size > 1 and not np.isnan(values).any():
+            values = np.unwrap(values, period=360.0)
+        if values.ndim != 1 or values.size < 2:
+            msg = f"The {name} coordinate needs at least two values, got shape {values.shape}"
+            raise ValueError(msg)
+        # the step from the end points, which averages out the rounding of
+        # coordinates stored as float32; spacing within a thousandth of it is
+        # regular
+        step = float(values[-1] - values[0]) / (values.size - 1)
+        if step == 0 or not np.allclose(np.diff(values), step, rtol=1e-3, atol=0.0):
+            msg = f"The {name} coordinate is not regularly spaced, so no transform describes it"
+            raise ValueError(msg)
+        axes[name] = (values, step)
+    (lat, dlat), (lon, dlon) = axes["latitude"], axes["longitude"]
+    # the bbox longitudes back in [-180, 180]: a grid crossing the antimeridian
+    # gets west > east, as STAC and GeoJSON spell the crossing
+    west, east = (_in_longitude_range(float(value)) for value in (lon.min(), lon.max()))
+    return {
+        "proj:code": "EPSG:4326",
+        "spatial:bbox": [west, float(lat.min()), east, float(lat.max())],
+        "spatial:dimensions": ["latitude", "longitude"],
+        "spatial:registration": "node",
+        "spatial:shape": [int(lat.size), int(lon.size)],
+        "spatial:transform": [dlon, 0.0, float(lon[0]), 0.0, dlat, float(lat[0])],
+        "zarr_conventions": [SPATIAL_CMO, PROJ_CMO],
+    }
+
+
 # The conditions/quality planner walks the input model's *dump* — plain Zarr
 # V2 documents — because the input model types those subtrees loosely, so
 # their nodes are a mix of spec models and raw mappings. A node holding
@@ -635,24 +671,55 @@ def _doc_attrs(doc: Mapping[str, Any]) -> Mapping[str, object]:
     return attributes
 
 
-def _carried_array_attributes(
-    attrs: Mapping[str, object], *, is_float: bool, grid_mapping: bool, name: str
+_LEVEL_GROUP = re.compile(r"r(\d+)m")
+"""The name of a resolution level group (`r10m`, `r720m`), its metres captured."""
+
+
+def _level_meters(path: str) -> int | None:
+    """The resolution in metres of the level group at `path`, if it is one."""
+    match = _LEVEL_GROUP.fullmatch(path.rsplit("/", 1)[-1])
+    return int(match.group(1)) if match else None
+
+
+def _with_level_short_name(
+    attributes: dict[str, object], name: str, meters: int | None
 ) -> dict[str, object]:
-    """The output attributes of a carried array: sanitized, with the CF float
-    fill, the grid-mapping reference and the SCL flag table added."""
-    out = {key: value for key, value in attrs.items() if key not in _DROPPED_ATTRS}
+    """
+    `attributes` with a carried `short_name` written for the level the array
+    is in, `<variable>_r<resolution>m`: a source `short_name` names the source
+    level (and a coarsened level copied it verbatim), and the source styles
+    are mixed (EOPF-Explorer/data-model#351). Outside a level group, or
+    without a `short_name`, the attributes are returned as they are.
+    """
+    if meters is None or "short_name" not in attributes:
+        return attributes
+    return {**attributes, "short_name": f"{name}_r{meters}m"}
+
+
+def _carried_array_attributes(
+    attrs: Mapping[str, object],
+    *,
+    is_float: bool,
+    name: str,
+    dtype: np.dtype[Any],
+    level_meters: int | None = None,
+) -> dict[str, object]:
+    """The output attributes of a carried array: sanitized, the CF attributes
+    put right for its data type, with the CF float fill, the SCL flag table
+    and a per-level `short_name`."""
+    out = normalize_cf_array_attrs(
+        {key: value for key, value in attrs.items() if key not in _DROPPED_ATTRS}, dtype
+    )
     if is_float:
         out["_FillValue"] = _NAN_FLOAT64_B64
-    if grid_mapping:
-        out["grid_mapping"] = "spatial_ref"
     if name == "scl":
         # the converter's SCL flag table and NO_DATA fill declaration
         out.update(SCL_ATTRS)
         out["_FillValue"] = SCL_NODATA
-    return out
+    return _with_level_short_name(out, name, level_meters)
 
 
-def _plan_carried_array(name: str, doc: _ArrayDoc, *, spatial: bool) -> DataArray:
+def _plan_carried_array(name: str, doc: _ArrayDoc, *, level_meters: int | None = None) -> DataArray:
     """
     One carried (non-reflectance) array, translated to its output document:
     `x`/`y` become the float64 coordinate arrays, other coordinate arrays
@@ -675,9 +742,20 @@ def _plan_carried_array(name: str, doc: _ArrayDoc, *, spatial: bool) -> DataArra
     attributes = _carried_array_attributes(
         attrs,
         is_float=parsed.kind == "f",
-        grid_mapping=spatial and "proj:epsg" in attrs,
         name=name,
+        dtype=parsed,
+        level_meters=level_meters,
     )
+    if parsed.kind in "US":
+        # fixed-length unicode or bytes labels (the geometry `angle`, `band`
+        # and `detector` coordinates) are stored as the registered `string`
+        # data type, which every Zarr V3 reader can read, instead of the
+        # unregistered `fixed_length_utf32` / `null_terminated_bytes` (#356);
+        # create_default supplies its `vlen-utf8` codec, the empty fill and
+        # one chunk
+        return DataArray.create_default(
+            attributes=attributes, shape=shape, data_type="string", dimension_names=dims
+        )
     if dims == (name,):
         # a coordinate array: one chunk, uncompressed (create_default supplies
         # the one-chunk grid and the `/` chunk key encoding)
@@ -713,8 +791,8 @@ def _spatial_anchor(arrays: Mapping[str, _ArrayDoc]) -> tuple[str, _ArrayDoc] | 
 _Transform6 = tuple[float, float, float, float, float, float]
 
 
-def _proj_of(name: str, doc: _ArrayDoc) -> tuple[_Transform6, int, str]:
-    """The (transform, EPSG, WKT2) a proj-bearing input array carries."""
+def _proj_of(name: str, doc: _ArrayDoc) -> tuple[_Transform6, int]:
+    """The (transform, EPSG) a proj-bearing input array carries."""
     attrs = _doc_attrs(doc)
     transform = attrs.get("proj:transform")
     if not isinstance(transform, (list, tuple)) or len(transform) < 6:
@@ -724,29 +802,54 @@ def _proj_of(name: str, doc: _ArrayDoc) -> tuple[_Transform6, int, str]:
     return (
         (a, b, c, d, e, f),
         int(attrs["proj:epsg"]),  # type: ignore[call-overload]
-        str(attrs["proj:wkt2"]),
     )
 
 
-def _plan_dataset(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
+def _plan_dataset(
+    group: _GroupDoc, path: str, coordinate_values: CoordinateValues | None = None
+) -> AnyGroupSpec | None:
     """
     Plan one carried leaf dataset: every non-scalar array translated, and —
     when the dataset is georeferenced (an array carries proj attributes) —
-    the group's spatial attributes and a `spatial_ref` grid-mapping array.
+    the group's spatial attributes.
     Returns `None` for a dataset with no arrays to carry.
     """
     arrays = _carried_arrays(group)
     if not arrays:
         return None
     anchor = _spatial_anchor(arrays)
-    members: dict[str, DataArray | ArraySpecV3] = {
-        name: _plan_carried_array(name, member, spatial=anchor is not None)
+    meters = _level_meters(path)
+    members: dict[str, DataArray] = {
+        name: _plan_carried_array(name, member, level_meters=meters)
         for name, member in arrays.items()
     }
     if anchor is None:
-        return GroupSpecV3(attributes=dict(_doc_attrs(group)), members=members)
-    transform, epsg, wkt2 = _proj_of(*anchor)
-    members["spatial_ref"] = _plan_spatial_ref(wkt2, native=True)
+        attributes = _carried_group_attributes(group)
+        latitude, longitude = arrays.get("latitude"), arrays.get("longitude")
+        if (
+            coordinate_values is not None
+            and latitude is not None
+            and longitude is not None
+            and _dims_of(latitude) == ("latitude",)
+            and _dims_of(longitude) == ("longitude",)
+        ):
+            lat_values = coordinate_values(f"{path}/latitude")
+            lon_values = coordinate_values(f"{path}/longitude")
+            if lat_values is not None and lon_values is not None:
+                # a regular geographic grid (the meteorology groups): its
+                # georeferencing derived from its coordinates. A grid no
+                # transform describes is carried without it, as before,
+                # rather than stopping the conversion.
+                try:
+                    attributes = {**attributes, **_lat_lon_attributes(lat_values, lon_values)}
+                except ValueError as error:
+                    log.warning(
+                        "Carrying a latitude/longitude group without georeferencing",
+                        group=path,
+                        reason=str(error),
+                    )
+        return GroupSpecV3(attributes=attributes, members=members)
+    transform, epsg = _proj_of(*anchor)
     return GroupSpecV3(
         attributes=_spatial_dataset_attributes(transform, tuple(anchor[1]["shape"]), epsg),
         members=members,
@@ -757,7 +860,7 @@ def _plan_aux_multiscale(
     group: _GroupDoc,
     path: str,
     scale_levels: tuple[int, ...],
-    product_proj: tuple[tuple[float, float], int, str] | None = None,
+    product_proj: tuple[tuple[float, float], int] | None = None,
 ) -> AnyGroupSpec:
     """
     Plan an auxiliary multiscale group (a classification mask or the cloud
@@ -783,12 +886,12 @@ def _plan_aux_multiscale(
     }
     anchor = _spatial_anchor(finest_arrays)
     if anchor is not None:
-        transform, epsg, wkt2 = _proj_of(*anchor)
+        transform, epsg = _proj_of(*anchor)
         origin = (transform[2], transform[5])
     elif product_proj is not None:
         # Zarr V3 baselines carry no proj attributes on the mask arrays; the
         # pyramid is georeferenced from the product-level declaration instead
-        origin, epsg, wkt2 = product_proj
+        origin, epsg = product_proj
     else:
         msg = f"The {path} group's finest level carries no proj attributes"
         raise ValueError(msg)
@@ -807,7 +910,7 @@ def _plan_aux_multiscale(
             for name, member in _carried_arrays(input_levels[meters]).items():
                 if name in ("x", "y"):
                     continue
-                variables[name] = _plan_carried_array(name, member, spatial=True)
+                variables[name] = _plan_carried_array(name, member, level_meters=meters)
             if not variables:
                 msg = f"The {path} r{meters}m dataset holds no arrays"
                 raise ValueError(msg)
@@ -825,9 +928,10 @@ def _plan_aux_multiscale(
                 if not isinstance(data_type, str):
                     msg = f"Cannot coarsen {path} variable {name!r} of data type {data_type!r}"
                     raise TypeError(msg)
-                # a coarsened variable keeps its attributes verbatim
+                # a coarsened variable keeps its attributes, its short_name
+                # written for this level
                 variables[name] = _band_array(
-                    previous.attributes.model_dump(),
+                    _with_level_short_name(previous.attributes.model_dump(), name, meters),
                     shape,
                     data_type,
                     previous.fill_value,
@@ -842,10 +946,9 @@ def _plan_aux_multiscale(
         )
         planned_levels[meters] = variables
         rows, cols = next(iter(variables.values())).shape
-        level_members: dict[str, DataArray | ArraySpecV3] = dict(variables)
+        level_members: dict[str, DataArray] = dict(variables)
         level_members["x"] = _plan_coordinate("x", cols)
         level_members["y"] = _plan_coordinate("y", rows)
-        level_members["spatial_ref"] = _plan_spatial_ref(wkt2, native=native)
         level_attributes[meters] = _level_spatial_attributes(
             meters=meters, shape=(rows, cols), origin=origin, epsg=epsg
         )
@@ -882,6 +985,7 @@ def _plan_aux_multiscale(
         "spatial:bbox": level_attributes[min(input_levels)]["spatial:bbox"],
         "spatial:dimensions": ["y", "x"],
         "spatial:registration": "pixel",
+        "spatial:shape": level_attributes[finest_meters]["spatial:shape"],
         "spatial:transform": [
             float(finest_meters),
             0.0,
@@ -898,7 +1002,8 @@ def _plan_aux_multiscale(
 def _plan_subtree(
     group: _GroupDoc,
     path: str,
-    product_proj: tuple[tuple[float, float], int, str] | None = None,
+    product_proj: tuple[tuple[float, float], int] | None = None,
+    coordinate_values: CoordinateValues | None = None,
 ) -> AnyGroupSpec | None:
     """
     Plan one conditions/quality subtree: aux multiscale groups by their specs,
@@ -915,22 +1020,24 @@ def _plan_subtree(
         if isinstance(member, Mapping) and "members" in member
     }
     if not subgroups:
-        return _plan_dataset(group, path)
+        return _plan_dataset(group, path, coordinate_values)
     planned: dict[str, AnyGroupSpec] = {}
     for name, member in subgroups.items():
-        sub = _plan_subtree(member, f"{path}/{name}", product_proj)
+        sub = _plan_subtree(member, f"{path}/{name}", product_proj, coordinate_values)
         if sub is not None:
             planned[name] = sub
     # a group holding arrays next to its subgroups keeps those arrays too
-    own = _plan_dataset(group, path)
+    own = _plan_dataset(group, path, coordinate_values)
     if own is not None:
         return GroupSpecV3(attributes=own.attributes, members={**dict(own.members), **planned})
     if not planned:
         return None
-    return GroupSpecV3(attributes=dict(_doc_attrs(group)), members=planned)
+    return GroupSpecV3(attributes=_carried_group_attributes(group), members=planned)
 
 
-def plan_geozarr(root: Sentinel2Root) -> AnyGroupSpec:
+def plan_geozarr(
+    root: Sentinel2Root, *, coordinate_values: CoordinateValues | None = None
+) -> AnyGroupSpec:
     """
     Plan the GeoZarr hierarchy to write for a Sentinel-2 product.
 
@@ -939,6 +1046,12 @@ def plan_geozarr(root: Sentinel2Root) -> AnyGroupSpec:
     pyramid, and the `conditions` and `quality` subtrees carried (their own
     multiscale groups planned by `AUX_MULTISCALE_LEVELS`, the quicklooks and
     scalar arrays dropped).
+
+    The plan reads metadata only, except where georeferencing must be derived
+    from coordinate values: a carried group on a regular geographic grid
+    (1-D `latitude` and `longitude` coordinates, no `proj:*` attributes,
+    such as the meteorology groups) gets its `proj` and `spatial` attributes
+    from the values `coordinate_values` looks up, and none without it.
     """
     members: dict[str, AnyGroupSpec] = {
         "measurements": GroupSpecV3(attributes={}, members={"reflectance": plan_reflectance(root)}),
@@ -948,7 +1061,7 @@ def plan_geozarr(root: Sentinel2Root) -> AnyGroupSpec:
         member = root.members.get(top)
         if member is None:
             continue
-        planned = _plan_subtree(member.model_dump(), top, product_proj)
+        planned = _plan_subtree(member.model_dump(), top, product_proj, coordinate_values)
         if planned is not None:
             members[top] = planned
     return GroupSpecV3(attributes={}, members=members)
