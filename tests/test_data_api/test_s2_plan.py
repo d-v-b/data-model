@@ -249,6 +249,35 @@ def test_plan_puts_cf_attributes_right_on_every_level() -> None:
         assert scl["valid_min"] == 0, level
 
 
+def _arrays(node: dict[str, Any], path: str = "") -> list[tuple[str, dict[str, Any]]]:
+    """Every array of a dumped tree, with its path."""
+    if node.get("node_type") == "array":
+        return [(path, node)]
+    found: list[tuple[str, dict[str, Any]]] = []
+    for name, member in (node.get("members") or {}).items():
+        found.extend(_arrays(member, f"{path}/{name}"))
+    return found
+
+
+@pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
+def test_plan_shards_only_arrays_of_several_chunks(path: pathlib.Path) -> None:
+    """
+    A sharded array spans more than one inner chunk; an array that fits in one
+    inner chunk is written in plain chunks (#357), with the same compressor.
+    """
+    single_chunk_shards = []
+    for array_path, array in _arrays(_planned_root(path)):
+        codecs = array["codecs"]
+        if codecs[0]["name"] == "sharding_indexed":
+            inner = codecs[0]["configuration"]["chunk_shape"]
+            if all(n <= i for n, i in zip(array["shape"], inner, strict=True)):
+                single_chunk_shards.append(array_path)
+        elif any(codec["name"] == "blosc" for codec in codecs):
+            # an unsharded band array is one chunk covering the array
+            assert array["chunk_grid"]["configuration"]["chunk_shape"] == array["shape"]
+    assert single_chunk_shards == []
+
+
 def test_plan_reflectance_requires_product_georeferencing() -> None:
     """A product whose bands carry no proj attributes and whose stac_discovery
     declares none is refused with a ValueError, not a KeyError."""

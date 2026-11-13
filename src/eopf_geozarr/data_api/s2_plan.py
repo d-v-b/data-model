@@ -238,7 +238,12 @@ def _band_array(
     dimension_names: tuple[str, ...],
     typesize: int,
 ) -> DataArray:
-    """One band array document: sharded uint16 with the blosc policy."""
+    """
+    One band array document with the blosc policy: sharded, unless the whole
+    array fits in one inner chunk, where a shard would hold that one chunk and
+    cost a reader an index request for nothing (#357); such an array is
+    written in plain chunks with the same codecs.
+    """
     shard, inner = _shard_and_inner(shape)
     compressor: BloscCodecObject = {
         "name": "blosc",
@@ -250,6 +255,19 @@ def _band_array(
             "blocksize": 0,
         },
     }
+    if shard == inner:
+        return DataArray.model_validate(
+            {
+                "attributes": attributes,
+                "shape": shape,
+                "data_type": data_type,
+                "chunk_grid": _regular_grid(inner),
+                "chunk_key_encoding": _CHUNK_KEY_ENCODING,
+                "fill_value": fill_value,
+                "codecs": (_BYTES_LITTLE, compressor),
+                "dimension_names": dimension_names,
+            }
+        )
     sharding: ShardingIndexedCodecObject = {
         "name": "sharding_indexed",
         "configuration": {
