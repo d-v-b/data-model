@@ -321,7 +321,7 @@ def test_plan_stores_labels_as_registered_strings(path: pathlib.Path) -> None:
             [10.0, 9.5, 9.0],
             [179.5, 179.75, -180.0, -179.75],
             {
-                "spatial:bbox": [179.5, 9.0, 180.25, 10.0],
+                "spatial:bbox": [179.5, 9.0, -179.75, 10.0],
                 "spatial:transform": [0.25, 0.0, 179.5, 0.0, -0.5, 10.0],
             },
         ),

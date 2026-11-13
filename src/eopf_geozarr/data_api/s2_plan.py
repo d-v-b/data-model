@@ -686,6 +686,15 @@ def _carried_group_attributes(group: Mapping[str, Any]) -> dict[str, object]:
     }
 
 
+def _in_longitude_range(longitude: float) -> float:
+    """`longitude` moved by a turn into [-180, 180] when outside it, else as it is."""
+    if longitude > 180.0:
+        return longitude - 360.0
+    if longitude < -180.0:
+        return longitude + 360.0
+    return longitude
+
+
 def _lat_lon_attributes(latitude: np.ndarray, longitude: np.ndarray) -> LatLonGroupAttrs:
     """
     The `proj` and `spatial` attributes of a group on a regular geographic
@@ -714,9 +723,12 @@ def _lat_lon_attributes(latitude: np.ndarray, longitude: np.ndarray) -> LatLonGr
             raise ValueError(msg)
         axes[name] = (values, step)
     (lat, dlat), (lon, dlon) = axes["latitude"], axes["longitude"]
+    # the bbox longitudes back in [-180, 180]: a grid crossing the antimeridian
+    # gets west > east, as STAC and GeoJSON spell the crossing
+    west, east = (_in_longitude_range(float(value)) for value in (lon.min(), lon.max()))
     return {
         "proj:code": "EPSG:4326",
-        "spatial:bbox": [float(lon.min()), float(lat.min()), float(lon.max()), float(lat.max())],
+        "spatial:bbox": [west, float(lat.min()), east, float(lat.max())],
         "spatial:dimensions": ["latitude", "longitude"],
         "spatial:registration": "node",
         "spatial:shape": [int(lat.size), int(lon.size)],
