@@ -605,12 +605,12 @@ def _carried_group_attributes(group: Mapping[str, Any]) -> dict[str, object]:
 
 
 def _in_longitude_range(longitude: float) -> float:
-    """`longitude` moved by a turn into [-180, 180] when outside it, else as it is."""
-    if longitude > 180.0:
-        return longitude - 360.0
-    if longitude < -180.0:
-        return longitude + 360.0
-    return longitude
+    """`longitude` moved by whole turns into [-180, 180] when outside it, else as it is."""
+    if -180.0 <= longitude <= 180.0:
+        return longitude
+    wrapped = (longitude + 180.0) % 360.0 - 180.0
+    # a positive multiple of 180 lands on the antimeridian's eastern spelling
+    return 180.0 if wrapped == -180.0 and longitude > 0 else wrapped
 
 
 def _lat_lon_attributes(latitude: np.ndarray, longitude: np.ndarray) -> LatLonGroupAttrs:

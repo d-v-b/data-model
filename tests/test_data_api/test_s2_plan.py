@@ -325,12 +325,26 @@ def test_plan_stores_labels_as_registered_strings(path: pathlib.Path) -> None:
             },
         ),
         (
+            [10.0, 9.5],
+            [300.0, 330.0, 0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0],
+            {
+                "spatial:bbox": [-60.0, 9.5, -150.0, 10.0],
+                "spatial:transform": [30.0, 0.0, 300.0, 0.0, -0.5, 10.0],
+            },
+        ),
+        (
             np.linspace(48.0, 44.8, 9, dtype="float32").tolist(),
             np.linspace(8.0, 11.2, 9, dtype="float32").tolist(),
             {"spatial:shape": [9, 9]},
         ),
     ],
-    ids=["latitude-decreasing", "latitude-increasing", "antimeridian", "float32-rounding"],
+    ids=[
+        "latitude-decreasing",
+        "latitude-increasing",
+        "antimeridian",
+        "wide-0-360-grid",
+        "float32-rounding",
+    ],
 )
 def test_lat_lon_attributes(
     latitude: list[float], longitude: list[float], expected: dict[str, object]
