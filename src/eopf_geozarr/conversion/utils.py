@@ -360,23 +360,41 @@ def strip_cf_grid_mapping(dataset: xr.Dataset) -> xr.Dataset:
     input is not modified (EOPF-Explorer/data-model#352).
 
     The `proj` and `spatial` conventions are the output's only georeferencing,
-    so the grid-mapping variables (`spatial_ref`, and any variable a
-    `grid_mapping` attribute or encoding names) are dropped, and
-    `grid_mapping` is removed from the dataset's attributes and from every
-    variable's attributes and encoding. rioxarray's `write_crs` adds them, so
-    a dataset that was reprojected through rioxarray needs this before it is
-    written.
+    so the grid-mapping variables (any variable a `grid_mapping` attribute or
+    encoding names, and a `spatial_ref` variable holding CF grid-mapping
+    attributes) are dropped, and `grid_mapping` is removed from the dataset's
+    attributes and from every variable's attributes and encoding. rioxarray's
+    `write_crs` adds them, so a dataset that was reprojected through rioxarray
+    needs this before it is written.
+
+    The CRS is not lost: when the dataset declares no `proj:*` attribute, the
+    grid mapping's CRS is carried over as the `proj` convention attributes
+    before the grid mapping is dropped.
     """
-    names = {"spatial_ref"}
+    names: set[str] = set()
+    reference = dataset.variables.get("spatial_ref")
+    if reference is not None and not {"crs_wkt", "grid_mapping_name", "spatial_ref"}.isdisjoint(
+        reference.attrs
+    ):
+        names.add("spatial_ref")
     for holder in (dataset.attrs, *(v.attrs for v in dataset.variables.values())):
         if isinstance(holder.get("grid_mapping"), str):
             names.add(holder["grid_mapping"])
     for variable in dataset.variables.values():
         if isinstance(variable.encoding.get("grid_mapping"), str):
             names.add(variable.encoding["grid_mapping"])
-    out = dataset.drop_vars([name for name in names if name in dataset.variables])
+    names = {name for name in names if name in dataset.variables}
+    carried: dict[str, Any] = {}
+    if names and not any(str(key).startswith("proj:") for key in dataset.attrs):
+        crs = dataset.rio.crs
+        if crs is not None:
+            carried = dict(build_convention_attrs(spatial=None, crs=CRS.from_user_input(crs)))
+    out = dataset.drop_vars(sorted(names))
     out = out.copy(deep=False)
-    out.attrs = {key: value for key, value in out.attrs.items() if key != "grid_mapping"}
+    out.attrs = {
+        **{key: value for key, value in out.attrs.items() if key != "grid_mapping"},
+        **carried,
+    }
     for variable in out.variables.values():
         variable.attrs = {k: v for k, v in variable.attrs.items() if k != "grid_mapping"}
         variable.encoding = {k: v for k, v in variable.encoding.items() if k != "grid_mapping"}
@@ -385,7 +403,7 @@ def strip_cf_grid_mapping(dataset: xr.Dataset) -> xr.Dataset:
 
 def write_dataset_geo_metadata(
     dataset: xr.Dataset,
-    crs: CRS | None = None,
+    crs: CRS | str | int | None = None,
 ) -> xr.Dataset:
     """
     Return a copy of the dataset with geographic metadata added; `dataset` is not modified.
@@ -458,7 +476,7 @@ def stream_write_dataset(
     encoding: dict[str, XarrayDataArrayEncoding],
     add_geo_metadata: bool = False,
     chunk_and_shard_coords: bool = True,
-    crs: CRS | None = None,
+    crs: CRS | str | int | None = None,
 ) -> xr.Dataset:
     """
     Stream write a lazy dataset with advanced chunking and sharding.

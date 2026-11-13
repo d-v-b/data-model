@@ -196,7 +196,8 @@ output.zarr/
 │   │   │   ├── b04/
 │   │   │   ├── b08/
 │   │   │   ├── x/            # X coordinates
-│   │   │   └── y/            # Y coordinates
+│   │   │   ├── y/            # Y coordinates
+│   │   │   └── spatial_ref/  # CF grid mapping (generic converter only)
 │   │   ├── 1/                # Overview level 1 (/2)
 │   │   └── 2/                # Overview level 2 (/4)
 │   ├── r20m/                 # 20m resolution group
@@ -353,10 +354,14 @@ Each dataset group declares its CRS with the
 [proj convention](https://github.com/zarr-conventions/proj) (`proj:code`), and
 its grid with the [spatial convention](https://github.com/zarr-conventions/spatial)
 (`spatial:transform`, `spatial:shape`, `spatial:bbox`). These are the only
-georeferencing: the CF grid mapping of GeoZarr V0 (a `spatial_ref` variable
-holding `crs_wkt`, referenced by `grid_mapping` attributes) is obsolete and no
-longer written ([#352](https://github.com/EOPF-Explorer/data-model/issues/352)).
-An array opened on its own has no CRS; read `proj:code` from its group.
+georeferencing of the S2, S1 RTC and OLCI converters: the CF grid mapping of
+GeoZarr V0 (a `spatial_ref` variable holding `crs_wkt`, referenced by
+`grid_mapping` attributes) is obsolete and no longer written by them
+([#352](https://github.com/EOPF-Explorer/data-model/issues/352)). The generic
+converter (`create_geozarr_dataset`), whose layout is shown above, still writes
+it. An array opened on its own has no CRS; read `proj:code` from its group.
+rioxarray (0.23, 0.24) does not yet read the proj convention under its spec
+name, `"proj"`, so it resolves no CRS from these groups.
 
 ### 3. Multiscales Metadata
 

@@ -18,6 +18,7 @@ from eopf_geozarr.conversion.utils import (
     _rechunk_ds,
     create_uniform_encoding,
     stream_write_dataset,
+    strip_cf_grid_mapping,
     write_dataset_geo_metadata,
 )
 
@@ -421,3 +422,57 @@ class TestWriteGeoMetadataEdgeCases:
 
         # Verify zarr_conventions was not added since no CRS was available
         assert "zarr_conventions" not in result.attrs
+
+
+def _grid_mapped_dataset() -> xr.Dataset:
+    """A dataset whose CRS is declared only by a CF grid mapping (rioxarray's)."""
+    ds = xr.Dataset(
+        {"b02": (["y", "x"], np.zeros((4, 4)))},
+        coords={"x": np.arange(4) * 10.0 + 5, "y": 35.0 - np.arange(4) * 10.0},
+    )
+    out = ds.rio.write_crs("EPSG:32632")
+    assert isinstance(out, xr.Dataset)
+    return out
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_code", "kept_spatial_ref"),
+    [
+        ("grid-mapped", "EPSG:32632", False),
+        ("grid-mapped-with-proj", "EPSG:4326", False),
+        ("unrelated-spatial_ref", None, True),
+    ],
+)
+def test_strip_cf_grid_mapping(
+    case: str, expected_code: str | None, kept_spatial_ref: bool
+) -> None:
+    """
+    The CF grid mapping is dropped, its CRS carried over as `proj:code` when the
+    dataset declares none (#352); a declared `proj:code` is kept, and a variable
+    named `spatial_ref` that is not a grid mapping is not touched.
+    """
+    if case == "unrelated-spatial_ref":
+        ds = xr.Dataset({"spatial_ref": (["n"], np.arange(3))})
+    else:
+        ds = _grid_mapped_dataset()
+        if case == "grid-mapped-with-proj":
+            ds.attrs["proj:code"] = "EPSG:4326"
+    result = strip_cf_grid_mapping(ds)
+    assert result.attrs.get("proj:code") == expected_code
+    assert ("spatial_ref" in result.variables) is kept_spatial_ref
+    assert all("grid_mapping" not in v.attrs for v in result.variables.values())
+    assert all("grid_mapping" not in v.encoding for v in result.variables.values())
+
+
+def test_stream_write_keeps_the_crs_of_a_grid_mapped_input(tmp_path: Path) -> None:
+    """
+    Without `add_geo_metadata` (the generic rechunker), a dataset whose CRS is
+    declared only by a CF grid mapping is written with that CRS as `proj:code`,
+    not with no CRS at all, and without the grid mapping (#352).
+    """
+    ds = _rechunk_ds(_grid_mapped_dataset(), spatial_chunk=1024)
+    encoding = create_uniform_encoding(ds, enable_sharding=True)
+    stream_write_dataset(ds, path="/data", group=zarr.create_group(tmp_path), encoding=encoding)
+    written = xr.open_dataset(tmp_path, engine="zarr", group="/data", decode_coords="all")
+    assert written.attrs["proj:code"] == "EPSG:32632"
+    assert "spatial_ref" not in written.variables
