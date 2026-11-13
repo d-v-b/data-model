@@ -354,18 +354,49 @@ def get_subroots(groups: tuple[str, ...]) -> set[str] | None:
     return subroots or None
 
 
+def strip_cf_grid_mapping(dataset: xr.Dataset) -> xr.Dataset:
+    """
+    Return a copy of *dataset* without the CF grid mapping (GeoZarr V0); the
+    input is not modified (EOPF-Explorer/data-model#352).
+
+    The `proj` and `spatial` conventions are the output's only georeferencing,
+    so the grid-mapping variables (`spatial_ref`, and any variable a
+    `grid_mapping` attribute or encoding names) are dropped, and
+    `grid_mapping` is removed from the dataset's attributes and from every
+    variable's attributes and encoding. rioxarray's `write_crs` adds them, so
+    a dataset that was reprojected through rioxarray needs this before it is
+    written.
+    """
+    names = {"spatial_ref"}
+    for holder in (dataset.attrs, *(v.attrs for v in dataset.variables.values())):
+        if isinstance(holder.get("grid_mapping"), str):
+            names.add(holder["grid_mapping"])
+    for variable in dataset.variables.values():
+        if isinstance(variable.encoding.get("grid_mapping"), str):
+            names.add(variable.encoding["grid_mapping"])
+    out = dataset.drop_vars([name for name in names if name in dataset.variables])
+    out = out.copy(deep=False)
+    out.attrs = {key: value for key, value in out.attrs.items() if key != "grid_mapping"}
+    for variable in out.variables.values():
+        variable.attrs = {k: v for k, v in variable.attrs.items() if k != "grid_mapping"}
+        variable.encoding = {k: v for k, v in variable.encoding.items() if k != "grid_mapping"}
+    return out
+
+
 def write_dataset_geo_metadata(
     dataset: xr.Dataset,
-    grid_mapping_var_name: str = "spatial_ref",
     crs: CRS | None = None,
 ) -> xr.Dataset:
     """
     Return a copy of the dataset with geographic metadata added; `dataset` is not modified.
     Requires a crs or a dataset from which a CRS can be derived.
 
+    The metadata is the `proj` and `spatial` convention attributes only: no
+    CF grid mapping (`spatial_ref` variable, `grid_mapping` attributes) is
+    written (EOPF-Explorer/data-model#352).
+
     Args:
         dataset: Dataset to add metadata to
-        grid_mapping_var_name: Name for grid mapping variable
         crs: Coordinate Reference System to use (if None, attempts to detect from dataset)
 
     Returns:
@@ -386,19 +417,9 @@ def write_dataset_geo_metadata(
                 break
 
     if crs is not None:
-        # Write CRS using rioxarray
-        # NOTE: for now rioxarray only supports writing grid mapping using CF conventions
-        dataset.rio.write_crs(crs, grid_mapping_name=grid_mapping_var_name, inplace=True)
-        dataset.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
-        dataset.attrs["grid_mapping"] = grid_mapping_var_name
-
-        for var in dataset.data_vars.values():
-            var.rio.write_grid_mapping(grid_mapping_var_name, inplace=True)
-            var.attrs["grid_mapping"] = grid_mapping_var_name
-
-        # Also add proj: and spatial: zarr conventions at dataset level
-        # TODO : Remove once rioxarray supports writing these conventions directly
-        # https://github.com/corteva/rioxarray/pull/883
+        # a CRS given as a string or EPSG code, which `rio.write_crs` used to take
+        crs = CRS.from_user_input(crs)
+        # The proj: and spatial: zarr conventions at dataset level
 
         # Assemble spatial convention data
         spatial_data: spatial_cm.SpatialAttrs = {
@@ -481,6 +502,11 @@ def stream_write_dataset(
 
     if add_geo_metadata:
         dataset = write_dataset_geo_metadata(dataset, crs=crs)
+
+    # No CF grid mapping reaches the output (#352); its encoding entries go
+    # with the variables
+    dataset = strip_cf_grid_mapping(dataset)
+    encoding = {name: enc for name, enc in encoding.items() if name in dataset.variables}
 
     # Sanitize NaN values in dataset attributes before writing
     dataset = fs_utils.sanitize_dataset_attributes(dataset)

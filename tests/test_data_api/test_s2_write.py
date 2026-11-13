@@ -212,8 +212,8 @@ def test_write_geozarr_data_semantics(tmp_path: pathlib.Path) -> None:
         x_generated, x_native[: x_generated.shape[0] * 2].reshape(-1, 2).mean(axis=1)
     )
 
-    # grid-mapping arrays hold zero
-    assert read(output, "measurements/reflectance/r120m/spatial_ref") == 0
+    # no CF grid-mapping array is written: proj:code is the CRS (#352)
+    assert "spatial_ref" not in output["measurements/reflectance/r120m"]
 
 
 @pytest.mark.parametrize("factor", [2, 3])

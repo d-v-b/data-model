@@ -94,7 +94,7 @@ def test_s1_rtc_overview_levels(s1_rtc_json_example: dict[str, object]) -> None:
         # and a level without `time` cannot be selected by datetime. This assertion used to
         # demand the opposite -- it was written against a fixture that predated #192, and it is
         # the reason a writer/model mismatch survived in the suite.
-        for coord in ("time", "x", "y", "spatial_ref"):
+        for coord in ("time", "x", "y"):
             assert coord in group.members, f"{level} is missing the {coord!r} coordinate"
 
 
@@ -166,8 +166,8 @@ def test_s1_rtc_rejects_conditions_without_condition_arrays(
     """
     data = copy.deepcopy(s1_rtc_json_example)
     cond_members = _nav(data, "members", "descending", "members", "conditions", "members")
-    kept = {name: spec for name, spec in cond_members.items() if name in ("x", "y", "spatial_ref")}
-    assert set(kept) == {"x", "y", "spatial_ref"}, "fixture lost its conditions coordinates"
+    kept = {name: spec for name, spec in cond_members.items() if name in ("x", "y")}
+    assert set(kept) == {"x", "y"}, "fixture lost its conditions coordinates"
     kept["some_other"] = next(iter(cond_members.values()))
     _nav(data, "members", "descending", "members", "conditions")["members"] = kept
     with pytest.raises(Exception, match="at least one condition array"):
@@ -272,10 +272,10 @@ class TestWriterRoundTrip:
         for level in ("r10m", "r20m", "r60m", "r120m", "r360m", "r720m"):
             group = model.ascending.get_resolution(level)
             assert group is not None, f"missing level {level}"
-            for coord in ("time", "x", "y", "spatial_ref"):
+            for coord in ("time", "x", "y"):
                 assert coord in group.members, f"{level} lost {coord!r}"
 
-    @pytest.mark.parametrize("coordinate", ["time", "x", "y", "spatial_ref"])
+    @pytest.mark.parametrize("coordinate", ["time", "x", "y"])
     def test_overview_missing_coordinate_is_rejected(self, tmp_path: Path, coordinate: str) -> None:
         """Deleting a coordinate from one overview level must fail validation.
 
@@ -354,7 +354,7 @@ class TestWriterRoundTrip:
         assert ingested_conditions <= fixture_conditions
 
 
-@pytest.mark.parametrize("coordinate", ["time", "x", "y", "spatial_ref"])
+@pytest.mark.parametrize("coordinate", ["time", "x", "y"])
 def test_native_missing_coordinate_is_rejected(
     s1_rtc_json_example: dict[str, object], coordinate: str
 ) -> None:
@@ -369,7 +369,7 @@ def test_native_missing_coordinate_is_rejected(
         S1RtcRoot.model_validate(data)
 
 
-@pytest.mark.parametrize("coordinate", ["x", "y", "spatial_ref"])
+@pytest.mark.parametrize("coordinate", ["x", "y"])
 def test_conditions_missing_coordinate_is_rejected(
     s1_rtc_json_example: dict[str, object], coordinate: str
 ) -> None:
@@ -383,3 +383,19 @@ def test_conditions_missing_coordinate_is_rejected(
     del _nav(data, "members", "descending", "members", "conditions", "members")[coordinate]
     with pytest.raises(Exception, match="coordinate arrays"):
         S1RtcRoot.model_validate(data)
+
+
+def test_store_ingested_with_a_cf_grid_mapping_still_validates(
+    s1_rtc_json_example: dict[str, object],
+) -> None:
+    """
+    The ingester no longer writes the CF `spatial_ref` grid mapping (#352), and the
+    model no longer requires it, but a store ingested before still holds it: the
+    model accepts it on the levels and in the conditions group.
+    """
+    data = copy.deepcopy(s1_rtc_json_example)
+    for group in ("r10m", "r60m", "conditions"):
+        members = _nav(data, "members", "descending", "members", group, "members")
+        assert "spatial_ref" not in members, "the fixture is written without a grid mapping"
+        members["spatial_ref"] = copy.deepcopy(members["x"])
+    S1RtcRoot.model_validate(data)

@@ -196,8 +196,7 @@ output.zarr/
 │   │   │   ├── b04/
 │   │   │   ├── b08/
 │   │   │   ├── x/            # X coordinates
-│   │   │   ├── y/            # Y coordinates
-│   │   │   └── spatial_ref/  # CRS information
+│   │   │   └── y/            # Y coordinates
 │   │   ├── 1/                # Overview level 1 (/2)
 │   │   └── 2/                # Overview level 2 (/4)
 │   ├── r20m/                 # 20m resolution group
@@ -348,20 +347,16 @@ y_attrs = {
 }
 ```
 
-### 2. Grid Mapping Variables
+### 2. CRS
 
-Each dataset includes proper grid mapping information:
-
-```python
-# test: skip
-grid_mapping_attrs = {
-    'grid_mapping_name': 'transverse_mercator',  # or appropriate mapping
-    'projected_crs_name': crs.to_string(),
-    'crs_wkt': crs.to_wkt(),
-    'spatial_ref': crs.to_wkt(),
-    'GeoTransform': transform_string
-}
-```
+Each dataset group declares its CRS with the
+[proj convention](https://github.com/zarr-conventions/proj) (`proj:code`), and
+its grid with the [spatial convention](https://github.com/zarr-conventions/spatial)
+(`spatial:transform`, `spatial:shape`, `spatial:bbox`). These are the only
+georeferencing: the CF grid mapping of GeoZarr V0 (a `spatial_ref` variable
+holding `crs_wkt`, referenced by `grid_mapping` attributes) is obsolete and no
+longer written ([#352](https://github.com/EOPF-Explorer/data-model/issues/352)).
+An array opened on its own has no CRS; read `proj:code` from its group.
 
 ### 3. Multiscales Metadata
 

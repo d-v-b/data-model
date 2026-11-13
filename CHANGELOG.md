@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Breaking
+
+* The output's only georeferencing is the `proj` and `spatial` conventions.
+  The CF grid mapping of GeoZarr V0 is obsolete and no longer written, by the
+  S2, S1 RTC and OLCI converters and the shared write path: no `spatial_ref`
+  arrays (with `crs_wkt` / `spatial_ref` attributes) and no `grid_mapping`
+  attributes. An array opened on its own has no CRS; read `proj:code` from its
+  group. Stores written before are still read
+  ([#352](https://github.com/EOPF-Explorer/data-model/issues/352)).
+
 ## 0.12.0 (2026-09-28)
 
 ## What's Changed

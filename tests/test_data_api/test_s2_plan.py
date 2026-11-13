@@ -13,7 +13,6 @@ import zarr
 from pydantic import ValidationError
 from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
-from pyproj import CRS
 
 from eopf_geozarr.data_api.s2 import Sentinel2Root
 from eopf_geozarr.data_api.s2_plan import (
@@ -71,9 +70,10 @@ def test_plan_matches_snapshot(path: pathlib.Path) -> None:
 def test_plan_georeferencing_is_self_consistent(path: pathlib.Path) -> None:
     """
     Every planned level's spatial attributes derive from the product's own
-    band attributes: the transform is the level resolution over the finest
-    band's origin, the bbox is the transform applied to the level shape, and
-    the grid-mapping array holds the band's own CRS.
+    band attributes: the CRS is the band's own, the transform is the level
+    resolution over the finest band's origin, and the bbox is the transform
+    applied to the level shape. `proj:code` is the only CRS statement: there
+    is no grid-mapping array (#352).
     """
     planned = _planned_reflectance(path)
     finest = planned["members"][f"r{REFLECTANCE_SCALE_LEVELS[0]}m"]
@@ -95,8 +95,7 @@ def test_plan_georeferencing_is_self_consistent(path: pathlib.Path) -> None:
             x0 + cols * meters,
             y0,
         ]
-        crs = CRS.from_wkt(level["members"]["spatial_ref"]["attributes"]["crs_wkt"])
-        assert crs.to_epsg() == epsg
+        assert "spatial_ref" not in level["members"]
 
 
 def _groups(node: dict[str, Any], path: str = "") -> list[tuple[str, dict[str, Any]]]:
@@ -442,6 +441,21 @@ def test_plan_carries_an_ungeoreferenceable_grid_without_georeferencing(
             "attributes"
         ]
         assert "proj:code" not in attributes
+
+
+@pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
+def test_plan_writes_no_cf_grid_mapping(path: pathlib.Path) -> None:
+    """`proj` and `spatial` are the only georeferencing: no group or array has
+    a `grid_mapping` attribute and there is no `spatial_ref` array (#352)."""
+    planned = _planned_root(path)
+    with_grid_mapping = [
+        node_path
+        for node_path, node in [*_groups(planned), *_arrays(planned)]
+        if "grid_mapping" in node["attributes"]
+    ]
+    spatial_refs = [p for p, _ in _arrays(planned) if p.endswith("/spatial_ref")]
+    assert with_grid_mapping == []
+    assert spatial_refs == []
 
 
 def test_plan_reflectance_requires_product_georeferencing() -> None:
