@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from eopf_geozarr.conversion.utils import normalize_cf_array_attrs
+from eopf_geozarr.conversion.utils import normalize_cf_array_attrs, sanitize_array_attrs
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -256,3 +256,14 @@ def test_normalize_cf_array_attrs(attrs: dict, dtype: str | None, expected: dict
     result = normalize_cf_array_attrs(attrs, None if dtype is None else np.dtype(dtype))
     assert result == expected
     assert attrs == before
+
+
+def test_sanitize_keeps_a_float_arrays_valid_range() -> None:
+    """
+    `sanitize_array_attrs` keeps an in-range `valid_min`/`valid_max` on a
+    float array: callers pass `is_decoded_float` for native floats too, whose
+    range is in physical units; only the CF rules of #351 apply.
+    """
+    attrs = {"valid_min": -5.0, "valid_max": 45.0, "dtype": "<f4", "fill_value": 0}
+    result = sanitize_array_attrs(attrs, is_decoded_float=True, dtype=np.dtype("float32"))
+    assert result == {"valid_min": -5.0, "valid_max": 45.0}

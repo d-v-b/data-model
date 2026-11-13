@@ -948,10 +948,13 @@ def sanitize_array_attrs(
     - The CF attributes are put right (`normalize_cf_array_attrs`): a
       ``flag_meanings`` list is joined, ``dtype`` is removed, and
       ``valid_min`` / ``valid_max`` outside the range of *dtype* are removed.
-    - For decoded float measurement arrays (*is_decoded_float=True*), also
-      removes raw-encoding leftovers ``fill_value``, ``valid_min`` and
-      ``valid_max`` (which describe the packed integers) and rewrites
-      ``units: "digital_counts"`` → ``"1"``.
+    - For float measurement arrays (*is_decoded_float=True*), also removes
+      the raw-encoding leftover ``fill_value`` and rewrites
+      ``units: "digital_counts"`` → ``"1"``. ``valid_min`` / ``valid_max``
+      are kept: callers pass the flag for native floats, whose range is in
+      physical units, and for re-packed integers, whose range is in packed
+      units; the decode path that unpacks integers drops them itself
+      (``encoding_utils``).
 
     - Geo-proj *convention* keys (``proj:code``, ``proj:wkt2``,
       ``proj:projjson``) are always removed: per the minispec they belong on
@@ -965,8 +968,7 @@ def sanitize_array_attrs(
     out = normalize_cf_array_attrs({k: v for k, v in attrs.items() if k not in dropped}, dtype)
 
     if is_decoded_float:
-        for key in ("fill_value", "valid_min", "valid_max"):
-            out.pop(key, None)
+        out.pop("fill_value", None)
         if out.get("units") == "digital_counts":
             out["units"] = "1"
     return out
