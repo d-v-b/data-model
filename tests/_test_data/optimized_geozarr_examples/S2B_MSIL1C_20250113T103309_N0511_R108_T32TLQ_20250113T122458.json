@@ -568,7 +568,6 @@
                   "members": {
                     "b02": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -663,7 +662,6 @@
                     },
                     "b03": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -758,7 +756,6 @@
                     },
                     "b04": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -853,7 +850,6 @@
                     },
                     "b08": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -1127,7 +1123,6 @@
                   "members": {
                     "b05": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -1222,7 +1217,6 @@
                     },
                     "b06": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -1317,7 +1311,6 @@
                     },
                     "b07": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -1412,7 +1405,6 @@
                     },
                     "b11": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -1507,7 +1499,6 @@
                     },
                     "b12": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -1602,7 +1593,6 @@
                     },
                     "b8a": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -1876,7 +1866,6 @@
                   "members": {
                     "b01": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -1971,7 +1960,6 @@
                     },
                     "b09": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -2066,7 +2054,6 @@
                     },
                     "b10": {
                       "attributes": {
-                        "dtype": "<u1",
                         "grid_mapping": "spatial_ref",
                         "long_name": "detector footprint mask provided in the final reference frame (ground geometry). 0 = no detector, 1-12 = detector 1-12",
                         "proj:bbox": [
@@ -2493,17 +2480,12 @@
                   "members": {
                     "b00": {
                       "attributes": {
-                        "dtype": "<u1",
                         "flag_masks": [
                           1,
                           2,
                           4
                         ],
-                        "flag_meanings": [
-                          "OPAQUE",
-                          "CIRRUS",
-                          "SNOW_ICE"
-                        ],
+                        "flag_meanings": "OPAQUE CIRRUS SNOW_ICE",
                         "grid_mapping": "spatial_ref",
                         "long_name": "cloud classification mask provided in the final reference frame (ground geometry)",
                         "proj:bbox": [
@@ -2770,17 +2752,12 @@
                   "members": {
                     "b00": {
                       "attributes": {
-                        "dtype": "<u1",
                         "flag_masks": [
                           1,
                           2,
                           4
                         ],
-                        "flag_meanings": [
-                          "OPAQUE",
-                          "CIRRUS",
-                          "SNOW_ICE"
-                        ],
+                        "flag_meanings": "OPAQUE CIRRUS SNOW_ICE",
                         "grid_mapping": "spatial_ref",
                         "long_name": "cloud classification mask provided in the final reference frame (ground geometry)",
                         "proj:bbox": [
@@ -3047,17 +3024,12 @@
                   "members": {
                     "b00": {
                       "attributes": {
-                        "dtype": "<u1",
                         "flag_masks": [
                           1,
                           2,
                           4
                         ],
-                        "flag_meanings": [
-                          "OPAQUE",
-                          "CIRRUS",
-                          "SNOW_ICE"
-                        ],
+                        "flag_meanings": "OPAQUE CIRRUS SNOW_ICE",
                         "grid_mapping": "spatial_ref",
                         "long_name": "cloud classification mask provided in the final reference frame (ground geometry)",
                         "proj:bbox": [
@@ -3331,17 +3303,12 @@
                   "members": {
                     "b00": {
                       "attributes": {
-                        "dtype": "<u1",
                         "flag_masks": [
                           1,
                           2,
                           4
                         ],
-                        "flag_meanings": [
-                          "OPAQUE",
-                          "CIRRUS",
-                          "SNOW_ICE"
-                        ],
+                        "flag_meanings": "OPAQUE CIRRUS SNOW_ICE",
                         "grid_mapping": "spatial_ref",
                         "long_name": "cloud classification mask provided in the final reference frame (ground geometry)",
                         "proj:bbox": [
@@ -13677,7 +13644,6 @@
               "members": {
                 "b02": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -13688,16 +13654,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -13792,7 +13749,6 @@
                 },
                 "b03": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -13803,16 +13759,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -13907,7 +13854,6 @@
                 },
                 "b04": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -13918,16 +13864,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -14022,7 +13959,6 @@
                 },
                 "b08": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -14033,16 +13969,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -14316,7 +14243,6 @@
               "members": {
                 "b05": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -14327,16 +14253,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -14431,7 +14348,6 @@
                 },
                 "b06": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -14442,16 +14358,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -14546,7 +14453,6 @@
                 },
                 "b07": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -14557,16 +14463,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -14661,7 +14558,6 @@
                 },
                 "b11": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -14672,16 +14568,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -14776,7 +14663,6 @@
                 },
                 "b12": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -14787,16 +14673,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -14891,7 +14768,6 @@
                 },
                 "b8a": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -14902,16 +14778,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -15185,7 +15052,6 @@
               "members": {
                 "b01": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -15196,16 +15062,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -15300,7 +15157,6 @@
                 },
                 "b09": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -15311,16 +15167,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [
@@ -15415,7 +15262,6 @@
                 },
                 "b10": {
                   "attributes": {
-                    "dtype": "<u1",
                     "flag_masks": [
                       1,
                       2,
@@ -15426,16 +15272,7 @@
                       64,
                       128
                     ],
-                    "flag_meanings": [
-                      "ANC_LOST",
-                      "ANC_DEG",
-                      "MSI_LOST",
-                      "MSI_DEG",
-                      "QT_DEFECTIVE_PIXELS",
-                      "QT_NODATA_PIXELS",
-                      "QT_PARTIALLY_CORRECTED_PIXELS",
-                      "QT_SATURATED_PIXELS_L1A"
-                    ],
+                    "flag_meanings": "ANC_LOST ANC_DEG MSI_LOST MSI_DEG QT_DEFECTIVE_PIXELS QT_NODATA_PIXELS QT_PARTIALLY_CORRECTED_PIXELS QT_SATURATED_PIXELS_L1A",
                     "grid_mapping": "spatial_ref",
                     "long_name": "quality mask provided in the final reference frame (ground geometry)",
                     "proj:bbox": [

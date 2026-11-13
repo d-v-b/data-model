@@ -33,6 +33,7 @@ scalar arrays are dropped, as the converter drops them.
 from __future__ import annotations
 
 import base64
+import re
 import struct
 from collections.abc import Mapping
 from math import ceil
@@ -53,6 +54,7 @@ from zarr_cm.proj import CMO as PROJ_CMO
 from zarr_cm.spatial import CMO as SPATIAL_CMO
 from zarr_metadata.typed_json import check
 
+from eopf_geozarr.conversion.utils import normalize_cf_array_attrs
 from eopf_geozarr.data_api.geozarr.scope import GEOZARR_SCOPE
 from eopf_geozarr.data_api.geozarr.v3 import DataArray
 from eopf_geozarr.data_api.s2 import Sentinel2Root
@@ -224,6 +226,7 @@ def _plan_band(
     for key in _BAND_ATTR_CARRY:
         if key in source_attrs:
             attributes[key] = source_attrs[key]
+    attributes = normalize_cf_array_attrs(attributes, np.dtype(data_type))
     return _band_array(attributes, shape, data_type, fill_value, dimension_names, typesize)
 
 
@@ -639,12 +642,46 @@ def _doc_attrs(doc: Mapping[str, Any]) -> Mapping[str, object]:
     return attributes
 
 
-def _carried_array_attributes(
-    attrs: Mapping[str, object], *, is_float: bool, grid_mapping: bool, name: str
+_LEVEL_GROUP = re.compile(r"r(\d+)m")
+"""The name of a resolution level group (`r10m`, `r720m`), its metres captured."""
+
+
+def _level_meters(path: str) -> int | None:
+    """The resolution in metres of the level group at `path`, if it is one."""
+    match = _LEVEL_GROUP.fullmatch(path.rsplit("/", 1)[-1])
+    return int(match.group(1)) if match else None
+
+
+def _with_level_short_name(
+    attributes: dict[str, object], name: str, meters: int | None
 ) -> dict[str, object]:
-    """The output attributes of a carried array: sanitized, with the CF float
-    fill, the grid-mapping reference and the SCL flag table added."""
-    out = {key: value for key, value in attrs.items() if key not in _DROPPED_ATTRS}
+    """
+    `attributes` with a carried `short_name` written for the level the array
+    is in, `<variable>_r<resolution>m`: a source `short_name` names the source
+    level (and a coarsened level copied it verbatim), and the source styles
+    are mixed (EOPF-Explorer/data-model#351). Outside a level group, or
+    without a `short_name`, the attributes are returned as they are.
+    """
+    if meters is None or "short_name" not in attributes:
+        return attributes
+    return {**attributes, "short_name": f"{name}_r{meters}m"}
+
+
+def _carried_array_attributes(
+    attrs: Mapping[str, object],
+    *,
+    is_float: bool,
+    grid_mapping: bool,
+    name: str,
+    dtype: np.dtype[Any],
+    level_meters: int | None = None,
+) -> dict[str, object]:
+    """The output attributes of a carried array: sanitized, the CF attributes
+    put right for its data type, with the CF float fill, the grid-mapping
+    reference, the SCL flag table and a per-level `short_name`."""
+    out = normalize_cf_array_attrs(
+        {key: value for key, value in attrs.items() if key not in _DROPPED_ATTRS}, dtype
+    )
     if is_float:
         out["_FillValue"] = _NAN_FLOAT64_B64
     if grid_mapping:
@@ -653,10 +690,12 @@ def _carried_array_attributes(
         # the converter's SCL flag table and NO_DATA fill declaration
         out.update(SCL_ATTRS)
         out["_FillValue"] = SCL_NODATA
-    return out
+    return _with_level_short_name(out, name, level_meters)
 
 
-def _plan_carried_array(name: str, doc: _ArrayDoc, *, spatial: bool) -> DataArray:
+def _plan_carried_array(
+    name: str, doc: _ArrayDoc, *, spatial: bool, level_meters: int | None = None
+) -> DataArray:
     """
     One carried (non-reflectance) array, translated to its output document:
     `x`/`y` become the float64 coordinate arrays, other coordinate arrays
@@ -681,6 +720,8 @@ def _plan_carried_array(name: str, doc: _ArrayDoc, *, spatial: bool) -> DataArra
         is_float=parsed.kind == "f",
         grid_mapping=spatial and "proj:epsg" in attrs,
         name=name,
+        dtype=parsed,
+        level_meters=level_meters,
     )
     if dims == (name,):
         # a coordinate array: one chunk, uncompressed (create_default supplies
@@ -743,8 +784,9 @@ def _plan_dataset(group: _GroupDoc, path: str) -> AnyGroupSpec | None:
     if not arrays:
         return None
     anchor = _spatial_anchor(arrays)
+    meters = _level_meters(path)
     members: dict[str, DataArray | ArraySpecV3] = {
-        name: _plan_carried_array(name, member, spatial=anchor is not None)
+        name: _plan_carried_array(name, member, spatial=anchor is not None, level_meters=meters)
         for name, member in arrays.items()
     }
     if anchor is None:
@@ -811,7 +853,9 @@ def _plan_aux_multiscale(
             for name, member in _carried_arrays(input_levels[meters]).items():
                 if name in ("x", "y"):
                     continue
-                variables[name] = _plan_carried_array(name, member, spatial=True)
+                variables[name] = _plan_carried_array(
+                    name, member, spatial=True, level_meters=meters
+                )
             if not variables:
                 msg = f"The {path} r{meters}m dataset holds no arrays"
                 raise ValueError(msg)
@@ -829,9 +873,10 @@ def _plan_aux_multiscale(
                 if not isinstance(data_type, str):
                     msg = f"Cannot coarsen {path} variable {name!r} of data type {data_type!r}"
                     raise TypeError(msg)
-                # a coarsened variable keeps its attributes verbatim
+                # a coarsened variable keeps its attributes, its short_name
+                # written for this level
                 variables[name] = _band_array(
-                    previous.attributes.model_dump(),
+                    _with_level_short_name(previous.attributes.model_dump(), name, meters),
                     shape,
                     data_type,
                     previous.fill_value,

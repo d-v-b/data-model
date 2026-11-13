@@ -742,7 +742,9 @@ def create_uniform_encoding(
             # remove keys, so stale ``_eopf_attrs`` / ``dtype`` / ``valid_*`` would
             # otherwise leak into the output).
             is_float = np.issubdtype(var_data.dtype, np.floating)
-            var_data.attrs = sanitize_array_attrs(var_data.attrs, is_decoded_float=is_float)
+            var_data.attrs = sanitize_array_attrs(
+                var_data.attrs, is_decoded_float=is_float, dtype=var_data.dtype
+            )
 
         encoding[str(var_name)] = var_encoding
 
@@ -763,7 +765,7 @@ def create_uniform_encoding(
         else:
             coord_encoding: XarrayDataArrayEncoding = {"compressors": ()}
 
-        coord_data.attrs = sanitize_array_attrs(coord_data.attrs)
+        coord_data.attrs = sanitize_array_attrs(coord_data.attrs, dtype=coord_data.dtype)
         encoding[str(coord_name)] = coord_encoding
 
     return encoding
@@ -893,10 +895,42 @@ def explicit_fill_value(var: xr.DataArray) -> Any:
     return source_fill
 
 
+def normalize_cf_array_attrs(
+    attrs: Mapping[str, Any], dtype: np.dtype[Any] | None = None
+) -> dict[str, Any]:
+    """Return a copy of *attrs* with the CF attributes put right
+    (EOPF-Explorer/data-model#351).
+
+    - A ``flag_meanings`` list is joined into the one blank-separated string
+      CF defines.
+    - The ``dtype`` attribute, which repeats the array's data type, is removed.
+    - ``valid_min`` / ``valid_max`` outside the range of an integer *dtype*
+      (``valid_max: 65535`` on a ``uint8`` array, say) are removed: they
+      cannot describe the stored values.
+    """
+    out = dict(attrs)
+    out.pop("dtype", None)
+    meanings = out.get("flag_meanings")
+    if isinstance(meanings, (list, tuple)):
+        out["flag_meanings"] = " ".join(str(meaning) for meaning in meanings)
+    if dtype is not None and np.dtype(dtype).kind in "iu":
+        info = np.iinfo(dtype)
+        for key in ("valid_min", "valid_max"):
+            value = out.get(key)
+            if (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and not info.min <= value <= info.max
+            ):
+                del out[key]
+    return out
+
+
 def sanitize_array_attrs(
     attrs: dict[str, Any],
     *,
     is_decoded_float: bool = False,
+    dtype: np.dtype[Any] | None = None,
 ) -> dict[str, Any]:
     """Return a copy of *attrs* with source-only and misleading keys removed.
 
@@ -911,9 +945,12 @@ def sanitize_array_attrs(
          (``s3_olci_optimization.olci_converter._sanitize_olci_array_attrs_keep_fill``)
          that **preserves** ``_FillValue`` for raw (non-mask-scaled) input.
          Edits to the strip-list here do not apply there, and vice versa.
+    - The CF attributes are put right (`normalize_cf_array_attrs`): a
+      ``flag_meanings`` list is joined, ``dtype`` is removed, and
+      ``valid_min`` / ``valid_max`` outside the range of *dtype* are removed.
     - For decoded float measurement arrays (*is_decoded_float=True*), also
-      removes raw-encoding leftovers ``dtype``, ``fill_value``,
-      ``valid_min``, ``valid_max`` and rewrites
+      removes raw-encoding leftovers ``fill_value``, ``valid_min`` and
+      ``valid_max`` (which describe the packed integers) and rewrites
       ``units: "digital_counts"`` → ``"1"``.
 
     - Geo-proj *convention* keys (``proj:code``, ``proj:wkt2``,
@@ -925,10 +962,10 @@ def sanitize_array_attrs(
     CF keys ``scale_factor`` and ``add_offset`` are always preserved.
     """
     dropped = {"_eopf_attrs", "_FillValue", *geo_proj_cm.CONVENTION_KEYS}
-    out = {k: v for k, v in attrs.items() if k not in dropped}
+    out = normalize_cf_array_attrs({k: v for k, v in attrs.items() if k not in dropped}, dtype)
 
     if is_decoded_float:
-        for key in ("dtype", "fill_value"):
+        for key in ("fill_value", "valid_min", "valid_max"):
             out.pop(key, None)
         if out.get("units") == "digital_counts":
             out["units"] = "1"

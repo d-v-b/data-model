@@ -214,6 +214,41 @@ def test_plan_carries_a_datetime_array_in_its_v3_form() -> None:
     assert time["dimension_names"] == ["time"]
 
 
+def test_plan_puts_cf_attributes_right_on_every_level() -> None:
+    """
+    A carried array's CF attributes are put right on its native level and on
+    every level coarsened from it (#351): its `short_name` names its own
+    level, a `flag_meanings` list becomes one string, the `dtype` attribute
+    is dropped, and a `valid_max` the data type cannot hold is dropped.
+    """
+    path = next(p for p in _INPUT_PATHS if "MSIL2A" in p.name)
+    document = _read(path)
+    l2a = document["members"]["conditions"]["members"]["mask"]["members"]["l2a_classification"]
+    # both native levels name the other level, as the source products do once
+    # a level's attributes are copied
+    for level, wrong in (("r20m", "scl_r60m"), ("r60m", "scl_r20m")):
+        l2a["members"][level]["members"]["scl"]["attributes"].update(
+            {
+                "short_name": wrong,
+                "flag_meanings": ["no_data", "saturated"],
+                "dtype": "<u1",
+                "valid_max": 65535,
+                "valid_min": 0,
+            }
+        )
+    planned = plan_geozarr(Sentinel2Root.model_validate(document)).model_dump(mode="json")
+    levels = planned["members"]["conditions"]["members"]["mask"]["members"]["l2a_classification"][
+        "members"
+    ]
+    for level, group in levels.items():
+        scl = group["members"]["scl"]["attributes"]
+        assert scl["short_name"] == f"scl_{level}", level
+        assert isinstance(scl["flag_meanings"], str), level
+        assert "dtype" not in scl, level
+        assert "valid_max" not in scl, level
+        assert scl["valid_min"] == 0, level
+
+
 def test_plan_reflectance_requires_product_georeferencing() -> None:
     """A product whose bands carry no proj attributes and whose stac_discovery
     declares none is refused with a ValueError, not a KeyError."""
