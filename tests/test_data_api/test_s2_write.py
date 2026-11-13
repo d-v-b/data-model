@@ -23,7 +23,7 @@ import zarr
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
 
 from eopf_geozarr.data_api.s2_plan import load_sentinel2
-from eopf_geozarr.data_api.s2_write import _coarsen, write_geozarr
+from eopf_geozarr.data_api.s2_write import _coarsen, _fill_carried_array, write_geozarr
 
 from ..conftest import create_zarrv2_group_from_json, get_stem, s2_example_json_paths
 
@@ -298,3 +298,33 @@ def test_write_geozarr_from_a_datatree_matches_the_store_write(
         tree_output = tmp_path / f"from_tree_{mask_and_scale}.zarr"
         write_geozarr(load_sentinel2(tree), tree, str(tree_output))
         assert _store_contents(tree_output) == reference, f"{mask_and_scale=}"
+
+
+class _LabelSource:
+    """A `SourceReader` holding one bytes label array, as native products do."""
+
+    def __init__(self, values: np.ndarray) -> None:
+        self._values = values
+
+    def values(self, path: str) -> np.ndarray | None:
+        return self._values if path == "conditions/geometry/band" else None
+
+    def is_group(self, path: str) -> bool:
+        return False
+
+    def group_names(self, path: str) -> tuple[str, ...]:
+        return ()
+
+
+def test_fill_decodes_bytes_labels_into_a_string_array() -> None:
+    """
+    A bytes (`S`) label array, which the plan stores as the `string` data type
+    (#356), is written decoded as ASCII: it reads back as the label strings.
+    """
+    output = zarr.open_group(zarr.storage.MemoryStore(), mode="w", zarr_format=3)
+    output.require_group("conditions/geometry").create_array(
+        "band", shape=(3,), dtype=np.dtypes.StringDType(), fill_value=""
+    )
+    labels = np.array([b"b02", b"b03", b"b8a"], dtype="S3")
+    _fill_carried_array(_LabelSource(labels), output, "conditions/geometry/band")
+    assert output["conditions/geometry/band"][...].tolist() == ["b02", "b03", "b8a"]

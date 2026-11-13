@@ -384,6 +384,31 @@ def test_plan_georeferences_the_meteorology_groups_from_their_coordinates() -> N
         assert "Conventions" not in bare
 
 
+def test_plan_stores_bytes_labels_as_strings() -> None:
+    """A carried bytes (`S`) label array, as native Zarr V3 products hold the
+    geometry `band` and `detector` labels, is planned as `string` (#356)."""
+    path = _INPUT_PATHS[0]
+    document = _read(path)
+    geometry = document["members"]["conditions"]["members"]["geometry"]["members"]
+    geometry["detector"] = {
+        "zarr_format": 2,
+        "shape": [7],
+        "chunks": [7],
+        "dtype": "|S3",
+        "fill_value": "",
+        "order": "C",
+        "filters": None,
+        "compressor": None,
+        "dimension_separator": "/",
+        "attributes": {"_ARRAY_DIMENSIONS": ["detector"]},
+    }
+    planned = plan_geozarr(Sentinel2Root.model_validate(document)).model_dump(mode="json")
+    detector = planned["members"]["conditions"]["members"]["geometry"]["members"]["detector"]
+    assert detector["data_type"] == "string"
+    assert detector["codecs"] == [{"name": "vlen-utf8"}]
+    assert detector["dimension_names"] == ["detector"]
+
+
 def test_plan_reflectance_requires_product_georeferencing() -> None:
     """A product whose bands carry no proj attributes and whose stac_discovery
     declares none is refused with a ValueError, not a KeyError."""
