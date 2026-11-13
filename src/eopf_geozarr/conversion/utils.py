@@ -367,9 +367,11 @@ def strip_cf_grid_mapping(dataset: xr.Dataset) -> xr.Dataset:
     `write_crs` adds them, so a dataset that was reprojected through rioxarray
     needs this before it is written.
 
-    The CRS is not lost: when the dataset declares no `proj:*` attribute, the
-    grid mapping's CRS is carried over as the `proj` convention attributes
-    before the grid mapping is dropped.
+    The CRS is not lost: when the dataset has none of the proj convention
+    keys (`proj:code`, `proj:wkt2`, `proj:projjson`; a legacy `proj:epsg` does
+    not count), the grid mapping's CRS is carried over as the `proj`
+    convention attributes before the grid mapping is dropped, and the proj
+    declaration is added to the dataset's existing `zarr_conventions`.
     """
     names: set[str] = set()
     reference = dataset.variables.get("spatial_ref")
