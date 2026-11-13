@@ -40,6 +40,7 @@ from math import ceil
 from typing import TYPE_CHECKING, Any, Final, Literal
 
 import numpy as np
+import structlog
 import xarray as xr
 from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
 from pydantic_zarr.v3 import ArraySpec as ArraySpecV3
@@ -72,6 +73,8 @@ if TYPE_CHECKING:
     from zarr_metadata.v3.codec.crc32c import Crc32cCodecObject
     from zarr_metadata.v3.codec.sharding_indexed import ShardingIndexedCodecObject
     from zarr_metadata.v3.codec.zstd import ZstdCodecObject
+
+log = structlog.get_logger()
 
 S2Level = Literal["L1C", "L2A"]
 
@@ -391,6 +394,21 @@ SpatialGroupAttrs = TypedDict(
 resolution dataset or a pyramid level), which always carries every key;
 the per-key value types are zarr-cm's."""
 
+LatLonGroupAttrs = TypedDict(
+    "LatLonGroupAttrs",
+    {
+        "proj:code": str,
+        "spatial:bbox": list[float],
+        "spatial:dimensions": list[str],
+        "spatial:registration": str,
+        "spatial:shape": list[int],
+        "spatial:transform": list[float],
+        "zarr_conventions": list[ConventionMetadataObject],
+    },
+)
+"""The spatial/proj convention attributes of a group on a regular geographic
+grid (`_lat_lon_attributes`), which always carries every key."""
+
 MultiscaleGroupAttrs = TypedDict(
     "MultiscaleGroupAttrs",
     {
@@ -668,19 +686,22 @@ def _carried_group_attributes(group: Mapping[str, Any]) -> dict[str, object]:
     }
 
 
-def _lat_lon_attributes(latitude: np.ndarray, longitude: np.ndarray) -> dict[str, object]:
+def _lat_lon_attributes(latitude: np.ndarray, longitude: np.ndarray) -> LatLonGroupAttrs:
     """
     The `proj` and `spatial` attributes of a group on a regular geographic
     grid, from its 1-D `latitude` and `longitude` coordinate values
     (EOPF-Explorer/data-model#353). The values are grid points, so the
     registration is `node`: the transform maps an index to a point, its
     origin the first point, and a decreasing latitude gives a negative step;
-    the bbox spans the outer points. Refuses irregular spacing, which no
-    affine transform describes.
+    the bbox spans the outer points. Longitudes are unwrapped first, so a grid
+    crossing the antimeridian (or 0/360 degrees) keeps a regular step. Refuses
+    irregular spacing, which no affine transform describes, and NaN values.
     """
     axes = {}
     for name, values in (("latitude", latitude), ("longitude", longitude)):
         values = np.asarray(values, dtype="float64")
+        if name == "longitude" and values.size > 1 and not np.isnan(values).any():
+            values = np.unwrap(values, period=360.0)
         if values.ndim != 1 or values.size < 2:
             msg = f"The {name} coordinate needs at least two values, got shape {values.shape}"
             raise ValueError(msg)
@@ -893,8 +914,17 @@ def _plan_dataset(
             lon_values = coordinate_values(f"{path}/longitude")
             if lat_values is not None and lon_values is not None:
                 # a regular geographic grid (the meteorology groups): its
-                # georeferencing derived from its coordinates
-                attributes = {**attributes, **_lat_lon_attributes(lat_values, lon_values)}
+                # georeferencing derived from its coordinates. A grid no
+                # transform describes is carried without it, as before,
+                # rather than stopping the conversion.
+                try:
+                    attributes = {**attributes, **_lat_lon_attributes(lat_values, lon_values)}
+                except ValueError as error:
+                    log.warning(
+                        "Carrying a latitude/longitude group without georeferencing",
+                        group=path,
+                        reason=str(error),
+                    )
         return GroupSpecV3(attributes=attributes, members=members)
     transform, epsg, wkt2 = _proj_of(*anchor)
     members["spatial_ref"] = _plan_spatial_ref(wkt2, native=True)

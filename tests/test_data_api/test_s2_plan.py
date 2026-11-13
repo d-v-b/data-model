@@ -318,12 +318,20 @@ def test_plan_stores_labels_as_registered_strings(path: pathlib.Path) -> None:
             },
         ),
         (
+            [10.0, 9.5, 9.0],
+            [179.5, 179.75, -180.0, -179.75],
+            {
+                "spatial:bbox": [179.5, 9.0, 180.25, 10.0],
+                "spatial:transform": [0.25, 0.0, 179.5, 0.0, -0.5, 10.0],
+            },
+        ),
+        (
             np.linspace(48.0, 44.8, 9, dtype="float32").tolist(),
             np.linspace(8.0, 11.2, 9, dtype="float32").tolist(),
             {"spatial:shape": [9, 9]},
         ),
     ],
-    ids=["latitude-decreasing", "latitude-increasing", "float32-rounding"],
+    ids=["latitude-decreasing", "latitude-increasing", "antimeridian", "float32-rounding"],
 )
 def test_lat_lon_attributes(
     latitude: list[float], longitude: list[float], expected: dict[str, object]
@@ -407,6 +415,33 @@ def test_plan_stores_bytes_labels_as_strings() -> None:
     assert detector["data_type"] == "string"
     assert detector["codecs"] == [{"name": "vlen-utf8"}]
     assert detector["dimension_names"] == ["detector"]
+
+
+@pytest.mark.parametrize(
+    ("latitude", "longitude"),
+    [
+        (np.array([48.0, 47.5, 46.0, 45.9, 45.0, 44.0, 43.0, 42.0, 41.0]), np.linspace(8, 10, 9)),
+        (np.full(9, np.nan), np.full(9, np.nan)),
+    ],
+    ids=["irregular", "nan-fill"],
+)
+def test_plan_carries_an_ungeoreferenceable_grid_without_georeferencing(
+    latitude: np.ndarray, longitude: np.ndarray
+) -> None:
+    """A latitude/longitude group whose values no transform describes is
+    carried without `proj`/`spatial` attributes, not refused (#353)."""
+    root = Sentinel2Root.model_validate(_read(_INPUT_PATHS[0]))
+    values = {
+        f"conditions/meteorology/{group}/{name}": axis
+        for group in ("cams", "ecmwf")
+        for name, axis in (("latitude", latitude), ("longitude", longitude))
+    }
+    planned = plan_geozarr(root, coordinate_values=values.get).model_dump(mode="json")
+    for group in ("cams", "ecmwf"):
+        attributes = planned["members"]["conditions"]["members"]["meteorology"]["members"][group][
+            "attributes"
+        ]
+        assert "proj:code" not in attributes
 
 
 def test_plan_reflectance_requires_product_georeferencing() -> None:

@@ -162,6 +162,13 @@ def test_write_geozarr_realizes_the_plan(source_path: pathlib.Path, tmp_path: pa
     plan, _, output = _written_store(source_path, tmp_path)
     observed = GroupSpecV3.from_zarr(output).model_dump(mode="json")
     assert observed == plan.model_dump(mode="json")
+    # the meteorology groups are georeferenced from the coordinate values the
+    # writer read from the source (#353): the seeded 9-point regular grid
+    meteorology = observed["members"]["conditions"]["members"]["meteorology"]["members"]
+    for group in ("cams", "ecmwf"):
+        attributes = meteorology[group]["attributes"]
+        assert attributes["proj:code"] == "EPSG:4326"
+        assert attributes["spatial:transform"] == [0.25, 0.0, 8.0, 0.0, -0.25, 48.0]
 
 
 def test_write_geozarr_data_semantics(tmp_path: pathlib.Path) -> None:
