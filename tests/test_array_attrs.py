@@ -207,7 +207,7 @@ def test_valid_range_fits_the_data_type(snapshot: dict) -> None:
             kind = None
         if kind is None or kind not in "iu":
             continue
-        info = np.iinfo(data_type)
+        info = np.iinfo(np.dtype(str(data_type)))
         for key in ("valid_min", "valid_max"):
             value = (node.get("attributes") or {}).get(key)
             if value is not None and not info.min <= value <= info.max:
