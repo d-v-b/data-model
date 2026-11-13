@@ -97,6 +97,28 @@ def test_plan_georeferencing_is_self_consistent(path: pathlib.Path) -> None:
         assert crs.to_epsg() == epsg
 
 
+def _groups(node: dict[str, Any], path: str = "") -> list[tuple[str, dict[str, Any]]]:
+    """Every group of a dumped tree, with its path."""
+    if node.get("node_type") != "group":
+        return []
+    found = [(path or "/", node)]
+    for name, member in (node.get("members") or {}).items():
+        found.extend(_groups(member, f"{path}/{name}"))
+    return found
+
+
+@pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
+def test_plan_states_a_shape_with_every_transform(path: pathlib.Path) -> None:
+    """Every planned group with a `spatial:transform` also has the `spatial:shape`
+    it describes, multiscale parents included (EOPF-Explorer/data-model#355)."""
+    missing = [
+        group_path
+        for group_path, group in _groups(_planned_root(path))
+        if "spatial:transform" in group["attributes"] and "spatial:shape" not in group["attributes"]
+    ]
+    assert missing == []
+
+
 def test_load_sentinel2_keeps_the_model(tmp_path: pathlib.Path) -> None:
     """
     `load_sentinel2` reads a Zarr store into the validated input model, and

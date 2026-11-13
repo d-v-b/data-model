@@ -2409,6 +2409,10 @@
                   "x"
                 ],
                 "spatial:registration": "pixel",
+                "spatial:shape": [
+                  1830,
+                  1830
+                ],
                 "spatial:transform": [
                   60.0,
                   0.0,
@@ -5724,6 +5728,10 @@
               "x"
             ],
             "spatial:registration": "pixel",
+            "spatial:shape": [
+              10980,
+              10980
+            ],
             "spatial:transform": [
               10.0,
               0.0,

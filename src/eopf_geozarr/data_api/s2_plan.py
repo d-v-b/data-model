@@ -378,13 +378,16 @@ MultiscaleGroupAttrs = TypedDict(
         "spatial:bbox": list[float],
         "spatial:dimensions": list[str],
         "spatial:registration": str,
+        "spatial:shape": list[int],
         "spatial:transform": list[float],
         "zarr_conventions": list[ConventionMetadataObject],
     },
 )
 """The attributes of a multiscale pyramid's root group: zarr-cm's multiscales
-attributes plus the finest level's georeferencing (no `grid_mapping` or
-`spatial:shape`, which belong to the level groups)."""
+attributes plus the finest level's georeferencing, its `spatial:shape` with
+its `spatial:transform` so the transform says what grid it describes
+(EOPF-Explorer/data-model#355); no `grid_mapping`, which belongs to the level
+groups."""
 
 
 def _spatial_dataset_attributes(
@@ -582,6 +585,7 @@ def plan_reflectance(root: Sentinel2Root) -> AnyGroupSpec:
         "spatial:bbox": finest_level_attrs["spatial:bbox"],
         "spatial:dimensions": ["y", "x"],
         "spatial:registration": "pixel",
+        "spatial:shape": level_attributes[finest_meters]["spatial:shape"],
         "spatial:transform": [
             float(finest_meters),
             0.0,
@@ -882,6 +886,7 @@ def _plan_aux_multiscale(
         "spatial:bbox": level_attributes[min(input_levels)]["spatial:bbox"],
         "spatial:dimensions": ["y", "x"],
         "spatial:registration": "pixel",
+        "spatial:shape": level_attributes[finest_meters]["spatial:shape"],
         "spatial:transform": [
             float(finest_meters),
             0.0,
