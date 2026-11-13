@@ -172,6 +172,10 @@ def _fill_carried_array(source: SourceReader, output: zarr.Group, path: str) -> 
     if values is None:
         msg = f"The input source holds no array at {path!r}"
         raise ValueError(msg)
+    if values.dtype.kind == "S":
+        # bytes labels are planned as the `string` data type (#356): decode
+        # them as ASCII rather than leave the conversion to zarr
+        values = np.char.decode(values, "ascii")
     out_array[...] = values
 
 

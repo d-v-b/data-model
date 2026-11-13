@@ -278,6 +278,22 @@ def test_plan_shards_only_arrays_of_several_chunks(path: pathlib.Path) -> None:
     assert single_chunk_shards == []
 
 
+@pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
+def test_plan_stores_labels_as_registered_strings(path: pathlib.Path) -> None:
+    """No planned array uses a data type outside the Zarr V3 core and its
+    registered extensions: label coordinates are `string` (#356)."""
+    unregistered = [
+        (array_path, array["data_type"]["name"])
+        for array_path, array in _arrays(_planned_root(path))
+        if isinstance(array["data_type"], dict)
+        and array["data_type"]["name"] in ("fixed_length_utf32", "null_terminated_bytes")
+    ]
+    assert unregistered == []
+    geometry = _planned_root(path)["members"]["conditions"]["members"]["geometry"]["members"]
+    assert geometry["angle"]["data_type"] == "string"
+    assert geometry["angle"]["codecs"] == [{"name": "vlen-utf8"}]
+
+
 def test_plan_reflectance_requires_product_georeferencing() -> None:
     """A product whose bands carry no proj attributes and whose stac_discovery
     declares none is refused with a ValueError, not a KeyError."""

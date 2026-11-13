@@ -25,18 +25,10 @@
               },
               "codecs": [
                 {
-                  "configuration": {
-                    "endian": "little"
-                  },
-                  "name": "bytes"
+                  "name": "vlen-utf8"
                 }
               ],
-              "data_type": {
-                "configuration": {
-                  "length_bytes": 28
-                },
-                "name": "fixed_length_utf32"
-              },
+              "data_type": "string",
               "dimension_names": [
                 "angle"
               ],
@@ -66,18 +58,10 @@
               },
               "codecs": [
                 {
-                  "configuration": {
-                    "endian": "little"
-                  },
-                  "name": "bytes"
+                  "name": "vlen-utf8"
                 }
               ],
-              "data_type": {
-                "configuration": {
-                  "length_bytes": 12
-                },
-                "name": "fixed_length_utf32"
-              },
+              "data_type": "string",
               "dimension_names": [
                 "band"
               ],

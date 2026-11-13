@@ -200,7 +200,12 @@ def test_valid_range_fits_the_data_type(snapshot: dict) -> None:
     offenders = []
     for path, node in _walk(snapshot):
         data_type = node.get("data_type")
-        if not isinstance(data_type, str) or np.dtype(data_type).kind not in "iu":
+        try:
+            kind = np.dtype(data_type).kind if isinstance(data_type, str) else None
+        except TypeError:
+            # a Zarr V3 name numpy does not read (`string`)
+            kind = None
+        if kind is None or kind not in "iu":
             continue
         info = np.iinfo(data_type)
         for key in ("valid_min", "valid_max"):

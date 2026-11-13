@@ -741,6 +741,16 @@ def _plan_carried_array(
         dtype=parsed,
         level_meters=level_meters,
     )
+    if parsed.kind in "US":
+        # fixed-length unicode or bytes labels (the geometry `angle`, `band`
+        # and `detector` coordinates) are stored as the registered `string`
+        # data type, which every Zarr V3 reader can read, instead of the
+        # unregistered `fixed_length_utf32` / `null_terminated_bytes` (#356);
+        # create_default supplies its `vlen-utf8` codec, the empty fill and
+        # one chunk
+        return DataArray.create_default(
+            attributes=attributes, shape=shape, data_type="string", dimension_names=dims
+        )
     if dims == (name,):
         # a coordinate array: one chunk, uncompressed (create_default supplies
         # the one-chunk grid and the `/` chunk key encoding)
