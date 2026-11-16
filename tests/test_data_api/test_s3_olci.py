@@ -2,11 +2,11 @@
 
 import pytest
 from pydantic import ValidationError
-from pydantic_zarr.v2 import ArraySpec, GroupSpec  # noqa: F401
+from pydantic_zarr.v2 import ArraySpec, GroupSpec
 from zarr.storage import LocalStore
 
 from eopf_geozarr.data_api.s3_olci import Sentinel3OlciRoot
-from eopf_geozarr.zarr_io import write_hierarchy
+from eopf_geozarr.zarr_io import read_documents, write_hierarchy
 
 
 def _olci_arr() -> dict[str, object]:
@@ -124,14 +124,10 @@ def test_real_olci_product_validates_model(s3_olci_group_example: object) -> Non
     import pathlib
 
     import zarr
-    from pydantic_zarr.v2 import GroupSpec as PyzGroupSpec
-
-    from eopf_geozarr.data_api.s3_olci import Sentinel3OlciRoot
-    from eopf_geozarr.zarr_io import read_documents
 
     assert isinstance(s3_olci_group_example, pathlib.Path)
     group = zarr.open_group(str(s3_olci_group_example), mode="r")
     model = Sentinel3OlciRoot.model_validate(
-        PyzGroupSpec.from_stored_metadata_json(read_documents(group)).model_dump()
+        GroupSpec.from_stored_metadata_json(read_documents(group)).model_dump()
     )
     assert "oa01_radiance" in model.measurements.members

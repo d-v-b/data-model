@@ -551,7 +551,7 @@ def test_olci_conversion_matches_snapshot(
     out = str(tmp_path / "out.zarr")
     convert_olci_optimized(dt_in, output_path=out, min_dimension=8, output_grid=output_grid)
 
-    # Each consolidated block is a snapshot, and GroupSpec.from_zarr below reads the
+    # Each consolidated block is a snapshot, and read_documents below reads the
     # levels through the `measurements` block, so a stale block would hide a late
     # write. Re-consolidating a current store rewrites the same bytes (#303).
     for path in ("measurements", ""):

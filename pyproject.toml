@@ -44,7 +44,11 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "pydantic-zarr>=0.11.0",
+    # GroupSpec's members type parameter (zarr-developers/pydantic-zarr#211) is on
+    # pydantic-zarr main and first ships in 0.12.0. A direct reference, so that PyPI
+    # refuses to publish a release that would install a pydantic-zarr without it.
+    # Replace with "pydantic-zarr>=0.12.0" once that release is out.
+    "pydantic-zarr @ git+https://github.com/zarr-developers/pydantic-zarr@d243077dfa2cc14379bf69c98b2b278d8d79990b",
     # imported directly (scopes, typed metadata objects, typed_json.check)
     "zarr-metadata>=0.8.0",
     "pydantic>=2.14.1",
@@ -245,12 +249,6 @@ exclude_lines = [
 [tool.bandit]
 exclude_dirs = ["tests", "docs"]
 skips = ["B101", "B601"]
-
-[tool.uv.sources]
-# GroupSpec's members type parameter (zarr-developers/pydantic-zarr#211) is on
-# pydantic-zarr main and first ships in 0.12.0. Drop this pin, and raise the
-# floor above to >=0.12.0, once that release is out.
-pydantic-zarr = { git = "https://github.com/zarr-developers/pydantic-zarr", rev = "d243077dfa2cc14379bf69c98b2b278d8d79990b" }
 
 [tool.uv]
 default-groups = ["dev", "test"]

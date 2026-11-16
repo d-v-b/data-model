@@ -10,6 +10,7 @@ import structlog
 import xarray as xr
 import zarr
 from affine import Affine
+from pydantic_zarr.v2 import GroupSpec
 from rasterio.crs import CRS
 
 from eopf_geozarr.conversion.constants import ZARR_FORMAT
@@ -23,6 +24,7 @@ from eopf_geozarr.s3_olci_optimization.olci_multiscale import (
     swath_spatial_attrs,
 )
 from eopf_geozarr.s3_olci_optimization.olci_reproject import GRID_DIMS, reproject_olci
+from eopf_geozarr.zarr_io import read_documents
 
 if TYPE_CHECKING:
     from zarr.core.common import JSON
@@ -63,10 +65,6 @@ def is_sentinel3_olci_dataset(group: zarr.Group) -> bool:
     converter in the CLI). Users with such near-miss products should use the
     explicit ``convert-s3-olci-optimized`` subcommand, which skips detection.
     """
-    from pydantic_zarr.v2 import GroupSpec
-
-    from eopf_geozarr.zarr_io import read_documents
-
     try:
         model = Sentinel3OlciRoot.model_validate(
             GroupSpec.from_stored_metadata_json(read_documents(group)).model_dump()

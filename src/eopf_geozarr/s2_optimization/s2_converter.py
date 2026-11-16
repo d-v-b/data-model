@@ -11,12 +11,14 @@ import structlog
 import xarray as xr
 import zarr
 from pydantic import TypeAdapter
+from pydantic_zarr.v2 import GroupSpec
 from pyproj import CRS
 
 from eopf_geozarr.conversion import utils
 from eopf_geozarr.conversion.geozarr import get_zarr_group
 from eopf_geozarr.data_api.s1 import Sentinel1Root
 from eopf_geozarr.data_api.s2 import Sentinel2Root
+from eopf_geozarr.zarr_io import read_documents
 
 from .s2_multiscale import (
     _AUX_MULTISCALES,
@@ -361,10 +363,6 @@ def convert_s2_optimized(
 def is_sentinel2_dataset(group: zarr.Group) -> bool:
     if group.metadata.zarr_format == 3:
         return _is_sentinel2_dataset_v3(group)
-
-    from pydantic_zarr.v2 import GroupSpec
-
-    from eopf_geozarr.zarr_io import read_documents
 
     adapter = TypeAdapter(Sentinel1Root | Sentinel2Root)
     try:
