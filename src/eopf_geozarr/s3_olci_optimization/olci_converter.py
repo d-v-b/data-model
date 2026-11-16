@@ -10,7 +10,6 @@ import structlog
 import xarray as xr
 import zarr
 from affine import Affine
-from pydantic_zarr.v2 import GroupSpec
 from rasterio.crs import CRS
 
 from eopf_geozarr.conversion.constants import ZARR_FORMAT
@@ -66,9 +65,7 @@ def is_sentinel3_olci_dataset(group: zarr.Group) -> bool:
     explicit ``convert-s3-olci-optimized`` subcommand, which skips detection.
     """
     try:
-        model = Sentinel3OlciRoot.model_validate(
-            GroupSpec.from_stored_metadata_json(read_documents(group)).model_dump()
-        )
+        model = Sentinel3OlciRoot.from_stored_metadata_json(read_documents(group))
     except Exception as e:
         # Classify, never raise: reading the documents can fail with types
         # other than ValidationError on malformed or unexpected stores, and

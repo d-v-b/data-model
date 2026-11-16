@@ -14,7 +14,6 @@ import pytest
 import xarray as xr
 import zarr
 from affine import Affine
-from pydantic_zarr.core import tuplify_json
 from pydantic_zarr.v3 import GroupSpec
 from pyproj import CRS
 from structlog.testing import capture_logs
@@ -311,8 +310,8 @@ def test_create_multiscale_from_datatree_snapshot(
     if os.environ.get("REGENERATE_SNAPSHOTS"):
         snapshot_path.write_text(json.dumps(observed_json, indent=2, sort_keys=True) + "\n")
 
-    observed = GroupSpec(**tuplify_json(observed_json)).to_flat()
-    expected = GroupSpec(**tuplify_json(json.loads(snapshot_path.read_text()))).to_flat()
+    observed = GroupSpec.model_validate(observed_json).to_flat()
+    expected = GroupSpec.model_validate(json.loads(snapshot_path.read_text())).to_flat()
     assert set(observed) == set(expected)
 
     # Compare as JSON: a NaN fill value never equals itself as a float.

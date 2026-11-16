@@ -1735,7 +1735,7 @@ requires-dist = [
     { name = "eopf", marker = "python_full_version >= '3.13' and extra == 'cpm'", specifier = ">=3.0.0" },
     { name = "numpy", specifier = ">=2.3.1" },
     { name = "pydantic", specifier = ">=2.14.1" },
-    { name = "pydantic-zarr", git = "https://github.com/zarr-developers/pydantic-zarr?rev=d243077dfa2cc14379bf69c98b2b278d8d79990b" },
+    { name = "pydantic-zarr", specifier = ">=0.12.0,<0.13" },
     { name = "pygit2", specifier = ">=1.20.1" },
     { name = "pyproj", specifier = ">=3.7.0" },
     { name = "pystac", specifier = ">=1.8.0" },
@@ -1748,7 +1748,7 @@ requires-dist = [
     { name = "xarray", specifier = ">=2025.7.1" },
     { name = "zarr", extras = ["cast-value-rs"], specifier = ">=3.2.0,<3.5.0" },
     { name = "zarr-cm", specifier = ">=0.5.0" },
-    { name = "zarr-metadata", specifier = ">=0.8.0" },
+    { name = "zarr-metadata", specifier = ">=0.9.0" },
 ]
 provides-extras = ["cpm"]
 
@@ -4534,8 +4534,8 @@ wheels = [
 
 [[package]]
 name = "pydantic-zarr"
-version = "0.11.1.dev12+gd243077df"
-source = { git = "https://github.com/zarr-developers/pydantic-zarr?rev=d243077dfa2cc14379bf69c98b2b278d8d79990b#d243077dfa2cc14379bf69c98b2b278d8d79990b" }
+version = "0.12.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
@@ -4543,6 +4543,10 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
     { name = "zarr-metadata" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/f6/6d89d2b6eae13407b853c43cd4771341a832660e1c1ec3d05ad9e5984dcf/pydantic_zarr-0.12.0.tar.gz", hash = "sha256:6c83ffdd790a60fb273242656c7e260a08c789486693457b4dcfb5d4d8d42b0b", size = 422831, upload-time = "2026-11-16T16:07:44.61Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8e/b8/67ab84a221d843d1a095fd45560310de02279f98741f7d6f516fdb3529b6/pydantic_zarr-0.12.0-py3-none-any.whl", hash = "sha256:2c55abd8e06771f4a9f0c472f9a79f9f58a94eb98ee80118c18b784474c269be", size = 88105, upload-time = "2026-11-16T16:07:42.773Z" },
 ]
 
 [[package]]

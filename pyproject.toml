@@ -44,13 +44,11 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    # GroupSpec's members type parameter (zarr-developers/pydantic-zarr#211) is on
-    # pydantic-zarr main and first ships in 0.12.0. A direct reference, so that PyPI
-    # refuses to publish a release that would install a pydantic-zarr without it.
-    # Replace with "pydantic-zarr>=0.12.0" once that release is out.
-    "pydantic-zarr @ git+https://github.com/zarr-developers/pydantic-zarr@d243077dfa2cc14379bf69c98b2b278d8d79990b",
+    # pydantic-zarr makes breaking changes in minor releases before 1.0 (0.12 removed
+    # from_zarr/to_zarr, which broke eopf-geozarr 0.13.1), so cap at the next minor.
+    "pydantic-zarr>=0.12.0,<0.13",
     # imported directly (scopes, typed metadata objects, typed_json.check)
-    "zarr-metadata>=0.8.0",
+    "zarr-metadata>=0.9.0",
     "pydantic>=2.14.1",
     # <3.3.0: open_source_datatree uses zarr's experimental CacheStore, whose
     # location/API may change between minor releases; bump deliberately.

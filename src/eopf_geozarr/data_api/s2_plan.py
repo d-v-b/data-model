@@ -42,7 +42,6 @@ from typing import TYPE_CHECKING, Any, Final, Literal
 import numpy as np
 import structlog
 import xarray as xr
-from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
 from pydantic_zarr.v3 import ArraySpec as ArraySpecV3
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
 from pydantic_zarr.v3 import parse_dtype_v3
@@ -139,12 +138,9 @@ def load_sentinel2(source: zarr.Group | xr.DataTree) -> Sentinel2Root:
     store does. Raises `pydantic.ValidationError` when the source is not a
     Sentinel-2 product.
     """
-    spec = (
-        group_spec_from_datatree(source)
-        if isinstance(source, xr.DataTree)
-        else GroupSpecV2.from_stored_metadata_json(read_documents(source))
-    )
-    return Sentinel2Root.model_validate(spec.model_dump())
+    if isinstance(source, xr.DataTree):
+        return Sentinel2Root.model_validate(group_spec_from_datatree(source).model_dump())
+    return Sentinel2Root.from_stored_metadata_json(read_documents(source))
 
 
 def product_level(root: Sentinel2Root) -> S2Level:
