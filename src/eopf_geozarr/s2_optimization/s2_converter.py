@@ -362,11 +362,15 @@ def is_sentinel2_dataset(group: zarr.Group) -> bool:
     if group.metadata.zarr_format == 3:
         return _is_sentinel2_dataset_v3(group)
 
-    from eopf_geozarr.pyz.v2 import GroupSpec
+    from pydantic_zarr.v2 import GroupSpec
+
+    from eopf_geozarr.zarr_io import read_documents
 
     adapter = TypeAdapter(Sentinel1Root | Sentinel2Root)
     try:
-        model = adapter.validate_python(GroupSpec.from_zarr(group).model_dump())
+        model = adapter.validate_python(
+            GroupSpec.from_stored_metadata_json(read_documents(group)).model_dump()
+        )
     except ValueError as e:
         log.warning("Could not validate Sentinel-2 dataset", error=str(e))
         return False

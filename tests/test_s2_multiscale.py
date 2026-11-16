@@ -39,6 +39,7 @@ from eopf_geozarr.s2_optimization.s2_multiscale import (
     generic_multiscales,
     inject_missing_bands,
 )
+from eopf_geozarr.zarr_io import read_documents
 
 from .conftest import create_zarrv2_group_from_json, get_stem, s2_example_json_paths
 
@@ -301,8 +302,8 @@ def test_create_multiscale_from_datatree_snapshot(
             crs=_TILE_CRS,
         )
 
-    observed_json = GroupSpec.from_zarr(
-        zarr.open_group(output_path, use_consolidated=False)
+    observed_json = GroupSpec.from_stored_metadata_json(
+        read_documents(zarr.open_group(output_path, use_consolidated=False))
     ).model_dump()
     snapshot_path = pathlib.Path("tests/_test_data/optimized_geozarr_examples") / (
         source_path.stem + ".json"

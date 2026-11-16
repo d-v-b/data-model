@@ -246,6 +246,12 @@ exclude_lines = [
 exclude_dirs = ["tests", "docs"]
 skips = ["B101", "B601"]
 
+[tool.uv.sources]
+# GroupSpec's members type parameter (zarr-developers/pydantic-zarr#211) is on
+# pydantic-zarr main and first ships in 0.12.0. Drop this pin, and raise the
+# floor above to >=0.12.0, once that release is out.
+pydantic-zarr = { git = "https://github.com/zarr-developers/pydantic-zarr", rev = "d243077dfa2cc14379bf69c98b2b278d8d79990b" }
+
 [tool.uv]
 default-groups = ["dev", "test"]
 constraint-dependencies = [

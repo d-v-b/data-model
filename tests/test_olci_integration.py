@@ -21,6 +21,7 @@ from eopf_geozarr.data_api.geozarr.validation import validate_store
 from eopf_geozarr.s3_olci_optimization.olci_converter import (
     _sanitize_olci_array_attrs_keep_fill,
 )
+from eopf_geozarr.zarr_io import read_documents
 
 if TYPE_CHECKING:
     import pathlib
@@ -561,7 +562,9 @@ def test_olci_conversion_matches_snapshot(
         assert meta.read_bytes() == before, f"/{path}: consolidated block is stale"
 
     observed_group = zarr.open_group(out, use_consolidated=False)
-    observed_structure_json = GroupSpec.from_zarr(observed_group).model_dump()
+    observed_structure_json = GroupSpec.from_stored_metadata_json(
+        read_documents(observed_group)
+    ).model_dump()
 
     expected_path = Path("tests/_test_data/optimized_olci_examples") / (
         f"{s3_olci_group_example.stem}-{golden_suffix}.json"

@@ -55,11 +55,12 @@ from zarr_cm.proj import CMO as PROJ_CMO
 from zarr_cm.spatial import CMO as SPATIAL_CMO
 from zarr_metadata.typed_json import check
 
+from eopf_geozarr.data_api.datatree import group_spec_from_datatree
 from eopf_geozarr.data_api.geozarr.scope import GEOZARR_SCOPE
 from eopf_geozarr.data_api.geozarr.v3 import DataArray
 from eopf_geozarr.data_api.s2 import Sentinel2Root
-from eopf_geozarr.pyz.datatree import group_spec_from_datatree
 from eopf_geozarr.s2_optimization.s2_multiscale import SCL_ATTRS, SCL_NODATA
+from eopf_geozarr.zarr_io import read_documents
 
 if TYPE_CHECKING:
     import zarr
@@ -141,7 +142,7 @@ def load_sentinel2(source: zarr.Group | xr.DataTree) -> Sentinel2Root:
     spec = (
         group_spec_from_datatree(source)
         if isinstance(source, xr.DataTree)
-        else GroupSpecV2.from_zarr(source)
+        else GroupSpecV2.from_stored_metadata_json(read_documents(source))
     )
     return Sentinel2Root.model_validate(spec.model_dump())
 
