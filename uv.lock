@@ -1683,6 +1683,7 @@ dependencies = [
     { name = "xarray" },
     { name = "zarr", extra = ["cast-value-rs"] },
     { name = "zarr-cm" },
+    { name = "zarr-metadata" },
 ]
 
 [package.optional-dependencies]
@@ -1747,6 +1748,7 @@ requires-dist = [
     { name = "xarray", specifier = ">=2025.7.1" },
     { name = "zarr", extras = ["cast-value-rs"], specifier = ">=3.2.0,<3.5.0" },
     { name = "zarr-cm", specifier = ">=0.5.0" },
+    { name = "zarr-metadata", specifier = ">=0.9.0" },
 ]
 provides-extras = ["cpm"]
 
