@@ -14,7 +14,6 @@ import zarr
 from pydantic import ValidationError
 from pydantic_zarr.v2 import GroupSpec as GroupSpecV2
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
-from pyproj import CRS
 from zarr.storage import LocalStore
 
 from eopf_geozarr.conversion.open_source import open_source_datatree
@@ -29,11 +28,11 @@ from eopf_geozarr.data_api.s2_plan import (
     CarriedDataset,
     ConditionsGroup,
     ConditionsMaskGroup,
-    GridMappingArray,
     QualityGroup,
     ReflectanceLevel,
     ReflectancePyramid,
     Sentinel2GeoZarr,
+    _lat_lon_attributes,
     load_sentinel2,
     plan_geozarr,
     plan_reflectance,
@@ -146,10 +145,24 @@ def _product_with_data(
     return store_path
 
 
+def _name_only(node: object) -> object:
+    """`node` with every named extension object that has an empty
+    `configuration` in its name-only form. The Zarr V3 spec makes the two
+    equivalent, and zarr-python stores `vlen-utf8` with the empty mapping."""
+    if isinstance(node, dict):
+        out = {key: _name_only(value) for key, value in node.items()}
+        if "name" in out and out.get("configuration") == {}:
+            del out["configuration"]
+        return out
+    if isinstance(node, list):
+        return [_name_only(value) for value in node]
+    return node
+
+
 def _canonical(document: object) -> str:
     """A document as sorted JSON text: equal texts are equal documents (a NaN
     never equals itself as a float)."""
-    return json.dumps(document, sort_keys=True)
+    return json.dumps(_name_only(document), sort_keys=True)
 
 
 @pytest.mark.filterwarnings("ignore")
@@ -227,11 +240,10 @@ def test_plan_matches_snapshot(path: pathlib.Path) -> None:
 def test_plan_is_the_typed_output_model(path: pathlib.Path) -> None:
     """
     The plan is a `Sentinel2GeoZarr`: the reflectance pyramid holds exactly
-    the six scale levels, each a `ReflectanceLevel` with `x`, `y`, its bands
-    and a `spatial_ref` grid mapping; the auxiliary pyramids hold the levels
-    `AUX_MULTISCALE_LEVELS` lists; `conditions` and `quality` are a
-    `ConditionsGroup` and a `QualityGroup`; and the model reads its own dump
-    back.
+    the six scale levels, each a `ReflectanceLevel` with `x`, `y` and its
+    bands; the auxiliary pyramids hold the levels `AUX_MULTISCALE_LEVELS`
+    lists; `conditions` and `quality` are a `ConditionsGroup` and a
+    `QualityGroup`; and the model reads its own dump back.
     """
     plan = plan_geozarr(Sentinel2Root.model_validate(_read(path)))
     assert isinstance(plan, Sentinel2GeoZarr)
@@ -241,7 +253,6 @@ def test_plan_is_the_typed_output_model(path: pathlib.Path) -> None:
     assert set(reflectance.members) == {f"r{meters}m" for meters in REFLECTANCE_SCALE_LEVELS}
     for level in (reflectance.members["r10m"], reflectance.members["r720m"]):
         assert isinstance(level, ReflectanceLevel)
-        assert isinstance(level.members["spatial_ref"], GridMappingArray)
         assert level.members["x"].dimension_names == ("x",)
         assert level.members["y"].dimension_names == ("y",)
         band = level.members.get("b02")
@@ -276,16 +287,16 @@ def _planned_level(name: str = "r10m") -> dict[str, Any]:
 
 
 def test_reflectance_level_refuses_an_unknown_member() -> None:
-    """A level holds only coordinates, a grid mapping and known bands."""
+    """A level holds only coordinates and known bands."""
     level = _planned_level()
     level["members"]["b99"] = level["members"]["b02"]
     with pytest.raises(ValidationError, match="b99"):
         ReflectanceLevel.model_validate(level)
 
 
-@pytest.mark.parametrize("missing", ["x", "y", "spatial_ref"])
-def test_reflectance_level_requires_coordinates_and_grid_mapping(missing: str) -> None:
-    """A level without `x`, `y` or `spatial_ref` is refused."""
+@pytest.mark.parametrize("missing", ["x", "y"])
+def test_reflectance_level_requires_coordinates(missing: str) -> None:
+    """A level without `x` or `y` is refused."""
     level = _planned_level()
     del level["members"][missing]
     with pytest.raises(ValidationError, match=missing):
@@ -371,9 +382,10 @@ def test_pyramid_refuses_an_unknown_layout_key() -> None:
 def test_plan_georeferencing_is_self_consistent(path: pathlib.Path) -> None:
     """
     Every planned level's spatial attributes derive from the product's own
-    band attributes: the transform is the level resolution over the finest
-    band's origin, the bbox is the transform applied to the level shape, and
-    the grid-mapping array holds the band's own CRS.
+    band attributes: the CRS is the band's own, the transform is the level
+    resolution over the finest band's origin, and the bbox is the transform
+    applied to the level shape. `proj:code` is the only CRS statement: there
+    is no grid-mapping array (#352).
     """
     planned = _planned_reflectance(path)
     finest = planned["members"][f"r{REFLECTANCE_SCALE_LEVELS[0]}m"]
@@ -395,8 +407,29 @@ def test_plan_georeferencing_is_self_consistent(path: pathlib.Path) -> None:
             x0 + cols * meters,
             y0,
         ]
-        crs = CRS.from_wkt(level["members"]["spatial_ref"]["attributes"]["crs_wkt"])
-        assert crs.to_epsg() == epsg
+        assert "spatial_ref" not in level["members"]
+
+
+def _groups(node: dict[str, Any], path: str = "") -> list[tuple[str, dict[str, Any]]]:
+    """Every group of a dumped tree, with its path."""
+    if node.get("node_type") != "group":
+        return []
+    found = [(path or "/", node)]
+    for name, member in (node.get("members") or {}).items():
+        found.extend(_groups(member, f"{path}/{name}"))
+    return found
+
+
+@pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
+def test_plan_states_a_shape_with_every_transform(path: pathlib.Path) -> None:
+    """Every planned group with a `spatial:transform` also has the `spatial:shape`
+    it describes, multiscale parents included (EOPF-Explorer/data-model#355)."""
+    missing = [
+        group_path
+        for group_path, group in _groups(_planned_root(path))
+        if "spatial:transform" in group["attributes"] and "spatial:shape" not in group["attributes"]
+    ]
+    assert missing == []
 
 
 def test_load_sentinel2_keeps_the_model(tmp_path: pathlib.Path) -> None:
@@ -495,6 +528,263 @@ def test_plan_carries_a_datetime_array_in_its_v3_form() -> None:
     assert observed["dimension_names"] == ["observed"]
 
 
+def test_plan_puts_cf_attributes_right_on_every_level() -> None:
+    """
+    A carried array's CF attributes are put right on its native level and on
+    every level coarsened from it (#351): its `short_name` names its own
+    level, a `flag_meanings` list becomes one string, the `dtype` attribute
+    is dropped, and a `valid_max` the data type cannot hold is dropped.
+    """
+    path = next(p for p in _INPUT_PATHS if "MSIL2A" in p.name)
+    document = _read(path)
+    l2a = document["members"]["conditions"]["members"]["mask"]["members"]["l2a_classification"]
+    # both native levels name the other level, as the source products do once
+    # a level's attributes are copied
+    for level, wrong in (("r20m", "scl_r60m"), ("r60m", "scl_r20m")):
+        l2a["members"][level]["members"]["scl"]["attributes"].update(
+            {
+                "short_name": wrong,
+                "flag_meanings": ["no_data", "saturated"],
+                "dtype": "<u1",
+                "valid_max": 65535,
+                "valid_min": 0,
+            }
+        )
+    planned = plan_geozarr(Sentinel2Root.model_validate(document)).model_dump(mode="json")
+    levels = planned["members"]["conditions"]["members"]["mask"]["members"]["l2a_classification"][
+        "members"
+    ]
+    for level, group in levels.items():
+        scl = group["members"]["scl"]["attributes"]
+        assert scl["short_name"] == f"scl_{level}", level
+        assert isinstance(scl["flag_meanings"], str), level
+        assert "dtype" not in scl, level
+        assert "valid_max" not in scl, level
+        assert scl["valid_min"] == 0, level
+
+
+def _arrays(node: dict[str, Any], path: str = "") -> list[tuple[str, dict[str, Any]]]:
+    """Every array of a dumped tree, with its path."""
+    if node.get("node_type") == "array":
+        return [(path, node)]
+    found: list[tuple[str, dict[str, Any]]] = []
+    for name, member in (node.get("members") or {}).items():
+        found.extend(_arrays(member, f"{path}/{name}"))
+    return found
+
+
+@pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
+def test_plan_shards_only_arrays_of_several_chunks(path: pathlib.Path) -> None:
+    """
+    A sharded array spans more than one inner chunk; an array that fits in one
+    inner chunk is written in plain chunks (#357), with the same compressor.
+    """
+    single_chunk_shards = []
+    for array_path, array in _arrays(_planned_root(path)):
+        codecs = array["codecs"]
+        if codecs[0]["name"] == "sharding_indexed":
+            inner = codecs[0]["configuration"]["chunk_shape"]
+            if all(n <= i for n, i in zip(array["shape"], inner, strict=True)):
+                single_chunk_shards.append(array_path)
+        elif any(codec["name"] == "blosc" for codec in codecs):
+            # an unsharded band array is one chunk covering the array
+            assert array["chunk_grid"]["configuration"]["chunk_shape"] == array["shape"]
+    assert single_chunk_shards == []
+
+
+@pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
+def test_plan_stores_labels_as_registered_strings(path: pathlib.Path) -> None:
+    """No planned array uses a data type outside the Zarr V3 core and its
+    registered extensions: label coordinates are `string` (#356)."""
+    unregistered = [
+        (array_path, array["data_type"]["name"])
+        for array_path, array in _arrays(_planned_root(path))
+        if isinstance(array["data_type"], dict)
+        and array["data_type"]["name"] in ("fixed_length_utf32", "null_terminated_bytes")
+    ]
+    assert unregistered == []
+    geometry = _planned_root(path)["members"]["conditions"]["members"]["geometry"]["members"]
+    assert geometry["angle"]["data_type"] == "string"
+    assert geometry["angle"]["codecs"] == [{"name": "vlen-utf8"}]
+
+
+@pytest.mark.parametrize(
+    ("latitude", "longitude", "expected"),
+    [
+        (
+            [48.0, 47.5, 47.0],
+            [8.0, 8.25, 8.5, 8.75],
+            {
+                "spatial:bbox": [8.0, 47.0, 8.75, 48.0],
+                "spatial:shape": [3, 4],
+                "spatial:transform": [0.25, 0.0, 8.0, 0.0, -0.5, 48.0],
+            },
+        ),
+        (
+            [47.0, 47.5, 48.0],
+            [8.0, 8.25],
+            {
+                "spatial:bbox": [8.0, 47.0, 8.25, 48.0],
+                "spatial:shape": [3, 2],
+                "spatial:transform": [0.25, 0.0, 8.0, 0.0, 0.5, 47.0],
+            },
+        ),
+        (
+            [10.0, 9.5, 9.0],
+            [179.5, 179.75, -180.0, -179.75],
+            {
+                "spatial:bbox": [179.5, 9.0, -179.75, 10.0],
+                "spatial:transform": [0.25, 0.0, 179.5, 0.0, -0.5, 10.0],
+            },
+        ),
+        (
+            [10.0, 9.5],
+            [300.0, 330.0, 0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0],
+            {
+                "spatial:bbox": [-60.0, 9.5, -150.0, 10.0],
+                "spatial:transform": [30.0, 0.0, 300.0, 0.0, -0.5, 10.0],
+            },
+        ),
+        (
+            np.linspace(48.0, 44.8, 9, dtype="float32").tolist(),
+            np.linspace(8.0, 11.2, 9, dtype="float32").tolist(),
+            {"spatial:shape": [9, 9]},
+        ),
+    ],
+    ids=[
+        "latitude-decreasing",
+        "latitude-increasing",
+        "antimeridian",
+        "wide-0-360-grid",
+        "float32-rounding",
+    ],
+)
+def test_lat_lon_attributes(
+    latitude: list[float], longitude: list[float], expected: dict[str, object]
+) -> None:
+    """
+    A regular geographic grid's `proj` and `spatial` attributes follow from
+    its coordinate points (#353): node registration, the transform's origin
+    the first point and its step signed, the bbox spanning the outer points.
+    """
+    attributes = _lat_lon_attributes(np.array(latitude), np.array(longitude))
+    assert {key: attributes[key] for key in expected} == expected
+    assert attributes["proj:code"] == "EPSG:4326"
+    assert attributes["spatial:dimensions"] == ["latitude", "longitude"]
+    assert attributes["spatial:registration"] == "node"
+
+
+def test_lat_lon_attributes_refuse_irregular_spacing() -> None:
+    with pytest.raises(ValueError, match="latitude coordinate is not regularly spaced"):
+        _lat_lon_attributes(np.array([48.0, 47.5, 46.0]), np.array([8.0, 8.25]))
+
+
+def test_lat_lon_attributes_refuse_a_single_point() -> None:
+    with pytest.raises(ValueError, match="longitude coordinate needs at least two values"):
+        _lat_lon_attributes(np.array([48.0, 47.5]), np.array([8.0]))
+
+
+def test_plan_georeferences_the_meteorology_groups_from_their_coordinates() -> None:
+    """
+    The meteorology groups get `proj` and `spatial` attributes derived from
+    their latitude/longitude values, and lose the source `Conventions`
+    claim (#353); without the values, they get no georeferencing but still
+    lose the claim.
+    """
+    path = _INPUT_PATHS[0]
+    root = Sentinel2Root.model_validate(_read(path))
+    values = {
+        f"conditions/meteorology/{group}/{name}": axis
+        for group in ("cams", "ecmwf")
+        for name, axis in (
+            ("latitude", np.linspace(48.0, 46.0, 9)),
+            ("longitude", np.linspace(8.0, 10.0, 9)),
+        )
+    }
+    with_values = plan_geozarr(root, coordinate_values=values.get).model_dump(mode="json")
+    without = plan_geozarr(root).model_dump(mode="json")
+    for group in ("cams", "ecmwf"):
+        attributes = with_values["members"]["conditions"]["members"]["meteorology"]["members"][
+            group
+        ]["attributes"]
+        assert attributes["proj:code"] == "EPSG:4326"
+        assert attributes["spatial:shape"] == [9, 9]
+        assert attributes["spatial:transform"] == [0.25, 0.0, 8.0, 0.0, -0.25, 48.0]
+        assert "Conventions" not in attributes
+        bare = without["members"]["conditions"]["members"]["meteorology"]["members"][group][
+            "attributes"
+        ]
+        assert "proj:code" not in bare
+        assert "Conventions" not in bare
+
+
+def test_plan_stores_bytes_labels_as_strings() -> None:
+    """A carried bytes (`S`) label array, as native Zarr V3 products hold the
+    geometry `band` and `detector` labels, is planned as `string` (#356)."""
+    path = _INPUT_PATHS[0]
+    document = _read(path)
+    geometry = document["members"]["conditions"]["members"]["geometry"]["members"]
+    geometry["detector"] = {
+        "zarr_format": 2,
+        "shape": [7],
+        "chunks": [7],
+        "dtype": "|S3",
+        "fill_value": "",
+        "order": "C",
+        "filters": None,
+        "compressor": None,
+        "dimension_separator": "/",
+        "attributes": {"_ARRAY_DIMENSIONS": ["detector"]},
+    }
+    planned = plan_geozarr(Sentinel2Root.model_validate(document)).model_dump(mode="json")
+    detector = planned["members"]["conditions"]["members"]["geometry"]["members"]["detector"]
+    assert detector["data_type"] == "string"
+    assert detector["codecs"] == [{"name": "vlen-utf8"}]
+    assert detector["dimension_names"] == ["detector"]
+
+
+@pytest.mark.parametrize(
+    ("latitude", "longitude"),
+    [
+        (np.array([48.0, 47.5, 46.0, 45.9, 45.0, 44.0, 43.0, 42.0, 41.0]), np.linspace(8, 10, 9)),
+        (np.full(9, np.nan), np.full(9, np.nan)),
+    ],
+    ids=["irregular", "nan-fill"],
+)
+def test_plan_carries_an_ungeoreferenceable_grid_without_georeferencing(
+    latitude: np.ndarray, longitude: np.ndarray
+) -> None:
+    """A latitude/longitude group whose values no transform describes is
+    carried without `proj`/`spatial` attributes, not refused (#353)."""
+    root = Sentinel2Root.model_validate(_read(_INPUT_PATHS[0]))
+    values = {
+        f"conditions/meteorology/{group}/{name}": axis
+        for group in ("cams", "ecmwf")
+        for name, axis in (("latitude", latitude), ("longitude", longitude))
+    }
+    planned = plan_geozarr(root, coordinate_values=values.get).model_dump(mode="json")
+    for group in ("cams", "ecmwf"):
+        attributes = planned["members"]["conditions"]["members"]["meteorology"]["members"][group][
+            "attributes"
+        ]
+        assert "proj:code" not in attributes
+
+
+@pytest.mark.parametrize("path", _INPUT_PATHS, ids=lambda p: p.stem[:26])
+def test_plan_writes_no_cf_grid_mapping(path: pathlib.Path) -> None:
+    """`proj` and `spatial` are the only georeferencing: no group or array has
+    a `grid_mapping` attribute and there is no `spatial_ref` array (#352)."""
+    planned = _planned_root(path)
+    with_grid_mapping = [
+        node_path
+        for node_path, node in [*_groups(planned), *_arrays(planned)]
+        if "grid_mapping" in node["attributes"]
+    ]
+    spatial_refs = [p for p, _ in _arrays(planned) if p.endswith("/spatial_ref")]
+    assert with_grid_mapping == []
+    assert spatial_refs == []
+
+
 def _tile_epsg(path: pathlib.Path) -> int:
     """The EPSG code of the product's finest reflectance band."""
     finest = _read(path)["members"]["measurements"]["members"]["reflectance"]["members"]["r10m"]
@@ -507,7 +797,7 @@ def test_plan_georeferences_the_geometry_grids_at_their_nodes() -> None:
     `conditions/geometry` declares the tile CRS (EOPF-Explorer/data-model#346).
     The angle grids are node-registered: `(x[0], y[0])` is the tile's
     upper-left corner, so the transform starts there and is not moved by a
-    half cell. Arrays without the (y, x) dimensions get no grid mapping.
+    half cell. As everywhere, no CF grid mapping is written (#352).
     """
     path = _INPUT_PATHS[0]
     size, step, ulx, uly = 23, 5000.0, 600000.0, 7800000.0
@@ -526,11 +816,8 @@ def test_plan_georeferences_the_geometry_grids_at_their_nodes() -> None:
     assert attrs["spatial:transform"] == [step, 0.0, ulx, 0.0, -step, uly]
     assert attrs["spatial:bbox"] == [ulx, uly - step * (size - 1), ulx + step * (size - 1), uly]
     arrays = geometry["members"]
-    assert "spatial_ref" in arrays
-    assert arrays["sun_angles"]["attributes"]["grid_mapping"] == "spatial_ref"
-    assert arrays["viewing_incidence_angles"]["attributes"]["grid_mapping"] == "spatial_ref"
-    assert "grid_mapping" not in arrays["mean_sun_angles"]["attributes"]
-    assert "grid_mapping" not in arrays["mean_viewing_incidence_angles"]["attributes"]
+    assert "spatial_ref" not in arrays
+    assert all("grid_mapping" not in array["attributes"] for array in arrays.values())
 
 
 def test_plan_carries_an_irregular_geometry_grid_without_georeferencing() -> None:

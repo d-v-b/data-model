@@ -204,9 +204,10 @@ output.zarr/
 
 - **Native mode**: bands keep per-pixel 2-D `latitude`/`longitude`/`altitude`
   and per-row `time_stamp`, with no projected CRS.
-- **Regular grid**: bands get 1-D `y`/`x` coordinates and a `spatial_ref`
-  variable referenced by `grid_mapping`. The per-row `time_stamp` is dropped;
-  it stays in the source product.
+- **Regular grid**: bands get 1-D `y`/`x` coordinates, and each level group
+  declares its CRS with the `proj` convention (`proj:code`). No CF
+  `spatial_ref` grid-mapping variable or `grid_mapping` attribute is written.
+  The per-row `time_stamp` is dropped; it stays in the source product.
 - Radiance keeps the source packing (`uint16` with CF `scale_factor` and
   `_FillValue`). The tie-point groups in `conditions` are copied, not converted
   to the GeoZarr conventions.

@@ -235,7 +235,11 @@ def _store_values(output: zarr.Group, path: str, values: np.ndarray) -> None:
     which would turn, say, float reflectance into the planned uint16 silently.
     """
     out_array = _output_array(output, path)
-    if not np.can_cast(values.dtype, out_array.dtype, casting="safe"):
+    # fixed-length unicode labels fit the variable-length `string` data type
+    # they are planned as (#356) without loss, though numpy does not call that
+    # cast safe
+    text_to_string = values.dtype.kind == "U" and isinstance(out_array.dtype, np.dtypes.StringDType)
+    if not text_to_string and not np.can_cast(values.dtype, out_array.dtype, casting="safe"):
         msg = (
             f"The input values for {path!r} have data type {values.dtype}, which does "
             f"not cast safely to the planned data type {out_array.dtype}"
@@ -257,15 +261,15 @@ def _fill_group(spec: AnyGroupSpec, source: SourceReader, output: zarr.Group, pa
 
 
 def _fill_carried_array(source: SourceReader, output: zarr.Group, path: str) -> None:
-    """Copy one carried array's data from the input (grid mappings hold 0)."""
-    out_array = _output_array(output, path)
-    if path.rsplit("/", 1)[-1] == "spatial_ref":
-        out_array[...] = 0
-        return
+    """Copy one carried array's data from the input."""
     values = source.values(path)
     if values is None:
         msg = f"The input source holds no array at {path!r}"
         raise ValueError(msg)
+    if values.dtype.kind == "S":
+        # bytes labels are planned as the `string` data type (#356): decode
+        # them as ASCII rather than leave the conversion to zarr
+        values = np.char.decode(values, "ascii")
     _store_values(output, path, values)
 
 
@@ -300,8 +304,6 @@ def _fill_pyramid(
         data: dict[str, np.ndarray] = {}
         coords: dict[str, np.ndarray] = {}
         for var in level_spec.members:
-            if var == "spatial_ref":
-                continue
             if var in ("x", "y"):
                 coords[var] = _level_coordinate(
                     source,
@@ -325,8 +327,6 @@ def _fill_pyramid(
                 )
         for var, values in {**data, **coords}.items():
             _store_values(output, f"{level_path}/{var}", values)
-        if "spatial_ref" in level_spec.members:
-            _output_array(output, f"{level_path}/spatial_ref")[...] = 0
         previous_data, previous_coords, previous_meters = data, coords, meters
 
 

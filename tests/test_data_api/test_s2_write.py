@@ -21,12 +21,14 @@ import pytest
 import xarray as xr
 import zarr
 from pydantic_zarr.v3 import GroupSpec as GroupSpecV3
+from zarr.storage import MemoryStore
 
 from eopf_geozarr.data_api.s2_plan import load_sentinel2
 from eopf_geozarr.data_api.s2_write import (
     DataTreeSourceReader,
     ZarrSourceReader,
     _coarsen,
+    _fill_carried_array,
     write_geozarr,
 )
 from eopf_geozarr.zarr_io import read_documents
@@ -95,8 +97,9 @@ def _seed_input_store(group: zarr.Group) -> None:
     Coordinates are the pixel centres of each group's own `proj:transform`.
     They are recreated as float64 so that the centres made up for groups
     without a transform are stored exactly; the int64 coordinates the
-    fixtures declare are covered by the plan's converter comparison. Selected
-    arrays get deterministic values.
+    fixtures declare are covered by the plan's converter comparison.
+    Latitude/longitude form a regular geographic grid, and selected arrays
+    get deterministic values.
     """
     patterned = set(_PATTERNED_PATHS)
     for group_path, subgroup in _walk_groups(group):
@@ -125,6 +128,12 @@ def _seed_input_store(group: zarr.Group) -> None:
                     overwrite=True,
                 )
                 replacement[:] = values
+            elif name in ("latitude", "longitude") and array.ndim == 1:
+                # a regular geographic grid, as the CAMS/ECMWF meteorology
+                # groups store it (latitude decreasing), from which the plan
+                # derives the groups' georeferencing
+                start, stop = (48.0, 46.0) if name == "latitude" else (8.0, 10.0)
+                array[...] = np.linspace(start, stop, array.shape[0]).astype(array.dtype)
             elif array.ndim == 2 and np.issubdtype(array.dtype, np.integer):
                 if array.size <= _PATTERN_MAX_ELEMENTS or path in patterned:
                     array[...] = _pattern(array.shape, array.dtype)
@@ -171,6 +180,13 @@ def test_write_geozarr_realizes_the_plan(source_path: pathlib.Path, tmp_path: pa
     plan, _, output = _written_store(source_path, tmp_path)
     observed = GroupSpecV3.from_stored_metadata_json(read_documents(output)).model_dump(mode="json")
     assert observed == plan.model_dump(mode="json")
+    # the meteorology groups are georeferenced from the coordinate values the
+    # writer read from the source (#353): the seeded 9-point regular grid
+    meteorology = observed["members"]["conditions"]["members"]["meteorology"]["members"]
+    for group in ("cams", "ecmwf"):
+        attributes = meteorology[group]["attributes"]
+        assert attributes["proj:code"] == "EPSG:4326"
+        assert attributes["spatial:transform"] == [0.25, 0.0, 8.0, 0.0, -0.25, 48.0]
     # the geometry grid is georeferenced at its nodes from the x/y values the writer
     # read from the source (EOPF-Explorer/data-model#346): the seeded pixel centres
     geometry = observed["members"]["conditions"]["members"]["geometry"]["attributes"]
@@ -187,8 +203,8 @@ def test_write_geozarr_data_semantics(tmp_path: pathlib.Path) -> None:
     values: native arrays are copied, injected bands are the masked block
     mean of the finest input level holding them, generated levels chain from
     the previous level (mean for bands and probabilities, window-centre pixel
-    for the classification), coordinates take window means, and grid-mapping
-    arrays hold zero. The mean skips only the nodata the input declares: the
+    for the classification), coordinates take window means, and no
+    grid-mapping array is written. The mean skips only the nodata the input declares: the
     bands declare 0, the probabilities and atmosphere arrays declare none, so
     their zeros (a valid probability) count.
     """
@@ -236,8 +252,8 @@ def test_write_geozarr_data_semantics(tmp_path: pathlib.Path) -> None:
         x_generated, x_native[: x_generated.shape[0] * 2].reshape(-1, 2).mean(axis=1)
     )
 
-    # grid-mapping arrays hold zero
-    assert read(output, "measurements/reflectance/r120m/spatial_ref") == 0
+    # no CF grid-mapping array is written: proj:code is the CRS (#352)
+    assert "spatial_ref" not in output["measurements/reflectance/r120m"]
 
 
 @pytest.mark.parametrize("factor", [2, 3])
@@ -371,6 +387,41 @@ def test_write_geozarr_from_a_datatree_matches_the_store_write(
         tree_output = tmp_path / f"from_tree_{mask_and_scale}.zarr"
         write_geozarr(load_sentinel2(tree), tree, str(tree_output))
         assert _store_contents(tree_output) == reference, f"{mask_and_scale=}"
+
+
+class _LabelSource:
+    """A `SourceReader` holding one bytes label array, as native products do."""
+
+    def __init__(self, values: np.ndarray) -> None:
+        self._values = values
+
+    def values(self, path: str) -> np.ndarray | None:
+        return self._values if path == "conditions/geometry/band" else None
+
+    def nodata(self, path: str) -> int | None:
+        return None
+
+    def is_group(self, path: str) -> bool:
+        return False
+
+    def group_names(self, path: str) -> tuple[str, ...]:
+        return ()
+
+
+def test_fill_decodes_bytes_labels_into_a_string_array() -> None:
+    """
+    A bytes (`S`) label array, which the plan stores as the `string` data type
+    (#356), is written decoded as ASCII: it reads back as the label strings.
+    """
+    output = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    output.require_group("conditions/geometry").create_array(
+        "band", shape=(3,), dtype=np.dtypes.StringDType(), fill_value=""
+    )
+    labels = np.array([b"b02", b"b03", b"b8a"], dtype="S3")
+    _fill_carried_array(_LabelSource(labels), output, "conditions/geometry/band")
+    band = output["conditions/geometry/band"]
+    assert isinstance(band, zarr.Array)
+    assert np.asarray(band[:]).tolist() == ["b02", "b03", "b8a"]
 
 
 @pytest.mark.parametrize(
