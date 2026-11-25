@@ -39,7 +39,8 @@ SCL_LABELS = [
 
 SCL_ATTRS = {
     "flag_values": SCL_VALUES,
-    "flag_meanings": SCL_LABELS,
+    # CF: one string of blank-separated words, not a list (#351)
+    "flag_meanings": " ".join(SCL_LABELS),
 }
 SCL_NODATA = SCL_VALUES[SCL_LABELS.index("NO_DATA")]
 

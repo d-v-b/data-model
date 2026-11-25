@@ -20,14 +20,13 @@ Store hierarchy::
     │   │   ├── border_mask/   # (time, Y, X) uint8
     │   │   ├── time/          # (time,) int64 datetime
     │   │   ├── x/, y/         # (X,) / (Y,) float64
-    │   │   ├── spatial_ref/   # CF grid mapping (scalar)
     │   │   ├── absolute_orbit/
     │   │   ├── relative_orbit/
     │   │   └── platform/
     │   ├── r20m/ … r720m/     # overview levels: vv, vh, border_mask +
-    │   │                      #   time, x, y, spatial_ref (no orbit metadata)
+    │   │                      #   time, x, y (no orbit metadata)
     │   └── conditions/
-    │       ├── x/, y/, spatial_ref/
+    │       ├── x/, y/
     │       └── gamma_area_{orbit}/  # (Y, X) float32; also lia_*/incidence_angle_*
     └── descending/
         └── (same structure)
@@ -148,8 +147,10 @@ class S1RtcConditionsAttrs(BaseModel):
 class S1RtcNativeResolutionMembers(TypedDict, closed=True, total=False):
     """Members for the native resolution dataset (r10m).
 
-    Data variables (time, Y, X), the 1-D coordinates (`time`, `y`, `x`), the per-acquisition
-    metadata arrays (time,) and the CF `spatial_ref` grid-mapping scalar.
+    Data variables (time, Y, X), the 1-D coordinates (`time`, `y`, `x`) and the per-acquisition
+    metadata arrays (time,). The CRS is the group's `proj:code`; a CF `spatial_ref`
+    grid-mapping scalar is no longer written (#352) but is accepted, so stores ingested before
+    are still read.
 
     Every key is optional *in the type* so the members mapping can be built up incrementally;
     presence of the coordinate arrays is enforced separately by `validate_coordinate_arrays`.
@@ -173,8 +174,8 @@ class S1RtcNativeResolutionMembers(TypedDict, closed=True, total=False):
 class S1RtcOverviewResolutionMembers(TypedDict, closed=True, total=False):
     """Members for overview resolution datasets (r20m … r720m).
 
-    Data variables plus the same coordinate set as the native level: `x`/`y` (georeferencing),
-    `spatial_ref` (CF grid mapping) and `time`. `time` is replicated at every level with
+    Data variables plus the same coordinate set as the native level: `x`/`y` (georeferencing)
+    and `time` (a legacy CF `spatial_ref` is accepted, as on the native level). `time` is replicated at every level with
     identical values — TiTiler renders previews off a coarse level, and a level without `time`
     cannot be selected by datetime (data-model #192) — so an overview is *not* a data-only group.
 
@@ -202,14 +203,15 @@ class S1RtcOverviewResolutionMembers(TypedDict, closed=True, total=False):
 # That is exactly the regression class this model exists to catch: `time` was missing from the
 # overview levels until data-model #192, which made datetime `.sel` fail on the coarse levels
 # TiTiler renders previews from. `x`/`y` absent means the level has no georeferencing at all
-# (rioxarray falls back to an identity transform), and `spatial_ref` absent means its CRS cannot
-# be resolved. Hence the explicit presence check below rather than `Required[...]`.
-LEVEL_COORDINATE_ARRAYS = ("time", "x", "y", "spatial_ref")
+# (rioxarray falls back to an identity transform). Hence the explicit presence check below rather
+# than `Required[...]`. The CRS is the group's `proj:code`: the CF `spatial_ref` grid mapping is
+# no longer written or required (#352), only accepted in stores ingested before.
+LEVEL_COORDINATE_ARRAYS = ("time", "x", "y")
 
 # The conditions group holds time-invariant rasters, so it carries no `time` — but it does need
 # the spatial coordinates. Without them the group opens with "dimensions without coordinates" and
 # rioxarray infers an identity transform: the georeferencing is absent, not merely undeclared.
-CONDITION_COORDINATE_ARRAYS = ("x", "y", "spatial_ref")
+CONDITION_COORDINATE_ARRAYS = ("x", "y")
 
 
 def _validate_coordinates(members: Mapping[str, Any], kind: str, required: tuple[str, ...]) -> None:
@@ -235,7 +237,7 @@ class S1RtcNativeResolutionDataset(GroupSpec[S1RtcResolutionAttrs, S1RtcNativeRe
 
     @model_validator(mode="after")
     def validate_coordinate_arrays(self) -> Self:
-        """Ensure time, x, y and spatial_ref are present (see LEVEL_COORDINATE_ARRAYS)."""
+        """Ensure time, x and y are present (see LEVEL_COORDINATE_ARRAYS)."""
         _validate_coordinates(self.members, "Native resolution dataset", LEVEL_COORDINATE_ARRAYS)
         return self
 
@@ -270,7 +272,7 @@ class S1RtcOverviewResolutionDataset(
 
     @model_validator(mode="after")
     def validate_coordinate_arrays(self) -> Self:
-        """Ensure time, x, y and spatial_ref are present (see LEVEL_COORDINATE_ARRAYS)."""
+        """Ensure time, x and y are present (see LEVEL_COORDINATE_ARRAYS)."""
         _validate_coordinates(self.members, "Overview resolution dataset", LEVEL_COORDINATE_ARRAYS)
         return self
 
@@ -292,7 +294,7 @@ class S1RtcConditionsGroup(GroupSpec[S1RtcConditionsAttrs, dict[str, ArraySpec[A
     # coordinates precisely so it exercises the other check.
     @model_validator(mode="after")
     def validate_coordinate_arrays(self) -> Self:
-        """Ensure x, y and spatial_ref are present (see CONDITION_COORDINATE_ARRAYS).
+        """Ensure x and y are present (see CONDITION_COORDINATE_ARRAYS).
 
         Same reasoning as the resolution levels: without 1-D coordinates the group opens with
         "dimensions without coordinates" and its rasters are not georeferenced at all. The writer
@@ -382,11 +384,11 @@ class S1RtcRoot(GroupSpec[DatasetAttrs, S1RtcRootMembers]):
         │   │   ├── vh/            # (time, Y, X) float32
         │   │   ├── border_mask/   # (time, Y, X) uint8
         │   │   ├── time/          # (time,) int64
-        │   │   ├── x/, y/, spatial_ref/
+        │   │   ├── x/, y/
         │   │   ├── absolute_orbit/
         │   │   ├── relative_orbit/
         │   │   └── platform/
-        │   ├── r20m/ … r720m/     # + time, x, y, spatial_ref at every level
+        │   ├── r20m/ … r720m/     # + time, x, y at every level
         │   └── conditions/
         │       └── gamma_area_{orbit}/
         └── descending/

@@ -226,18 +226,18 @@ def test_convert_olci_regridded_output_opens_as_datatree(tmp_path: object) -> No
     assert set(r0.sizes) == {"y", "x"}
     for i in range(1, 22):
         assert f"oa{i:02d}_radiance" in r0
-    # CRS declared at every level, 1-D regular coordinates
+    # CRS declared at every level with the proj convention (the only
+    # georeferencing, #352), 1-D regular coordinates
     for level in ("r0", "r2", "r4"):
         ds = opened[f"/measurements/{level}"].to_dataset()
-        assert ds.rio.crs is not None, f"{level}: no CRS"
-        assert ds.rio.crs.to_epsg() == 4326
+        assert ds.attrs.get("proj:code") == "EPSG:4326", f"{level}: no CRS"
         for dim in ("y", "x"):
             coord = ds[dim]
             assert coord.ndim == 1
             steps = np.diff(coord.values)
             assert np.allclose(steps, steps[0])
-        band = ds["oa01_radiance"]
-        assert band.attrs["grid_mapping"] == "spatial_ref"
+        assert "spatial_ref" not in ds.variables
+        assert "grid_mapping" not in ds["oa01_radiance"].attrs
     # halving structure relative to observed r0
     r2 = opened["/measurements/r2"].to_dataset()
     assert r2.sizes["y"] == r0.sizes["y"] // 2
